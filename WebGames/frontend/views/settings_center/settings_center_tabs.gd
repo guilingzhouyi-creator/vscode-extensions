@@ -36,13 +36,13 @@ func init_audio_tab() -> void:
 	var sound_effect_label: Label = _view.get_node_or_null("MainLayout/TabContainer/音频设置/SERow/Label")
 	if sound_effect_label != null:
 		UIIntermediary.resolve(sound_effect_label, "ui.fe15.audio.se")
-	if _view._check_mute_master != null:
-		UIIntermediary.resolve(_view._check_mute_master, "ui.fe15.audio.mute")
-		UIIntermediary.resolve(_view._check_mute_background_music, "ui.fe15.audio.mute")
-		UIIntermediary.resolve(_view._check_mute_sound_effect, "ui.fe15.audio.mute")
-		_view._slider_master.value = _view.volume_master
-		_view._slider_background_music.value = _view.volume_bgm
-		_view._slider_sound_effect.value = _view.volume_se
+	if _view.check_mute_master != null:
+		UIIntermediary.resolve(_view.check_mute_master, "ui.fe15.audio.mute")
+		UIIntermediary.resolve(_view.check_mute_background_music, "ui.fe15.audio.mute")
+		UIIntermediary.resolve(_view.check_mute_sound_effect, "ui.fe15.audio.mute")
+		_view.slider_master.value = _view.volume_master
+		_view.slider_background_music.value = _view.volume_bgm
+		_view.slider_sound_effect.value = _view.volume_se
 	refresh_volume_labels()
 
 ## 初始化画质 Tab：文案 + 分辨率/画质档位选项回填 + 全屏/垂直同步 + 回滚弹窗隐藏
@@ -58,30 +58,30 @@ func init_graphics_tab() -> void:
 	var quality_label: Label = _view.get_node_or_null("MainLayout/TabContainer/画质设置/QualityRow/Label")
 	if quality_label != null:
 		UIIntermediary.resolve(quality_label, "ui.fe15.graphics.quality")
-	if _view._check_fullscreen != null:
-		UIIntermediary.resolve(_view._check_fullscreen, "ui.fe15.graphics.fullscreen")
-		UIIntermediary.resolve(_view._check_vsync, "ui.fe15.graphics.vsync")
-		UIIntermediary.resolve(_view._apply_graphics_button, "ui.fe15.graphics.apply")
-		UIIntermediary.resolve(_view._confirm_resolution_button, "ui.fe15.graphics.confirm_resolution")
-		UIIntermediary.resolve(_view._revert_resolution_button, "ui.fe15.graphics.revert_resolution")
+	if _view.check_fullscreen != null:
+		UIIntermediary.resolve(_view.check_fullscreen, "ui.fe15.graphics.fullscreen")
+		UIIntermediary.resolve(_view.check_vsync, "ui.fe15.graphics.vsync")
+		UIIntermediary.resolve(_view.apply_graphics_button, "ui.fe15.graphics.apply")
+		UIIntermediary.resolve(_view.confirm_resolution_button, "ui.fe15.graphics.confirm_resolution")
+		UIIntermediary.resolve(_view.revert_resolution_button, "ui.fe15.graphics.revert_resolution")
 
-		_view._option_resolution.clear()
+		_view.option_resolution.clear()
 		var resolutions := ["1280x720", "1920x1080", "2560x1440", "3840x2160"]
 		for resolution_index in range(resolutions.size()):
-			_view._option_resolution.add_item(resolutions[resolution_index])
+			_view.option_resolution.add_item(resolutions[resolution_index])
 			if resolutions[resolution_index] == _view.selected_resolution:
-				_view._option_resolution.select(resolution_index)
+				_view.option_resolution.select(resolution_index)
 
-		_view._option_quality.clear()
+		_view.option_quality.clear()
 		var quality_keys := ["low", "medium", "high", "ultra"]
 		for quality_index in range(quality_keys.size()):
-			_view._option_quality.add_item(UIIntermediary.text("ui.fe15.graphics.quality_" + quality_keys[quality_index]))
+			_view.option_quality.add_item(UIIntermediary.text("ui.fe15.graphics.quality_" + quality_keys[quality_index]))
 			if quality_keys[quality_index] == _view.selected_quality:
-				_view._option_quality.select(quality_index)
+				_view.option_quality.select(quality_index)
 
-		_view._check_fullscreen.button_pressed = _view.is_fullscreen
-		_view._check_vsync.button_pressed = _view.is_vsync
-		_view._panel_revert_popup.visible = false
+		_view.check_fullscreen.button_pressed = _view.is_fullscreen
+		_view.check_vsync.button_pressed = _view.is_vsync
+		_view.panel_revert_popup.visible = false
 
 ## 初始化按键 Tab：8 行按键标签 + 鼠标左键 + 重置按钮/手柄提示（i18n）
 func init_keys_tab() -> void:
@@ -108,9 +108,9 @@ func init_keys_tab() -> void:
 	var mouse_left_button: Button = _view.get_node_or_null(key_base + "/KeyRow5/KeyBtn")
 	if mouse_left_button != null:
 		UIIntermediary.resolve(mouse_left_button, "ui.fe15.keys.mouse_left")
-	if _view._reset_keys_button != null:
-		UIIntermediary.resolve(_view._reset_keys_button, "ui.fe15.keys.reset")
-		UIIntermediary.resolve(_view._label_gamepad_hint, "ui.fe15.keys.gamepad_hint")
+	if _view.reset_keys_button != null:
+		UIIntermediary.resolve(_view.reset_keys_button, "ui.fe15.keys.reset")
+		UIIntermediary.resolve(_view.label_gamepad_hint, "ui.fe15.keys.gamepad_hint")
 
 ## 初始化语言 Tab：文案 + 四语言选项回填选中 locale
 func init_language_tab() -> void:
@@ -122,19 +122,17 @@ func init_language_tab() -> void:
 	var language_label: Label = _view.get_node_or_null("MainLayout/TabContainer/语言设置/LanguageRow/Label")
 	if language_label != null:
 		UIIntermediary.resolve(language_label, "ui.fe15.language.label")
-	if _view._apply_language_button != null:
-		UIIntermediary.resolve(_view._apply_language_button, "ui.fe15.language.apply")
-		_view._option_language.clear()
+	if _view.apply_language_button != null:
+		UIIntermediary.resolve(_view.apply_language_button, "ui.fe15.language.apply")
+		_view.option_language.clear()
 		var language_entries := [
 			{"code": "zh_CN", "name_key": "ui.fe15.language.zh_CN"},
-			{"code": "zh_TW", "name_key": "ui.fe15.language.zh_TW"},
 			{"code": "en_US", "name_key": "ui.fe15.language.en_US"},
-			{"code": "ja_JP", "name_key": "ui.fe15.language.ja_JP"},
 		]
 		for language_index in range(language_entries.size()):
-			_view._option_language.add_item(UIIntermediary.text(language_entries[language_index]["name_key"]))
+			_view.option_language.add_item(UIIntermediary.text(language_entries[language_index]["name_key"]))
 			if language_entries[language_index]["code"] == _view.selected_locale:
-				_view._option_language.select(language_index)
+				_view.option_language.select(language_index)
 
 ## 初始化功能开关 Tab：文案 + 六开关回填默认值
 func init_toggles_tab() -> void:
@@ -143,32 +141,39 @@ func init_toggles_tab() -> void:
 	var section_label: Label = _view.get_node_or_null("MainLayout/TabContainer/功能开关/SectionLabel")
 	if section_label != null:
 		UIIntermediary.resolve(section_label, "ui.fe15.toggles.section")
-	if _view._check_combat_numbers != null:
-		UIIntermediary.resolve(_view._check_combat_numbers, "ui.fe15.toggles.combat_numbers")
-		UIIntermediary.resolve(_view._check_floating_text, "ui.fe15.toggles.floating_text")
-		UIIntermediary.resolve(_view._check_vibration, "ui.fe15.toggles.vibration")
-		UIIntermediary.resolve(_view._check_auto_save, "ui.fe15.toggles.auto_save")
-		UIIntermediary.resolve(_view._check_bloom, "ui.fe15.toggles.bloom")
-		UIIntermediary.resolve(_view._check_motion_blur, "ui.fe15.toggles.motion_blur")
+	if _view.check_combat_numbers != null:
+		UIIntermediary.resolve(_view.check_combat_numbers, "ui.fe15.toggles.combat_numbers")
+		UIIntermediary.resolve(_view.check_floating_text, "ui.fe15.toggles.floating_text")
+		UIIntermediary.resolve(_view.check_vibration, "ui.fe15.toggles.vibration")
+		UIIntermediary.resolve(_view.check_auto_save, "ui.fe15.toggles.auto_save")
+		UIIntermediary.resolve(_view.check_bloom, "ui.fe15.toggles.bloom")
+		UIIntermediary.resolve(_view.check_motion_blur, "ui.fe15.toggles.motion_blur")
 
-		_view._check_combat_numbers.button_pressed = _view.toggle_combat_numbers
-		_view._check_floating_text.button_pressed = _view.toggle_floating_text
-		_view._check_vibration.button_pressed = _view.toggle_vibration
-		_view._check_auto_save.button_pressed = _view.toggle_auto_save
-		_view._check_bloom.button_pressed = _view.toggle_bloom
-		_view._check_motion_blur.button_pressed = _view.toggle_motion_blur
+		_view.check_combat_numbers.button_pressed = _view.toggle_combat_numbers
+		_view.check_floating_text.button_pressed = _view.toggle_floating_text
+		_view.check_vibration.button_pressed = _view.toggle_vibration
+		_view.check_auto_save.button_pressed = _view.toggle_auto_save
+		_view.check_bloom.button_pressed = _view.toggle_bloom
+		_view.check_motion_blur.button_pressed = _view.toggle_motion_blur
 
-## 初始化关于 Tab：版本/引擎/版权文案（引擎版本动态读取）
+## 初始化关于 Tab：版本握手读取/引擎/版权文案
 func init_about_tab() -> void:
 	if _view == null:
 		return
 	var section_label: Label = _view.get_node_or_null("MainLayout/TabContainer/关于/SectionLabel")
 	if section_label != null:
 		UIIntermediary.resolve(section_label, "ui.fe15.about.section")
-	if _view._label_version != null:
-		UIIntermediary.resolve(_view._label_version, "ui.fe15.about.version")
-		UIIntermediary.resolve(_view._label_engine, "ui.fe15.about.engine", {"version": Engine.get_version_info()["string"]})
-		UIIntermediary.resolve(_view._label_copyright, "ui.fe15.about.copyright")
+	if _view.label_version != null:
+		UIIntermediary.resolve(_view.label_version, "ui.fe15.about.version")
+		UIIntermediary.resolve(_view.label_engine, "ui.fe15.about.engine", {"version": Engine.get_version_info()["string"]})
+		UIIntermediary.resolve(_view.label_copyright, "ui.fe15.about.copyright")
+		ServiceLocator.get_instance().version().check_version_async(func(version_reply: Dictionary) -> void:
+			if _view == null or not is_instance_valid(_view) or _view.label_version == null:
+				return
+			var version_text := str(version_reply.get("version", version_reply.get("client_version", "")))
+			if not version_text.is_empty():
+				_view.label_version.text = "%s (%s)" % [UIIntermediary.text("ui.fe15.about.version"), version_text]
+		)
 
 # ==============================================================================
 # 交互信号处理
@@ -176,16 +181,24 @@ func init_about_tab() -> void:
 
 ## 刷新三路音量百分比显示标签
 func refresh_volume_labels() -> void:
-	if _view == null or _view._label_master_value == null:
+	if _view == null or _view.label_master_value == null:
 		return
-	UIIntermediary.resolve(_view._label_master_value, "ui.fe15.audio.volume_value", {"percent": int(_view.volume_master * 100)})
-	UIIntermediary.resolve(_view._label_background_music_value, "ui.fe15.audio.volume_value", {"percent": int(_view.volume_bgm * 100)})
-	UIIntermediary.resolve(_view._label_sound_effect_value, "ui.fe15.audio.volume_value", {"percent": int(_view.volume_se * 100)})
+	UIIntermediary.resolve(_view.label_master_value, "ui.fe15.audio.volume_value", {"percent": int(_view.volume_master * 100)})
+	UIIntermediary.resolve(_view.label_background_music_value, "ui.fe15.audio.volume_value", {"percent": int(_view.volume_bgm * 100)})
+	UIIntermediary.resolve(_view.label_sound_effect_value, "ui.fe15.audio.volume_value", {"percent": int(_view.volume_se * 100)})
 
-## 处理主音量滑块变化并刷新显示标签
+func _apply_audio_bus_volume(linear_value: float) -> void:
+	if AudioServer.get_bus_count() > 0:
+		AudioServer.set_bus_volume_db(0, linear_to_db(clampf(linear_value, 0.001, 1.0)))
+
+## 处理主音量滑块变化、同步音频总线并刷新显示标签
 func on_master_volume_changed(volume_value: float) -> void:
 	if _view != null:
 		_view.volume_master = volume_value
+		_apply_audio_bus_volume(volume_value)
+		ServiceLocator.get_instance().game_settings().apply_settings_async("", "", {"volume_master": volume_value}, func(_reply: Dictionary) -> void:
+			pass
+		)
 		refresh_volume_labels()
 
 ## 处理背景音乐音量滑块变化并刷新显示标签
@@ -204,27 +217,27 @@ func on_se_volume_changed(volume_value: float) -> void:
 func on_mute_master_toggled(is_muted: bool) -> void:
 	if _view != null:
 		_view.mute_master = is_muted
-		if _view._slider_master != null:
-			_view._slider_master.editable = not is_muted
+		if _view.slider_master != null:
+			_view.slider_master.editable = not is_muted
 
 ## 切换背景音乐静音状态并锁定对应滑块
 func on_mute_bgm_toggled(is_muted: bool) -> void:
 	if _view != null:
 		_view.mute_bgm = is_muted
-		if _view._slider_background_music != null:
-			_view._slider_background_music.editable = not is_muted
+		if _view.slider_background_music != null:
+			_view.slider_background_music.editable = not is_muted
 
 ## 切换音效静音状态并锁定对应滑块
 func on_mute_se_toggled(is_muted: bool) -> void:
 	if _view != null:
 		_view.mute_se = is_muted
-		if _view._slider_sound_effect != null:
-			_view._slider_sound_effect.editable = not is_muted
+		if _view.slider_sound_effect != null:
+			_view.slider_sound_effect.editable = not is_muted
 
 ## 更新当前选中的屏幕分辨率字符串
 func on_resolution_selected(option_index: int) -> void:
-	if _view != null and _view._option_resolution != null:
-		_view.selected_resolution = _view._option_resolution.get_item_text(option_index)
+	if _view != null and _view.option_resolution != null:
+		_view.selected_resolution = _view.option_resolution.get_item_text(option_index)
 
 ## 更新当前选中的画质档位标识
 func on_quality_selected(option_index: int) -> void:
@@ -243,8 +256,17 @@ func on_vsync_toggled(is_enabled: bool) -> void:
 	if _view != null:
 		_view.is_vsync = is_enabled
 
-## 应用画质设置并弹出分辨率回滚确认倒计时
+## 应用画质设置：持久化设置并弹出分辨率回滚确认倒计时
 func on_apply_graphics_pressed() -> void:
+	if _view != null:
+		ServiceLocator.get_instance().game_settings().apply_settings_async("", "", {
+			"resolution": _view.selected_resolution,
+			"quality": _view.selected_quality,
+			"fullscreen": _view.is_fullscreen,
+			"vsync": _view.is_vsync,
+		}, func(_reply: Dictionary) -> void:
+			pass
+		)
 	start_revert_countdown()
 
 ## 启动分辨率变更回滚倒计时并显示确认弹窗
@@ -253,17 +275,17 @@ func start_revert_countdown() -> void:
 		return
 	_view.is_in_resolution_revert_countdown = true
 	_view.revert_seconds_remain = GameConfig.get_float("frontend.views", "fe15_settings_center/revert_timeout_seconds", 15.0)
-	if _view._panel_revert_popup != null:
-		_view._panel_revert_popup.visible = true
+	if _view.panel_revert_popup != null:
+		_view.panel_revert_popup.visible = true
 
-	if _view._revert_timer == null and _view.is_inside_tree():
-		_view._revert_timer = Timer.new()
-		_view._revert_timer.wait_time = 1.0
-		_view._revert_timer.autostart = false
-		connect_managed(_view._revert_timer.timeout, on_revert_tick)
-		_view.add_child(_view._revert_timer)
-	if _view._revert_timer != null:
-		_view._revert_timer.start()
+	if _view.revert_timer == null and _view.is_inside_tree():
+		_view.revert_timer = Timer.new()
+		_view.revert_timer.wait_time = 1.0
+		_view.revert_timer.autostart = false
+		connect_managed(_view.revert_timer.timeout, on_revert_tick)
+		_view.add_child(_view.revert_timer)
+	if _view.revert_timer != null:
+		_view.revert_timer.start()
 	update_revert_label()
 
 ## 每秒递减回滚倒计时，归零时自动恢复默认分辨率
@@ -277,20 +299,23 @@ func on_revert_tick() -> void:
 
 ## 刷新回滚弹窗剩余秒数提示文案
 func update_revert_label() -> void:
-	if _view != null and _view._label_revert_countdown != null:
-		UIIntermediary.resolve(_view._label_revert_countdown, "ui.fe15.graphics.revert_countdown", {"seconds": int(_view.revert_seconds_remain)})
+	if _view != null and _view.label_revert_countdown != null:
+		UIIntermediary.resolve(_view.label_revert_countdown, "ui.fe15.graphics.revert_countdown", {"seconds": int(_view.revert_seconds_remain)})
 
 func _dismiss_revert_popup() -> void:
 	_view.is_in_resolution_revert_countdown = false
-	if _view._panel_revert_popup != null:
-		_view._panel_revert_popup.visible = false
-	if _view._revert_timer != null:
-		_view._revert_timer.stop()
+	if _view.panel_revert_popup != null:
+		_view.panel_revert_popup.visible = false
+	if _view.revert_timer != null:
+		_view.revert_timer.stop()
 
-## 确认保留当前分辨率变更并关闭回滚弹窗
+## 确认保留当前分辨率变更、持久化确认回执并关闭回滚弹窗
 func on_confirm_resolution_pressed() -> void:
 	if _view == null:
 		return
+	ServiceLocator.get_instance().game_settings().confirm_resolution_async("", "", func(_reply: Dictionary) -> void:
+		pass
+	)
 	_dismiss_revert_popup()
 
 ## 回滚分辨率至默认 1920x1080 并关闭确认弹窗
@@ -299,32 +324,35 @@ func on_revert_resolution_pressed() -> void:
 		return
 	_dismiss_revert_popup()
 	_view.selected_resolution = "1920x1080"
-	if _view._option_resolution != null:
-		for option_index in range(_view._option_resolution.item_count):
-			if _view._option_resolution.get_item_text(option_index) == _view.selected_resolution:
-				_view._option_resolution.select(option_index)
+	if _view.option_resolution != null:
+		for option_index in range(_view.option_resolution.item_count):
+			if _view.option_resolution.get_item_text(option_index) == _view.selected_resolution:
+				_view.option_resolution.select(option_index)
 				break
 
-## 重置按键绑定并刷新手柄与键位重置提示
+## 重置按键绑定，调用设置重置服务并刷新手柄与键位重置提示
 func on_reset_keys_pressed() -> void:
-	if _view != null and _view._label_gamepad_hint != null:
-		UIIntermediary.resolve(_view._label_gamepad_hint, "ui.fe15.keys.reset_hint")
+	ServiceLocator.get_instance().game_settings().reset_defaults_async("", "", func(_reply: Dictionary) -> void:
+		pass
+	)
+	if _view != null and _view.label_gamepad_hint != null:
+		UIIntermediary.resolve(_view.label_gamepad_hint, "ui.fe15.keys.reset_hint")
+
+const _SUPPORTED_LOCALES: Array[String] = ["zh_CN", "en_US"]
 
 ## 记录下拉框选中的语言代码
 func on_language_selected(option_index: int) -> void:
 	if _view != null:
-		var language_codes := ["zh_CN", "zh_TW", "en_US", "ja_JP"]
-		if option_index >= 0 and option_index < language_codes.size():
-			_view.selected_locale = language_codes[option_index]
+		if option_index >= 0 and option_index < _SUPPORTED_LOCALES.size():
+			_view.selected_locale = _SUPPORTED_LOCALES[option_index]
 
 ## 应用语言按钮：触发多语言热更换（UIIntermediary.switch_locale）
 func on_apply_language_pressed() -> void:
-	if _view == null or _view._option_language == null:
+	if _view == null or _view.option_language == null:
 		return
-	var selected_index: int = _view._option_language.selected
-	var language_codes := ["zh_CN", "zh_TW", "en_US", "ja_JP"]
-	if selected_index >= 0 and selected_index < language_codes.size():
-		_view.selected_locale = language_codes[selected_index]
+	var selected_index: int = _view.option_language.selected
+	if selected_index >= 0 and selected_index < _SUPPORTED_LOCALES.size():
+		_view.selected_locale = _SUPPORTED_LOCALES[selected_index]
 		# 触发实时多语言就地热更换
 		UIIntermediary.switch_locale(_view.selected_locale)
 
@@ -362,29 +390,29 @@ func on_toggle_motion_blur(is_enabled: bool) -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
-	connect_managed(_view._slider_master.value_changed, on_master_volume_changed)
-	connect_managed(_view._slider_background_music.value_changed, on_bgm_volume_changed)
-	connect_managed(_view._slider_sound_effect.value_changed, on_se_volume_changed)
-	connect_managed(_view._check_mute_master.toggled, on_mute_master_toggled)
-	connect_managed(_view._check_mute_background_music.toggled, on_mute_bgm_toggled)
-	connect_managed(_view._check_mute_sound_effect.toggled, on_mute_se_toggled)
+	connect_managed(_view.slider_master.value_changed, on_master_volume_changed)
+	connect_managed(_view.slider_background_music.value_changed, on_bgm_volume_changed)
+	connect_managed(_view.slider_sound_effect.value_changed, on_se_volume_changed)
+	connect_managed(_view.check_mute_master.toggled, on_mute_master_toggled)
+	connect_managed(_view.check_mute_background_music.toggled, on_mute_bgm_toggled)
+	connect_managed(_view.check_mute_sound_effect.toggled, on_mute_se_toggled)
 
-	connect_managed(_view._option_resolution.item_selected, on_resolution_selected)
-	connect_managed(_view._option_quality.item_selected, on_quality_selected)
-	connect_managed(_view._check_fullscreen.toggled, on_fullscreen_toggled)
-	connect_managed(_view._check_vsync.toggled, on_vsync_toggled)
-	connect_managed(_view._apply_graphics_button.pressed, on_apply_graphics_pressed)
-	connect_managed(_view._confirm_resolution_button.pressed, on_confirm_resolution_pressed)
-	connect_managed(_view._revert_resolution_button.pressed, on_revert_resolution_pressed)
+	connect_managed(_view.option_resolution.item_selected, on_resolution_selected)
+	connect_managed(_view.option_quality.item_selected, on_quality_selected)
+	connect_managed(_view.check_fullscreen.toggled, on_fullscreen_toggled)
+	connect_managed(_view.check_vsync.toggled, on_vsync_toggled)
+	connect_managed(_view.apply_graphics_button.pressed, on_apply_graphics_pressed)
+	connect_managed(_view.confirm_resolution_button.pressed, on_confirm_resolution_pressed)
+	connect_managed(_view.revert_resolution_button.pressed, on_revert_resolution_pressed)
 
-	connect_managed(_view._reset_keys_button.pressed, on_reset_keys_pressed)
+	connect_managed(_view.reset_keys_button.pressed, on_reset_keys_pressed)
 
-	connect_managed(_view._option_language.item_selected, on_language_selected)
-	connect_managed(_view._apply_language_button.pressed, on_apply_language_pressed)
+	connect_managed(_view.option_language.item_selected, on_language_selected)
+	connect_managed(_view.apply_language_button.pressed, on_apply_language_pressed)
 
-	connect_managed(_view._check_combat_numbers.toggled, on_toggle_combat_numbers)
-	connect_managed(_view._check_floating_text.toggled, on_toggle_floating_text)
-	connect_managed(_view._check_vibration.toggled, on_toggle_vibration)
-	connect_managed(_view._check_auto_save.toggled, on_toggle_auto_save)
-	connect_managed(_view._check_bloom.toggled, on_toggle_bloom)
-	connect_managed(_view._check_motion_blur.toggled, on_toggle_motion_blur)
+	connect_managed(_view.check_combat_numbers.toggled, on_toggle_combat_numbers)
+	connect_managed(_view.check_floating_text.toggled, on_toggle_floating_text)
+	connect_managed(_view.check_vibration.toggled, on_toggle_vibration)
+	connect_managed(_view.check_auto_save.toggled, on_toggle_auto_save)
+	connect_managed(_view.check_bloom.toggled, on_toggle_bloom)
+	connect_managed(_view.check_motion_blur.toggled, on_toggle_motion_blur)

@@ -10,7 +10,6 @@
 class_name SettingsCenterView
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const SettingsCenterTabsClass = preload("res://frontend/views/settings_center/settings_center_tabs.gd")
 
 # ------------------------------------------------------------------------------
@@ -47,53 +46,53 @@ var toggle_motion_blur: bool = false
 @onready var _tab_container: TabContainer = %TabContainer
 
 # --- 音频设置 Tab ---
-@onready var _slider_master: HSlider = %SliderMasterVolume
-@onready var _slider_background_music: HSlider = %SliderBGMVolume
-@onready var _slider_sound_effect: HSlider = %SliderSEVolume
-@onready var _label_master_value: Label = %LabelMasterVal
-@onready var _label_background_music_value: Label = %LabelBGMVal
-@onready var _label_sound_effect_value: Label = %LabelSEVal
-@onready var _check_mute_master: CheckBox = %CheckMuteMaster
-@onready var _check_mute_background_music: CheckBox = %CheckMuteBGM
-@onready var _check_mute_sound_effect: CheckBox = %CheckMuteSE
+@onready var slider_master: HSlider = %SliderMasterVolume
+@onready var slider_background_music: HSlider = %SliderBGMVolume
+@onready var slider_sound_effect: HSlider = %SliderSEVolume
+@onready var label_master_value: Label = %LabelMasterVal
+@onready var label_background_music_value: Label = %LabelBGMVal
+@onready var label_sound_effect_value: Label = %LabelSEVal
+@onready var check_mute_master: CheckBox = %CheckMuteMaster
+@onready var check_mute_background_music: CheckBox = %CheckMuteBGM
+@onready var check_mute_sound_effect: CheckBox = %CheckMuteSE
 
 # --- 画质设置 Tab ---
-@onready var _option_resolution: OptionButton = %OptionResolution
-@onready var _option_quality: OptionButton = %OptionQuality
-@onready var _check_fullscreen: CheckBox = %CheckFullscreen
-@onready var _check_vsync: CheckBox = %CheckVSync
-@onready var _apply_graphics_button: Button = %BtnApplyGraphics
-@onready var _panel_revert_popup: PanelContainer = %PanelRevertPopup
-@onready var _label_revert_countdown: Label = %LabelRevertCountdown
-@onready var _confirm_resolution_button: Button = %BtnConfirmResolution
-@onready var _revert_resolution_button: Button = %BtnRevertResolution
+@onready var option_resolution: OptionButton = %OptionResolution
+@onready var option_quality: OptionButton = %OptionQuality
+@onready var check_fullscreen: CheckBox = %CheckFullscreen
+@onready var check_vsync: CheckBox = %CheckVSync
+@onready var apply_graphics_button: Button = %BtnApplyGraphics
+@onready var panel_revert_popup: PanelContainer = %PanelRevertPopup
+@onready var label_revert_countdown: Label = %LabelRevertCountdown
+@onready var confirm_resolution_button: Button = %BtnConfirmResolution
+@onready var revert_resolution_button: Button = %BtnRevertResolution
 
 # --- 按键设置 Tab ---
-@onready var _reset_keys_button: Button = %BtnResetKeys
-@onready var _label_gamepad_hint: Label = %LabelGamepadHint
+@onready var reset_keys_button: Button = %BtnResetKeys
+@onready var label_gamepad_hint: Label = %LabelGamepadHint
 
 # --- 语言设置 Tab ---
-@onready var _option_language: OptionButton = %OptionLanguage
-@onready var _apply_language_button: Button = %BtnApplyLanguage
+@onready var option_language: OptionButton = %OptionLanguage
+@onready var apply_language_button: Button = %BtnApplyLanguage
 
 # --- 功能开关 Tab ---
-@onready var _check_combat_numbers: CheckBox = %CheckCombatNumbers
-@onready var _check_floating_text: CheckBox = %CheckFloatingText
-@onready var _check_vibration: CheckBox = %CheckVibration
-@onready var _check_auto_save: CheckBox = %CheckAutoSave
-@onready var _check_bloom: CheckBox = %CheckBloom
-@onready var _check_motion_blur: CheckBox = %CheckMotionBlur
+@onready var check_combat_numbers: CheckBox = %CheckCombatNumbers
+@onready var check_floating_text: CheckBox = %CheckFloatingText
+@onready var check_vibration: CheckBox = %CheckVibration
+@onready var check_auto_save: CheckBox = %CheckAutoSave
+@onready var check_bloom: CheckBox = %CheckBloom
+@onready var check_motion_blur: CheckBox = %CheckMotionBlur
 
 # --- 关于 Tab ---
-@onready var _label_version: Label = %LabelVersion
-@onready var _label_engine: Label = %LabelEngine
-@onready var _label_copyright: Label = %LabelCopyright
+@onready var label_version: Label = %LabelVersion
+@onready var label_engine: Label = %LabelEngine
+@onready var label_copyright: Label = %LabelCopyright
 
 # --- 全局 ---
 @onready var _back_button: Button = %BtnBack
 
 # 回滚倒计时计时器与子委托控制器
-var _revert_timer: Timer
+var revert_timer: Timer
 var _tabs: Variant = null
 
 # ==============================================================================
@@ -124,13 +123,19 @@ func apply_resolution_with_countdown(resolution: String) -> void:
 ## 确认分辨率变更并终止回滚倒计时
 func confirm_resolution_change() -> void:
 	is_in_resolution_revert_countdown = false
+	ServiceLocator.get_instance().game_settings().confirm_resolution_async("", "", func(_confirm_reply: Dictionary) -> void:
+		pass
+	)
 	if _tabs != null:
 		_tabs.on_confirm_resolution_pressed()
 
-## 切换语言记录并同步触发实时热切换
+## 切换语言记录并同步触发实时热切换与设置持久化
 func switch_locale(locale: String) -> void:
 	selected_locale = locale
 	UIIntermediary.switch_locale(locale)
+	ServiceLocator.get_instance().game_settings().apply_settings_async("", "", {"locale": locale}, func(_apply_reply: Dictionary) -> void:
+		pass
+	)
 
 # ==============================================================================
 # 生命周期
@@ -142,6 +147,11 @@ func _ready() -> void:
 
 	_apply_theme()
 	_init_all_text()
+	ServiceLocator.get_instance().game_settings().get_settings_async("", "", func(settings_reply: Dictionary) -> void:
+		var settings_map: Dictionary = settings_reply.get("settings", settings_reply.get("data", settings_reply)) as Dictionary
+		if bool(settings_reply.get("success", false)) and not settings_map.is_empty():
+			apply_snapshot(settings_map)
+	)
 	_tabs.init_audio_tab()
 	_tabs.init_graphics_tab()
 	_tabs.init_keys_tab()
@@ -175,8 +185,11 @@ func _connect_signals() -> void:
 	if _tab_container != null:
 		connect_managed(_tab_container.tab_changed, _on_tab_changed)
 
-func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe15.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
+func _on_tab_changed(tab_index: int) -> void:
+	if tab_index == 0 and _tabs != null:
+		_tabs.refresh_volume_labels()
+	elif tab_index == 5 and _tabs != null:
+		_tabs.init_about_tab()
 
 func _on_back_pressed() -> void:
 	self.back()
