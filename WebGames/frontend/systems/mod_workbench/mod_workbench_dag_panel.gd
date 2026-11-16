@@ -39,6 +39,7 @@ func _init() -> void:
 
 
 func _exit_tree() -> void:
+	_disconnect_editor_signals()
 	clear_graph()
 
 
@@ -190,6 +191,17 @@ func _build_controls() -> void:
 	_graph_editor.connection_request.connect(_on_connection_request)
 	_graph_editor.disconnection_request.connect(_on_disconnection_request)
 	add_child(_graph_editor)
+
+
+func _disconnect_editor_signals() -> void:
+	if _add_node_button != null and _add_node_button.pressed.is_connected(_on_add_node_pressed):
+		_add_node_button.pressed.disconnect(_on_add_node_pressed)
+	if _relayout_button != null and _relayout_button.pressed.is_connected(_on_relayout_pressed):
+		_relayout_button.pressed.disconnect(_on_relayout_pressed)
+	if _graph_editor != null and _graph_editor.connection_request.is_connected(_on_connection_request):
+		_graph_editor.connection_request.disconnect(_on_connection_request)
+	if _graph_editor != null and _graph_editor.disconnection_request.is_connected(_on_disconnection_request):
+		_graph_editor.disconnection_request.disconnect(_on_disconnection_request)
 
 
 func _on_add_node_pressed() -> void:

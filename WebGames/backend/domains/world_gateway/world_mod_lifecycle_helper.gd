@@ -133,15 +133,18 @@ static func _resolve_pack_directory_for_edit(request_payload: Dictionary, pack_i
 static func _apply_editable_manifest_fields(manifest_payload: Dictionary, request_payload: Dictionary) -> void:
 	var updates: Dictionary = request_payload.get("manifest_updates", request_payload) if request_payload.get("manifest_updates") is Dictionary else request_payload
 	for string_key in ["display_name", "pack_name", "version", "author", "description"]:
-		if not updates.has(string_key):
-			continue
-		var text_value := str(updates.get(string_key, "")).strip_edges()
-		if not text_value.is_empty():
-			manifest_payload[string_key] = text_value
+		if updates.has(string_key):
+			var text_value := str(updates.get(string_key, "")).strip_edges()
+			if not text_value.is_empty():
+				manifest_payload[string_key] = text_value
 	if updates.has("display_name") and not updates.has("pack_name"):
 		manifest_payload["pack_name"] = manifest_payload.get("display_name", manifest_payload.get("pack_id", ""))
 	if updates.has("priority"):
 		manifest_payload["priority"] = int(updates.get("priority", manifest_payload.get("priority", 100)))
+	_apply_manifest_flags_and_collections(manifest_payload, updates)
+
+
+static func _apply_manifest_flags_and_collections(manifest_payload: Dictionary, updates: Dictionary) -> void:
 	if updates.has("is_active"):
 		manifest_payload["is_active"] = bool(updates.get("is_active", true))
 	if updates.has("has_prologue_dag"):
@@ -150,10 +153,13 @@ static func _apply_editable_manifest_fields(manifest_payload: Dictionary, reques
 		var normalized_profile := str(updates.get("pack_profile", "CONTENT_ADDON")).strip_edges().to_upper()
 		if normalized_profile in ["CONTENT_ADDON", "TOTAL_CONVERSION", "SYSTEM_EXTENSION", "OFFICIAL_BASE"]:
 			manifest_payload["pack_profile"] = normalized_profile
-	if updates.has("dependencies") and updates.get("dependencies") is Array:
-		manifest_payload["dependencies"] = (updates.get("dependencies") as Array).duplicate()
-	if updates.has("incompatible_packs") and updates.get("incompatible_packs") is Array:
-		manifest_payload["incompatible_packs"] = (updates.get("incompatible_packs") as Array).duplicate()
+	_copy_optional_array(manifest_payload, updates, "dependencies")
+	_copy_optional_array(manifest_payload, updates, "incompatible_packs")
+
+
+static func _copy_optional_array(manifest_payload: Dictionary, updates: Dictionary, array_key: String) -> void:
+	if updates.has(array_key) and updates.get(array_key) is Array:
+		manifest_payload[array_key] = (updates.get(array_key) as Array).duplicate()
 
 
 static func _maybe_write_updated_dag_graph(pack_directory: String, manifest_payload: Dictionary, request_payload: Dictionary) -> Dictionary:
