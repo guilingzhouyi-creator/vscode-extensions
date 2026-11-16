@@ -293,7 +293,7 @@ func _load_mock_snapshot() -> void:
 			"LEGS": null, "FEET": null, "NECK": null, "RING_L": null, "RING_R": null
 		}
 	if _tabs != null and is_mock_mode:
-		_tabs._load_mock_supplements()
+		_tabs._get_inventory_panel().load_mock_supplements()
 
 # ==============================================================================
 # Tab 委托转发
@@ -337,27 +337,27 @@ func _refresh_skill_tree_tab() -> void:
 
 func _init_equipment_tab() -> void:
 	if _tabs != null:
-		_tabs._init_equipment_tab()
+		_tabs._get_inventory_panel().init_equipment_tab()
 
 func _refresh_equipment_detail(slot_index: int) -> void:
 	if _tabs != null:
-		_tabs._refresh_equipment_detail(slot_index)
+		_tabs._get_inventory_panel().refresh_equipment_detail(slot_index)
 
 func _refresh_equipment_affix() -> void:
 	if _tabs != null:
-		_tabs._refresh_equipment_affix()
+		_tabs._get_inventory_panel().refresh_equipment_affix()
 
 func _init_inventory_tab() -> void:
 	if _tabs != null:
-		_tabs._init_inventory_tab()
+		_tabs._get_inventory_panel().init_inventory_tab()
 
 func _refresh_inventory_grid() -> void:
 	if _tabs != null:
-		_tabs._refresh_inventory_grid()
+		_tabs._get_inventory_panel().refresh_inventory_grid()
 
 func _refresh_inventory_status() -> void:
 	if _tabs != null:
-		_tabs._refresh_inventory_status()
+		_tabs._get_inventory_panel().refresh_inventory_status()
 
 func _init_titles_tab() -> void:
 	if _tabs != null:
