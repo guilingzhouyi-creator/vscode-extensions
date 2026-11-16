@@ -611,7 +611,7 @@ def _check_cap_protocol(
                 file_path=rel_path,
                 line=1,
                 severity=SEVERITY_ERROR,
-                message=f"human_preemption_lease_ms 未对齐单一真源 3000ms: {proto.get('human_preemption_lease_ms')}",
+                message=f"human_preemption_lease_ms 与单一真源 3000ms 不一致: {proto.get('human_preemption_lease_ms')}",
             )
         )
 

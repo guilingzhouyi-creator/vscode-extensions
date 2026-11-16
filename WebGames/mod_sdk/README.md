@@ -36,7 +36,7 @@ graph TD
 ### 3. Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)
 - **定位**：对底层游戏世界观、地理空间阻抗、物品道具库、动作战技与战斗动力学常数进行深度重塑。
 - **物理组成**：Tier 1 & Tier 2 完整架构 + `content/` 模块化目录（包含 `world/`, `items/`, `skills/`, `entities/`, `rules/`）。
-- **核心特性**：声明式差分覆写语义（`MERGE` 追加合并、`REPLACE_ENTRY` 条目替换、`TOTAL_PURGE` 全局覆写），由引擎生命周期底座统一解析调度。
+- **核心特性**：声明式差分覆写语义（`MERGE` 追加合并、`REPLACE_ENTRY` 条目替换、`TOTAL_PURGE` 全局覆写），由引擎运行时加载器统一解析调度。
 
 ---
 
@@ -92,7 +92,7 @@ WebGames/mod_sdk/
 
 ## 🛠️ 三、 统一命令行工具指南 (`kalar-mod`)
 
-SDK 提供统一的开发者 CLI 工具门面 `tools/kalar_mod.py`（跨平台兼容 Python 3.10+，亦可作为单文件独立二进制 `kalar-mod` 运行），涵盖模组工程初始化、静态检查、资产烹饪、无头预览、交互推演与打包发布全链路。
+SDK 提供统一的开发者 CLI 工具门面 `tools/kalar_mod.py`（跨平台兼容 Python 3.10+，亦可作为单文件独立二进制 `kalar-mod` 运行），涵盖模组工程初始化、静态检查、资产烹饪、无头预览、交互推演与打包发布全流程。
 
 ```bash
 # 查看 CLI 版本与全局帮助
@@ -200,7 +200,7 @@ python WebGames/mod_sdk/tools/kalar_mod.py pack ./mods/my_prologue --format zip
 # 工作台概览与快捷引导
 python WebGames/mod_sdk/tools/kalar_mod.py workbench
 
-# 运行工作台全链路集成自测试夹具
+# 运行工作台端到端集成自测试夹具
 python WebGames/mod_sdk/tools/kalar_mod.py workbench --self-test
 
 # 校验并验证外部 .kmod 归档包完整性指纹
@@ -229,7 +229,7 @@ python WebGames/mod_sdk/tools/kalar_mod.py bake ./mods/my_overhaul/content --mon
 
 - **统一目录发现**：引擎运行时（`ModPackageDiscoverySolver.get_discovery_roots()`）按优先级扫描 `res://config/narratives/packs/`、`res://mods/`、`res://mods/narratives/`（发布态对应 `<exe>/mods/` 与 `<exe>/mods/narratives/`）以及 `user://mods/`、`user://mods/narratives/`，同时兼容目录形式与 `.kmod` 归档包。
 - **分级支持矩阵**：
-  - **Tier 1 (`pack.json` / `routing_rules.json` / `destinies.json` / `dag_graphs/` / `i18n/`)**：CLI 全项检查，Godot 运行时全链路装载与执行。
+  - **Tier 1 (`pack.json` / `routing_rules.json` / `destinies.json` / `dag_graphs/` / `i18n/`)**：CLI 全项检查，Godot 运行时完整装载与执行。
   - **Tier 2 (`assets/` + `assets/manifest.json`)**：`cook` 校验格式白名单（`.png`, `.webp`, `.ogg`, `.wav`, `.ogv`, `.ttf`, `.otf`, `.gdshader`, `.gltf`, `.glb`）与 SHA-256 指纹，运行时经受控虚拟路径解析加载。
   - **Tier 3 (`content/{items,skills,rules,world}/`)**：Godot 单机网关由 `Tier3ContentOverrideLoader` 在 `GameConfig` 与 `ItemLoaderPipeline` 上实施非破坏性运行时差分覆写（支持 `MERGE` / `REPLACE_ENTRY` / `TOTAL_PURGE`），并在退出或切回原版时原子清除；`content/entities/` 当前为 Schema 与目录规范预留目录，运行时暂未接入载入。
 
@@ -266,7 +266,7 @@ flowchart LR
    - 执行零漂移断言，核验工具链定义与契约声明一致。
 
 ```bash
-# 门禁自检命令：校验真源对齐（0 漂移）
+# 门禁自检命令：校验真源一致性（0 漂移）
 python WebGames/scripts/py/sync_mod_sdk.py --check-only
 
 # 门禁自检命令：执行 SDK 全量资产完整性与结构审计

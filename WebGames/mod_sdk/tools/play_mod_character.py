@@ -4,7 +4,7 @@
 # 文件路径: WebGames/mod_sdk/tools/play_mod_character.py
 # 架构定位: 创角六维属性、因果天赋与初始行囊解算器
 # 依赖与触发: 触发方: play_mod / play_mod_interactive | 上游: destinies.json / 默认配置 | 运行时: Python 3.10+
-# 职责说明: 提供确定性六维属性生成 (总和 21)、身世与因果天赋筛选、角色全量面板与水化上下文构建
+# 职责说明: 提供确定性六维属性生成 (总和 21)、身世与因果天赋筛选、角色全量面板与文本插值上下文构建
 # 退出语义与设计依据: 纯计算与数据配置模块，无独立退出码 | 符合《卡拉尔数据契约规范 v1.0》
 # ==============================================================================
 """创角六维属性、因果天赋与初始行囊解算器。"""
@@ -387,7 +387,7 @@ def resolve_character_sheet(
 
 
 def build_character_context(char: dict[str, Any]) -> dict[str, Any]:
-    """根据角色面板构建全量双轨占位符上下文字典。"""
+    """根据角色面板构建大小写兼容的全量占位符上下文字典。"""
     ctx: dict[str, Any] = {
         "player_name": char["player_name"],
         "character_name": char["character_name"],

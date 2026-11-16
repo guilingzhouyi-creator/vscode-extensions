@@ -192,7 +192,7 @@ def verify_kmod_package(kmod_path: Path) -> tuple[bool, dict[str, Any], list[str
 
 
 def handle_kmod_pack_cli(target_dir: Path, out_path: Path | None, as_json: bool, pack_id: str, version: str) -> int:
-    """供 kalar_mod pack 调用的标准 kmod 构建与验证闭环。"""
+    """供 kalar_mod pack 调用的标准 kmod 构建与校验流程。"""
     out_kmod = out_path if out_path else target_dir.parent / f"{pack_id}_v{version}.kmod"
     ok, res_path, errors = build_kmod_package(target_dir, out_kmod)
     if not ok or not res_path:

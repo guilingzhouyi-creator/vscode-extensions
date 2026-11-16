@@ -4,7 +4,7 @@
 # 文件路径: WebGames/mod_sdk/tools/preview_mod.py
 # 架构定位: MOD无头剧情演习推演器 (Headless Mod Narrative Preview & Simulator)
 # 依赖与触发: 触发方: CLI / 外部 Agent | 上游: MOD 目录、DAG 图元与语言包 | 下游: 纯文本剧情演习日志 / 结构化 JSON | 运行时: Python 3.10+
-# 职责说明: 无头遍历 MOD 因果 DAG 叙事分支，支持四级路由、大小写双轨占位符与 inline_text 语法糖
+# 职责说明: 无头遍历 MOD 因果 DAG 叙事分支，支持四级路由、大小写兼容占位符与 inline_text 语法糖
 # 退出语义与设计依据: 退出码: 0=推演成功, 1=模组缺陷/文件错误, 2=参数错误 | 设计依据: 《卡拉尔数据契约规范 v1.0》与第一性原理
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -12,7 +12,7 @@
 #   python mod_sdk/tools/preview_mod.py ./my_mod --simulate
 #   python mod_sdk/tools/preview_mod.py ./my_mod --simulate --race ELF --name "伊兰迪尔" --origin ORIGIN_VALAN_SCOUT --json
 # ==============================================================================
-"""MOD 无头演习器：离线模拟剧情流转、四级路由分支推演与双轨占位符水化日志输出。"""
+"""MOD 无头演习器：离线模拟剧情流转、四级路由分支推演与占位符替换日志输出。"""
 
 from __future__ import annotations
 from pathlib import Path
@@ -329,7 +329,7 @@ def _resolve_node_raw_text(node_data: dict[str, Any], i18n_catalog: dict[str, st
 
 
 def _hydrate_text(template: str, context: dict[str, Any]) -> str:
-    """水化文案中的占位符参数（支持大小写双轨检索）。"""
+    """替换文案模板中的占位符参数（兼容大小写键名）。"""
     def _repl(match: re.Match[str]) -> str:
         key = match.group(1)
         if key in context:
@@ -462,7 +462,7 @@ def _build_simulation_context(
     initial_gold: int,
     trait_summary: str,
 ) -> dict[str, Any]:
-    """生成演习用大小写双轨模拟角色上下文环境。
+    """生成演习用大小写兼容模拟角色上下文环境。
 
     Args:
         race_id: 玩家种族标识符 (如 ELF, HUMAN)。
@@ -473,7 +473,7 @@ def _build_simulation_context(
         trait_summary: 特质组合摘要文本。
 
     Returns:
-        包含全套双轨 (小写+大写) 占位符变量的水化上下文字典。
+        包含全套大小写 (小写+大写) 占位符变量的文本插值上下文字典。
     """
     oid = str(selected_origin.get("origin_id") or "ORIGIN_DEFAULT")
     oname = str(selected_origin.get("name") or oid)
@@ -526,7 +526,7 @@ def simulate_mod(
     origin_id: str | None = None,
     as_json: bool = False,
 ) -> int:
-    """执行 MOD 全链路剧情与分支选项无头演习推演。
+    """执行 MOD 端到端剧情与分支选项无头演习推演。
 
     Args:
         mod_dir: 模组工程根目录。
@@ -675,13 +675,13 @@ def simulate_mod(
                 bgm_info = step.get("bgm_asset") or "无"
                 print(f"      视听绑定: 背景: {bg_info} | BGM: {bgm_info}")
             print(f"      叙事键 : {step['narrative_key']}")
-            print(f"      水化台词: \"{step['hydrated_text']}\"")
+            print(f"      填充台词: \"{step['hydrated_text']}\"")
             if step["mutations_on_complete"]:
                 print(f"      状态变更: {json.dumps(step['mutations_on_complete'], ensure_ascii=False)}")
         print("  🏁 分支终态: 剧情顺利达成 TERMINAL_EXIT。")
 
     print("\n==============================================================================")
-    print("🎉 无头推演演习圆满完成！所有分支均可通畅闭环。")
+    print("🎉 无头推演演习圆满完成！所有分支均可顺利抵达终态。")
     print("==============================================================================")
     return 0
 
@@ -766,7 +766,7 @@ def preview_overview(
         c_kits = _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id")
         print(f"  • 命途扩展   : 身世 {len(c_origins)} 项 / 天赋 {len(c_traits)} 项 / 套件 {len(c_kits)} 套")
     print("------------------------------------------------------------------------------")
-    print("💡 提示: 传入 '--simulate' 参数可启动无头剧情推演与占位符动态水化。")
+    print("💡 提示: 传入 '--simulate' 参数可启动无头剧情推演与占位符动态填充。")
     print("==============================================================================")
     return 0
 
@@ -779,7 +779,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("mod_dir", help="待演习的 MOD 根目录路径")
-    parser.add_argument("--simulate", action="store_true", dest="simulate", help="启动全分支剧情推演与文本占位符水化")
+    parser.add_argument("--simulate", action="store_true", dest="simulate", help="启动全分支剧情推演与文本占位符填充")
     parser.add_argument("--race", default="HUMAN", dest="race_id", help="模拟角色的种族 (默认: HUMAN)")
     parser.add_argument("--name", default="阿尔温", dest="player_name", help="模拟角色的名称 (默认: 阿尔温)")
     parser.add_argument("--origin", default=None, dest="origin_id", help="指定演习选定的创角身世 ID")

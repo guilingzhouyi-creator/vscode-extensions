@@ -236,7 +236,7 @@ def play_mod_suite(
     ctx: PlaySuiteContext | None = None,
     **kwargs: Any,
 ) -> tuple[dict[str, Any], bool]:
-    """执行完整的预检、面板解算、路由装配与批处理推演闭环（100% 向后兼容）。"""
+    """执行完整的预检、面板解算、路由装配与批处理推演流程（保持向后兼容）。"""
     if ctx is None:
         ctx = PlaySuiteContext(**kwargs)
 
@@ -319,7 +319,7 @@ def print_transcript_text(transcript: dict[str, Any]) -> None:
             bg_info = s.get("background_asset") or "无"
             bgm_info = s.get("bgm_asset") or "无"
             print(f"      视听绑定: 背景: {bg_info} | BGM: {bgm_info}")
-        print(f"      水化台词: \"{s.get('hydrated_text')}\"")
+        print(f"      填充台词: \"{s.get('hydrated_text')}\"")
         if s.get("mutations_on_complete"):
             print(f"      状态突变: {json.dumps(s.get('mutations_on_complete'), ensure_ascii=False)}")
     print("------------------------------------------------------------------------------")

@@ -68,7 +68,7 @@
 
 ## 二、 MOD 清单元数据契约 (`pack.json`)
 
-`pack.json` 描述 MOD 的基础身份与依赖拓扑，反序列化严格对齐 `NarrativePackManifestDTO`：
+`pack.json` 描述 MOD 的基础身份与依赖拓扑，反序列化严格映射至 `NarrativePackManifestDTO`：
 
 | 字段名称 | 类型 | 必需 | 默认值 | 约束说明与语义 |
 | :--- | :---: | :---: | :--- | :--- |
@@ -113,7 +113,7 @@ MOD 创作者角色与序章节点路由仅允许绑定下列已启用种族：
 
 ### 3. 合法文本占位符字典 (Available Placeholders)
 
-本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写双轨插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：
+本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写兼容占位符插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：
 
 | 占位符宏 (Placeholder) | 解析源与说明 |
 | :--- | :--- |
@@ -208,7 +208,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
    - 正向天赋 `cost > 0`，负向天赋 `cost < 0`；
    - `paired_presets` 必须将 1 个正向天赋与 1 个负向天赋成对绑定，且正负 `cost` 代数和绝对值必须 `<= 1`（即 `abs(pos_cost + neg_cost) <= 1`）。
 4. **自定义初始行囊契约 (`custom_starter_kits`)**：
-   - 每套行囊（含唯一 `kit_id`）的 `initial_items` 物品总件数必须 `<= 10`，且每项物品的 `canonical_id` 必须非空并对齐 `config/items/core.json`。
+   - 每套行囊（含唯一 `kit_id`）的 `initial_items` 物品总件数必须 `<= 10`，且每项物品的 `canonical_id` 必须非空并登记于 `config/items/core.json`。
 5. **多包非冲突合并规则 (Multi-Pack Merge & Conflict Guard)**：
    - 多个 MOD 同时启用时，各包的 `custom_origins`、`custom_traits`、`paired_presets`、`custom_starter_kits` 按优先级顺序执行列表追加合并；
    - 严禁跨包出现同名 `origin_id` / `trait_id` / `kit_id`（报 `ERR_MOD_DUPLICATE_ID_CONFLICT`），严禁同时启用 `incompatible_packs` 互斥包（报 `ERR_MOD_INCOMPATIBLE_CONFLICT`），严禁在 `ui_capabilities` 中同时声明 `"ALLOW_MANUAL"` 与 `"FORCE_RANDOM"` 相反策略（报 `ERR_MOD_UI_POLICY_CONFLICT`）。
@@ -406,7 +406,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 本 SDK 规格说明与 `capabilities.json` 由引擎门禁脚本进行强校验。运行以下命令可验证契约是否与底层配置保持一致：
 
 ```bash
-# 验证 MOD SDK 契约是否与引擎底层真源 100% 对齐（0 漂移）
+# 验证 MOD SDK 契约是否与引擎底层真源 100% 一致（0 漂移）
 python WebGames/scripts/py/sync_mod_sdk.py --check-only
 
 # 执行全量 SDK 完整性与门禁审计断言

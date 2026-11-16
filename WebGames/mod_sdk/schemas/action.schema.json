@@ -12,7 +12,7 @@
     },
     "session_id": {
       "type": "string",
-      "description": "所属会话 ID（可选，若提供需与当前推演会话严格对齐）"
+      "description": "所属会话 ID（可选，若提供需与当前推演会话严格匹配）"
     },
     "action_type": {
       "type": "string",

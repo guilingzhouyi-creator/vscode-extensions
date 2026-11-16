@@ -130,7 +130,7 @@ def apply_mutations_to_state(
     char_state: dict[str, Any],
     context: dict[str, Any],
 ) -> None:
-    """结算步骤中触发的状态突变并同步更新角色快照与水化上下文。"""
+    """结算步骤中触发的状态突变并同步更新角色快照与文本插值上下文。"""
     for m in mutations:
         if isinstance(m, dict):
             apply_single_mutation(m, char_state, context)

@@ -122,7 +122,7 @@ def main() -> int:
 
     if passed:
         print(
-            "\n✅ [AUDIT SUCCESS] MOD SDK 契约与引擎真源保持 100% 深度对齐，全量资产完整无漂移。"
+            "\n✅ [AUDIT SUCCESS] MOD SDK 契约与引擎真源保持 100% 一致，全量资产完整无漂移。"
         )
         print("  - capabilities.json 结构与必要枚举语义校验通过")
         print(

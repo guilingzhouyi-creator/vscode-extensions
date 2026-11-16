@@ -37,7 +37,7 @@ graph TD
 ### 3. Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)
 - **定位**：重构游戏底层世界观、空间拓扑、物品库、动作卡牌与战斗数值物理公式。
 - **物理结构**：完整架构体系 + `content/` 模块化目录（运行时经 `Tier3ContentOverrideLoader` 加载 `content/{items,skills,rules,world}/*.json` 与根目录对应文件；`content/entities/` 为 Schema 预留扩展目录）。
-- **合并语义**：具备声明式差分覆写模式（`MERGE`, `REPLACE_ENTRY`, `TOTAL_PURGE`），由引擎生命周期底座统一调度。
+- **合并语义**：具备声明式差分覆写模式（`MERGE`, `REPLACE_ENTRY`, `TOTAL_PURGE`），由引擎运行时加载器统一调度。
 
 ---
 
@@ -74,7 +74,7 @@ graph TD
 
 ## 三、 清单元数据契约 (`pack.json`)
 
-`pack.json` 采用标准 JSON 格式，反序列化严格对齐 `NarrativePackManifestDTO`。
+`pack.json` 采用标准 JSON 格式，反序列化严格映射至 `NarrativePackManifestDTO`。
 
 ### 1. 字段定义表
 
@@ -190,7 +190,7 @@ flowchart TD
 ### 拓扑排序规则详述：
 1. **依赖前置**：若 MOD B 依赖 MOD A（`B.dependencies` 包含 `A`），则 A 必须严格在 B 之前完成装配初始化。
 2. **同层优先级**：当多个 MOD 的入度同时归零时，装配器提取各 MOD 的 `priority` 数值进行降序排序（数值越大越优先装配）。
-3. **环路阻断**：若待装配列表未清空但队列 Q 已空，说明依赖关系中存在拓扑死锁闭环，引擎将立即阻断启动并抛出受影响的模组清单。
+3. **环路阻断**：若待装配列表未清空但队列 Q 已空，说明依赖关系中存在拓扑循环依赖，引擎将立即阻断启动并抛出受影响的模组清单。
 
 ---
 
@@ -244,7 +244,7 @@ flowchart TD
 | `ERR_DAG_TERMINAL_COUNT` | 因果 DAG | 缺少 `TERMINAL_EXIT` 终态节点 | 至少添加 1 个退出节点 |
 | `ERR_DAG_DANGLING_EDGE` | 因果 DAG | 有向边连接了未在 `nodes` 声明的节点 | 修正边两端的节点 ID |
 | `ERR_DAG_MISSING_PREREQUISITE`| 因果 DAG | 节点引用的前置前驱节点不存在 | 补充节点或修正依赖列表 |
-| `ERR_DAG_CYCLE` | 因果 DAG | Kahn 算法检测到有向闭环死锁 | 移除形成闭环的边，保持严格有向单向 |
+| `ERR_DAG_CYCLE` | 因果 DAG | Kahn 算法检测到有向循环依赖 | 移除形成循环的边，保持严格有向无环 |
 | `ERR_DAG_ORPHAN_NODE` | 因果 DAG | 存在自入口无法到达的孤儿节点 | 添加来自上游节点的边或移除孤儿节点 |
 | `ERR_DAG_UNREACHABLE_TERMINAL`| 因果 DAG | 存在无法通向终态的死胡同节点 | 添加引向终态节点的出边 |
 | `ERR_DAG_NODE_TEXT_MISSING`| 因果 DAG | 节点既无 `narrative_key` 也无 `inline_text` | 提供文案键或内联文本 |

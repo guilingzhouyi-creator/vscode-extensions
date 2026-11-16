@@ -583,7 +583,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # 4. preview
     p_prev = subparsers.add_parser("preview", help="无头演习推演 MOD 剧情流转与四级路由分支")
     p_prev.add_argument("mod_dir", nargs="?", default=".", help="待演习的 MOD 根目录路径 (默认: 当前目录)")
-    p_prev.add_argument("--simulate", action="store_true", dest="simulate", help="启动全分支剧情推演与文本占位符水化")
+    p_prev.add_argument("--simulate", action="store_true", dest="simulate", help="启动全分支剧情推演与文本占位符填充")
     p_prev.add_argument("--race", default="HUMAN", dest="race_id", help="模拟角色的种族 (默认: HUMAN)")
     p_prev.add_argument("--name", default="阿尔温", dest="player_name", help="模拟角色的名称 (默认: 阿尔温)")
     p_prev.add_argument("--origin", default=None, dest="origin_id", help="指定演习选定的创角身世 ID")
@@ -637,7 +637,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_pack.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 打包结果")
 
     # 7. dispatch
-    p_disp = subparsers.add_parser("dispatch", help="离线派发全域统一协议请求并执行双轨信封校验")
+    p_disp = subparsers.add_parser("dispatch", help="离线派发全域统一协议请求并执行请求信封校验")
     p_disp.add_argument("--actor", choices=["HUMAN_UI", "AGENT"], default="HUMAN_UI", help="操作发起方主体类型 (默认: HUMAN_UI)")
     p_disp.add_argument("--domain", default="ESC_MENU", help="目标业务领域名称 (默认: ESC_MENU)")
     p_disp.add_argument("--action", default="ESC_QUERY_READINESS", help="具体指令动作类型 (默认: ESC_QUERY_READINESS)")

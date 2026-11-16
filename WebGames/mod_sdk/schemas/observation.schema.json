@@ -39,11 +39,11 @@
     },
     "raw_text": {
       "type": "string",
-      "description": "未水化插值的原始文案模板"
+      "description": "尚未完成占位符替换的原始文案模板"
     },
     "hydrated_text": {
       "type": "string",
-      "description": "已完成占位符插值水化的人类可读文案"
+      "description": "已完成占位符替换的可读文案"
     },
     "available_choices": {
       "type": "array",

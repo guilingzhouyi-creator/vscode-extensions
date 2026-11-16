@@ -199,7 +199,7 @@ def generate_autogen_spec_section(capabilities: dict[str, Any]) -> str:
             "",
             "### 3. 合法文本占位符字典 (Available Placeholders)",
             "",
-            "本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写双轨插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：",
+            "本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写兼容占位符插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：",
             "",
             "| 占位符宏 (Placeholder) | 解析源与说明 |",
             "| :--- | :--- |",

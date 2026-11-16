@@ -171,7 +171,7 @@ def _check_esc_action_enum_parity(
           line=10,
           severity=SEVERITY_ERROR,
           message=f"ESC 菜单动作枚举与 capabilities.json 不一致: schema={sorted(schema_actions)} vs cap={sorted(cap_actions)}",
-          suggestion="将 esc_menu_action_payload.schema.json action_type.enum 与 capabilities.json 对齐",
+          suggestion="使 esc_menu_action_payload.schema.json 的 action_type.enum 与 capabilities.json 保持一致",
         )
       )
   except (OSError, ValueError) as exc:

@@ -4,7 +4,7 @@
 # 文件路径: WebGames/mod_sdk/tools/play_mod_common.py
 # 架构定位: MOD试玩推演公共基础设施与资产会话装配器
 # 依赖与触发: 触发方: play_mod / play_mod_interactive | 上游: check_mod / play_mod_character | 运行时: Python 3.10+
-# 职责说明: 提供编码保障、JSON读取、文案水化、DAG拓扑解析、四级路由匹配与资产合并会话准备
+# 职责说明: 提供编码保障、JSON读取、文案占位符填充、DAG拓扑解析、四级路由匹配与资产合并会话准备
 # 退出语义与设计依据: 纯计算与数据装配模块，无独立退出码 | 符合《卡拉尔数据契约规范 v1.0》
 # ==============================================================================
 """MOD试玩推演公共基础设施与资产会话装配器。"""
@@ -123,7 +123,7 @@ def extract_rules(routing_rules_data: Any) -> list[dict[str, Any]]:
 
 
 def hydrate(template: str, context: dict[str, Any]) -> str:
-    """双轨水化文案中的占位符。"""
+    """替换文案模板中的大小写占位符。"""
     def _repl(match: re.Match[str]) -> str:
         key = match.group(1)
         if key in context:
@@ -183,7 +183,7 @@ def parse_dag_topology(
 
 
 def score_rule(rule: dict[str, Any], race_u: str, origin_id: str) -> int:
-    """计算路由规则匹配优先级权重 (4: 双匹配, 3: 仅身世, 2: 仅种族, 1: 默认兜底)。"""
+    """计算路由规则匹配优先级权重 (4: 双匹配, 3: 仅身世, 2: 仅种族, 1: 默认回退)。"""
     cond = rule.get("match_condition", rule) if isinstance(rule.get("match_condition"), dict) else rule
     r = str(cond.get("race_id") or "").upper()
     o = str(cond.get("origin_id") or "")

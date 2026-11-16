@@ -5,7 +5,7 @@
 # 架构定位: 开发者集成单一应用台与 .kmod 打包引擎 (Developer Workbench & Bundler)
 # 依赖与触发: 触发方: CLI / kalar_mod.py / 外部 Agent | 上游: check_mod.py, play_mod.py, schemas/ | 运行时: Python 3.10+
 # 职责说明: 提供一站式脚手架初始化、离线静态检查、.kmod 标准包构建与 Agent 自动化推演
-# 退出语义与设计依据: 退出码: 0=成功, 1=校验或打包失败, 2=参数异常 | 设计依据: Phase 124 开发者集成工作台规范
+# 退出语义与设计依据: 退出码: 0=成功, 1=校验或打包失败, 2=参数异常 | 设计依据: 开发者集成工作台规范
 # ==============================================================================
 """纯净世界引擎 MOD 开发者集成工作台与 .kmod 打包引擎。"""
 
@@ -154,7 +154,7 @@ def handle_workbench_cli(args: Any) -> int:
 
 
 def handle_kmod_pack_cli(target_dir: Path, out_path: Path | None, as_json: bool, pack_id: str, version: str) -> int:
-    """供 kalar_mod pack 调用的标准 kmod 构建与验证闭环。"""
+    """供 kalar_mod pack 调用的标准 kmod 构建与验证流程。"""
     out_kmod = out_path if out_path else target_dir.parent / f"{pack_id}_v{version}.kmod"
     ok, res_path, errors = build_kmod_package(target_dir, out_kmod)
     if not ok or not res_path:

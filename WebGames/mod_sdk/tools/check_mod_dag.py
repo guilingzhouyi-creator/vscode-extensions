@@ -167,7 +167,7 @@ def detect_dag_cycle_kahn(
             code="ERR_DAG_CYCLE",
             file_path=rel_name,
             detail=f"DAG 存在死锁循环依赖环 (Cycle)！涉及节点: {cyclic_nodes}",
-            fix_suggestion="断开循环环路中的边（移除导致依赖闭环的边，使拓扑保持严格单向）",
+            fix_suggestion="断开循环环路中的边（移除构成循环依赖的边，使拓扑保持严格单向）",
         ))
 
 

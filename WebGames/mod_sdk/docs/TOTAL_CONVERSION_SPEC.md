@@ -40,7 +40,7 @@ my_overhaul_mod/
 flowchart TD
     ModData["MOD 声明数据 (Content JSON)"] --> ModeSelect{"读取 override_mode"}
 
-    ModeSelect -- MERGE (增量补丁) --> M1["保留原版数据底座<br/>• 新增缺失键与新条目<br/>• 对同名键执行递归字段更新"]
+    ModeSelect -- MERGE (增量补丁) --> M1["保留原版基础数据<br/>• 新增缺失键与新条目<br/>• 对同名键执行递归字段更新"]
     ModeSelect -- REPLACE_ENTRY (精确替换) --> M2["保留原版未指定条目<br/>• 根据唯一主键 (如 canonical_id)<br/>• 完整替换同名条目内部全部字段"]
     ModeSelect -- TOTAL_PURGE (全量清洗) --> M3["彻底清空原版该领域数据注册表<br/>• 仅保留 MOD 文件内显式声明的条目<br/>• 实现完全重构的架空世界观"]
 
