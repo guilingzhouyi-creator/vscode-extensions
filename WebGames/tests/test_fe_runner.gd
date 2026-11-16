@@ -5,7 +5,19 @@
 # ==============================================================================
 extends SceneTree
 
+var _has_executed: bool = false
+
 func _initialize() -> void:
+	pass
+
+func _process(_delta: float) -> bool:
+	if _has_executed:
+		return true
+	_has_executed = true
+	_execute_fe_suites()
+	return false
+
+func _execute_fe_suites() -> void:
 	print("\n==============================================================================")
 	print("  🎨  卡拉尔世界引擎 (KALAR WORLD ENGINE) - 前端全域专项测试执行  🎨")
 	print("==============================================================================\n")
@@ -95,6 +107,7 @@ func _reset_all_fe_singletons() -> void:
 	FocusInputManager.reset_instance()
 	RedDotTreeManager.reset_instance()
 	UIAudioBridge.reset_instance()
+	CutsceneEventBridge.reset_for_tests()
 	ThemeManager.reset_instance()
 	AppLifecycleFSM.reset_instance()
 	ServiceLocator.clear_active_gateway()

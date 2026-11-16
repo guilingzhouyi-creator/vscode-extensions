@@ -13,8 +13,6 @@
 class_name TestAssetPathResolver
 extends RefCounted
 
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-
 # ==============================================================================
 # 一、测试套件总入口
 # ==============================================================================

@@ -12,21 +12,7 @@
 class_name TestCutsceneHookAndPlaybackPipeline
 extends TestCase
 
-const CutsceneRequestDTO = preload("res://backend/infrastructure/media/dto/cutscene_request_dto.gd")
-const CutscenePlaybackStateDTO = preload("res://backend/infrastructure/media/dto/cutscene_playback_state_dto.gd")
-const CutsceneManifestDTO = preload("res://backend/infrastructure/media/dto/cutscene_manifest_dto.gd")
-const CutsceneAsyncLoader = preload("res://backend/infrastructure/media/cutscene_async_loader.gd")
-const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
-const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
-const CutscenePreloadPredictor = preload("res://backend/infrastructure/media/cutscene_preload_predictor.gd")
-const CutscenePlayerView = preload("res://frontend/views/cutscene_player/cutscene_player_view.gd")
 const CutscenePresenterClass = preload("res://frontend/presentation/common/cutscene_presenter.gd")
-const CutsceneEventBridge = preload("res://frontend/systems/cutscene_event_bridge.gd")
-
-const NarrativeDagExecutionEngine = preload("res://backend/domains/narrative_orchestration/narrative_dag_execution_engine.gd")
-const NarrativeDAGGraphDTO = preload("res://backend/domains/narrative_orchestration/narrative_dag_graph_dto.gd")
-const NarrativeDAGNode = preload("res://backend/domains/narrative_orchestration/narrative_dag_node.gd")
-const NarrativeDAGEdge = preload("res://backend/domains/narrative_orchestration/narrative_dag_edge.gd")
 
 # ==============================================================================
 # 一、测试套件总入口与环境重置

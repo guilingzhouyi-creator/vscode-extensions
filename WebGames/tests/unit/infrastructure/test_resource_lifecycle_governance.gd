@@ -5,10 +5,6 @@
 # ==============================================================================
 class_name TestResourceLifecycleGovernance extends RefCounted
 
-const ResourceLifecycleDescriptor = preload("res://backend/infrastructure/resource_governance/resource_lifecycle_descriptor.gd")
-const ResourceLifecycleManager = preload("res://backend/infrastructure/resource_governance/resource_lifecycle_manager.gd")
-const ScopedEventSubscriber = preload("res://backend/infrastructure/resource_governance/scoped_event_subscriber.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_track_resource())
@@ -44,7 +40,7 @@ static func test_track_resource() -> Dictionary:
 	return {
 		"test": "TC-RM-01: 资源管理器实例纳管与描述符初始化",
 		"passed": passed,
-		"detail": "tracked state: %s" % (desc.current_state if desc != null else "null")
+		"detail": "tracked state: %s" % (str(desc.current_state) if desc != null else "null")
 	}
 
 ## TC-RM-02: 状态机流转合法性校验

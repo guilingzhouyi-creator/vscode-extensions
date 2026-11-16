@@ -4,12 +4,6 @@
 # ==============================================================================
 class_name TestAccountDomain extends RefCounted
 
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_guest_account_creation())

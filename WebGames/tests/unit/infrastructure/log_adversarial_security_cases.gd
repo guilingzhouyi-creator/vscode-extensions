@@ -6,10 +6,6 @@
 class_name LogAdversarialSecurityCases
 extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-const UnifiedLoggerService = preload("res://backend/infrastructure/logging/unified_logger_service.gd")
-
 class _MockRingBuffer extends RefCounted:
 	var records: Array = []
 	func push_record(dto: Dictionary) -> void:

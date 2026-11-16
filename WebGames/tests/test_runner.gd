@@ -8,6 +8,8 @@ extends SceneTree
 
 const TestRegistryClass = preload("res://tests/test_registry.gd")
 
+var _has_executed: bool = false
+
 ## 检查测试套件是否具备合法的 run_all_tests 入口
 func _is_valid_suite(test_cls: Variant) -> bool:
 	if test_cls == null:
@@ -155,6 +157,16 @@ func _reset_all_runtime_singletons() -> void:
 ## _init() 是构造期，此时 SceneTree 尚未就绪，在其中调用 quit() 会导致进程
 ## 以 SIGSEGV (退出码 139) 终止——测试全部通过但 CI 判定失败，且极难察觉。
 func _initialize() -> void:
+	pass
+
+func _process(_delta: float) -> bool:
+	if _has_executed:
+		return true
+	_has_executed = true
+	_run_all_suites()
+	return false
+
+func _run_all_suites() -> void:
 	# 全域启动装配（幂等）：GameConfig 就绪 + 物品注册表 + 内置 GM 命令，
 	# 测试运行器作为 CLI 运行时入口覆盖真实装配路径
 	GameBootstrap.assemble()

@@ -5,9 +5,6 @@
 # ==============================================================================
 class_name TestUnifiedLoggerService extends RefCounted
 
-const UnifiedLoggerService = preload("res://backend/infrastructure/logging/unified_logger_service.gd")
-const ProfilingMetricHook = preload("res://backend/infrastructure/profiling/profiling_metric_hook.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_logger_catalog_load())
@@ -128,7 +125,7 @@ static func test_severity_threshold_pass() -> Dictionary:
 	return {
 		"test": "TC-RM-33: 达到过滤门槛的日志事件正常分发放行",
 		"passed": passed,
-		"detail": "rec_severity=%s" % (rec.severity if rec != null else "null")
+		"detail": "rec_severity=%s" % (str(rec.severity) if rec != null else "null")
 	}
 
 ## TC-RM-34: 单机模式本地日志隔离阻断

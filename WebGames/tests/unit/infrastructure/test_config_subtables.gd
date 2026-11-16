@@ -10,10 +10,6 @@
 
 class_name TestConfigSubtablesDomain extends RefCounted
 
-const ConfigRouteDTO = preload("res://backend/infrastructure/config_route_dto.gd")
-const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
-const StorageResourceCatalog = preload("res://backend/domains/persistence_protocol/storage_resource_catalog.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_subtable_resolution_and_alias())

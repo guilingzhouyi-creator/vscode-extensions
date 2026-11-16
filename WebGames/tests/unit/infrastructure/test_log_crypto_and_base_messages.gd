@@ -5,12 +5,6 @@
 # ==============================================================================
 class_name TestLogCryptoAndBaseMessages extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
-const LogAdversarialSecurityCases = preload("res://tests/unit/infrastructure/log_adversarial_security_cases.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_crypto_integrity_lib_encrypt_and_tamper_reject())

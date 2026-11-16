@@ -32,9 +32,9 @@ static func run_all_tests() -> Dictionary:
 static func test_event_bus_token_weakref_cycle_breaker() -> Dictionary:
 	var local_bus: EventBusCore = EventBusCore.new()
 	var bus_weak: WeakRef = weakref(local_bus)
-	var callback_called: bool = false
+	var callback_state := {"called": false}
 	var cb: Callable = func(_pkt: EventPacket) -> void:
-		callback_called = true
+		callback_state["called"] = true
 
 	var token: EventBusSubscriptionToken = local_bus.subscribe(101, 0, cb)
 	var token_has_bus: bool = (token != null and token.bus != null)
@@ -61,7 +61,7 @@ static func test_event_bus_dead_token_lazy_pruning() -> Dictionary:
 	var channel_id: int = 202
 
 	# 1. 创建有效订阅
-	var valid_token: EventBusSubscriptionToken = local_bus.subscribe(channel_id, 0, func(_p): pass)
+	var valid_token: EventBusSubscriptionToken = local_bus.subscribe(channel_id, 0, func(_p): pass )
 
 	# 2. 创建临时目标对象并绑定其方法，随后释放该目标对象使 Callable 变为失效（invalid）
 	var dummy_target: RefCounted = RefCounted.new()

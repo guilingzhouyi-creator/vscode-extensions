@@ -14,18 +14,6 @@
 class_name TestZeroModFailClosedPipeline
 extends TestCase
 
-const GameModeRoutingSolver = preload("res://backend/domains/world_gateway/game_mode_routing_solver.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldCharacterCreationOrchestrator = preload("res://backend/domains/character_creation/world_character_creation_orchestrator.gd")
-const AuthoritativeCharacterCreationRequestDTO = preload("res://backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd")
-const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
-const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
-const StarterLoadoutDispatcher = preload("res://backend/domains/character_creation/starter_loadout_dispatcher.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const WorldInstance = preload("res://backend/domains/world_state/world_instance.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
 const WorldGatewayViewScript = preload("res://frontend/views/world_gateway/world_gateway_view.gd")
 const WORLD_GATEWAY_SCENE = preload("res://frontend/views/world_gateway/world_gateway_view.tscn")
 

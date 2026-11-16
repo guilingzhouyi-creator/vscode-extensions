@@ -5,10 +5,6 @@
 # ==============================================================================
 class_name TestBoundedCacheAndIdempotency extends RefCounted
 
-const CachePolicySpec = preload("res://backend/infrastructure/resource_governance/cache_policy_spec.gd")
-const BoundedResourceCache = preload("res://backend/infrastructure/resource_governance/bounded_resource_cache.gd")
-const IdempotencyController = preload("res://backend/infrastructure/robustness/idempotency_controller.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_basic_cache_ops())

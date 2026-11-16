@@ -15,20 +15,7 @@
 class_name TestWorldModLockReentryAndDrift
 extends TestCase
 
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const SaveLoadRoutingSolver = preload("res://backend/domains/world_gateway/save_load_routing_solver.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
-const WorldCharacterCreationOrchestrator = preload("res://backend/domains/character_creation/world_character_creation_orchestrator.gd")
-const AuthoritativeCharacterCreationRequestDTO = preload("res://backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const WorldInstance = preload("res://backend/domains/world_state/world_instance.gd")
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-const SaveSlotDTO = preload("res://backend/domains/account/save_slot_dto.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const WorldModLockTestHelper = preload("res://tests/support/world_mod_lock_test_helper.gd")
 const WorldGatewayViewScript = preload("res://frontend/views/world_gateway/world_gateway_view.gd")
-const WorldGatewayRenderHelper = preload("res://frontend/views/world_gateway/world_gateway_render_helper.gd")
 const WORLD_GATEWAY_SCENE = preload("res://frontend/views/world_gateway/world_gateway_view.tscn")
 
 const LOCKED_WORLD_ID: String = WorldModLockTestHelper.LOCKED_WORLD_ID

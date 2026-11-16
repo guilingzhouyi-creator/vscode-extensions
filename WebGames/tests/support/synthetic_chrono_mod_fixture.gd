@@ -11,9 +11,6 @@
 class_name SyntheticChronoModFixture
 extends RefCounted
 
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-const TestTier3ContentOverrideHelper = preload("res://tests/integration/pipelines/test_tier3_content_override_helper.gd")
-
 const SANDBOX_MODS_ROOT: String = "user://test_sandbox_phase130_composition/"
 
 

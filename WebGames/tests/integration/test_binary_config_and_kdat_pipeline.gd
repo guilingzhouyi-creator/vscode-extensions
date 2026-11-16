@@ -10,14 +10,6 @@
 class_name TestBinaryConfigAndKdatPipeline
 extends TestCase
 
-const BinaryConfigReader = preload("res://backend/infrastructure/binary_config_reader.gd")
-const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
-const RunModeIsolationSolver = preload("res://backend/domains/world_gateway/run_mode_isolation_solver.gd")
-const AuthoritySyncStub = preload("res://backend/infrastructure/authority_sync_stub.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const KDataHeaderDTO = preload("res://backend/infrastructure/dto/kdata_header_dto.gd")
-const KDataTOCEntryDTO = preload("res://backend/infrastructure/dto/kdata_toc_entry_dto.gd")
-
 # ==============================================================================
 # 一、测试套件总入口与环境重置
 # ==============================================================================

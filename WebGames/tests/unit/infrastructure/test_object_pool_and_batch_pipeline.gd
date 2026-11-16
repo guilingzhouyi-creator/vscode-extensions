@@ -10,13 +10,6 @@
 
 class_name TestObjectPoolAndBatchPipeline extends RefCounted
 
-const ObjectPoolConfigDTO = preload("res://backend/infrastructure/object_pool_config_dto.gd")
-const ObjectPoolStatsDTO = preload("res://backend/infrastructure/object_pool_stats_dto.gd")
-const ObjectPool = preload("res://backend/infrastructure/object_pool.gd")
-const SoAEntityBuffer = preload("res://backend/infrastructure/soa_entity_buffer.gd")
-const HeadlessBatchPipeline = preload("res://backend/infrastructure/headless_batch_pipeline.gd")
-const ObjectPoolManager = preload("res://backend/infrastructure/object_pool_manager.gd")
-
 class DummyPoolableItem extends RefCounted:
 	var value: int = 100
 	var tag: String = "dirty"
@@ -172,7 +165,7 @@ static func test_headless_batch_pipeline_zero_allocation() -> Dictionary:
 ## 8. 全局池管理器生命周期断言
 static func test_pool_manager_assembly_lifecycle() -> Dictionary:
 	ObjectPoolManager.initialize()
-	var pool := ObjectPoolManager.register_pool("dummy_pool", func(): return DummyPoolableItem.new())
+	var _pool := ObjectPoolManager.register_pool("dummy_pool", func(): return DummyPoolableItem.new())
 	var acquired: bool = (ObjectPoolManager.get_pool("dummy_pool") != null)
 	var pool_count: int = ObjectPoolManager.get_pool_count()
 	ObjectPoolManager.teardown()

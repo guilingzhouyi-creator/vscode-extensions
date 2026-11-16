@@ -11,14 +11,6 @@
 class_name WorldModLockTestHelper
 extends RefCounted
 
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
-const WorldCharacterCreationOrchestrator = preload("res://backend/domains/character_creation/world_character_creation_orchestrator.gd")
-const AuthoritativeCharacterCreationRequestDTO = preload("res://backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const WorldInstance = preload("res://backend/domains/world_state/world_instance.gd")
-
 const LOCKED_WORLD_ID: String = "WORLD_P130_LOCK_REENTRY_01"
 
 

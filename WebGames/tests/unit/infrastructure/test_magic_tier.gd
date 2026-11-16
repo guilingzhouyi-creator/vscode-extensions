@@ -265,6 +265,7 @@ static func _test_registry_assembled_ready() -> Dictionary:
 
 ## TC-M3-02: rank_to_level 非法值显式错误（0 哨兵——不静默伪装一阶）
 static func _test_rank_to_level_invalid_explicit() -> Dictionary:
+	@warning_ignore("int_as_enum_without_match", "int_as_enum_without_cast")
 	var invalid: int = MagicTierSnapshot.rank_to_level(99)
 	var valid: int = MagicTierSnapshot.rank_to_level(MagicTierSnapshot.MagicRank.RANK_7)
 	var passed = invalid == 0 and valid == 7

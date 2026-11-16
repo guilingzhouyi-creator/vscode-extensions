@@ -6,12 +6,6 @@
 class_name TestLocalizationI18nDomain
 extends RefCounted
 
-const LocalizationRegistryCatalog = preload("res://backend/domains/localization_i18n/localization_registry_catalog.gd")
-const LocalizationSolver = preload("res://backend/domains/localization_i18n/localization_solver.gd")
-const I18nHotReloadPipeline = preload("res://backend/domains/localization_i18n/i18n_hot_reload_pipeline.gd")
-const LocalizationI18nService = preload("res://backend/domains/localization_i18n/localization_i18n_service.gd")
-const LocalizationI18nDTO = preload("res://backend/domains/localization_i18n/dto/localization_i18n_dto.gd")
-
 static func run_all_tests() -> Dictionary:
     var results: Array[Dictionary] = []
     var domain_name = "Domain 38: 全域多语言国际化与动态插值引擎"

@@ -6,14 +6,6 @@
 # ==============================================================================
 class_name TestSaveConsistencyRecovery extends RefCounted
 
-const SaveDomainContract = preload("res://backend/domains/persistence_protocol/save_domain_contract.gd")
-const SaveValidationService = preload("res://backend/domains/persistence_protocol/save_validation_service.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const AtomicFileWriter = preload("res://backend/infrastructure/atomic_file_writer.gd")
-const SaveMigrationEngine = preload("res://backend/domains/persistence_protocol/save_migration_engine.gd")
-const EditorHotReloadManager = preload("res://backend/domains/persistence_protocol/editor_hot_reload_manager.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_inventory_item_reference_integrity())

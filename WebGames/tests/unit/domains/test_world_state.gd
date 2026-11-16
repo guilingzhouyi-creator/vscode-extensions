@@ -63,7 +63,7 @@ static func test_world_continues_after_death() -> Dictionary:
 	world.world_time = {"tick": 10}
 	world.world_state = {"resource": 5}
 	var tick_before: int = int(world.world_time["tick"])
-	var res := CharacterDeathSolver.handle_character_death(acc, "SLOT_01", world)
+	var _death_res := CharacterDeathSolver.handle_character_death(acc, "SLOT_01", world)
 	var passed: bool = int(world.world_time["tick"]) > tick_before and world.world_state.get("resource") == 5 and world.history_fragments.size() == 1
 	return {"test": "TC-WS-02: 死亡世界时间继续+状态保留+历史片段只增", "passed": passed}
 
@@ -74,13 +74,13 @@ static func test_no_character_inheritance() -> Dictionary:
 
 static func test_recombination_stub_off() -> Dictionary:
 	var template: Dictionary = GameConfig.get_dict("domains.world", "default_template", {"world_id": "WORLD_DEFAULT"})
-	var res := WorldRecombinationStub.generate_new_world(template, [{"history_fragments": [{"event": "war"}]}])
+	var res := WorldRecombinationStub.generate_new_world(template, [ {"history_fragments": [ {"event": "war"}]}])
 	var passed: bool = not WorldRecombinationStub.continuity_enabled() and res.mode == "DEFAULT_ONLY" and res.world.get("world_id") == template.get("world_id")
 	return {"test": "TC-WS-04: 多世界连续性开关关闭 → 仅默认世界", "passed": passed}
 
 static func test_recombination_stub_on() -> Dictionary:
 	var template: Dictionary = {"world_id": "WORLD_DEFAULT", "region_mana_density": 1.0}
-	var forced := WorldRecombinationStub.generate_new_world(template, [{"history_fragments": [{"event": "war"}, {"event": "plague"}]}], {"enabled": true})
+	var forced := WorldRecombinationStub.generate_new_world(template, [ {"history_fragments": [ {"event": "war"}, {"event": "plague"}]}], {"enabled": true})
 	var passed: bool = forced.mode == "RECOMBINED_STUB" and forced.fragments_count == 2 and forced.world.get("sources").size() == 2 and String(forced.world.get("world_id")).ends_with("_GEN_F2")
 	return {"test": "TC-WS-05: 重组预留（config 覆盖开启 → RECOMBINED_STUB + 片段数派生 world_id）", "passed": passed}
 
