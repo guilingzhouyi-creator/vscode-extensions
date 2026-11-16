@@ -11,10 +11,8 @@
 class_name MockCharacterService
 extends ICharacterService
 
-const IAuthService = preload("res://frontend/domain_boundary/interfaces/i_auth_service.gd")
-
 ## 模拟异步创建角色并返回组装后的角色槽位摘要
-func create_character_async(account_id: String, token: String, request_payload: Dictionary, result_callback: Callable) -> void:
+func create_character_async(_account_id: String, _token: String, request_payload: Dictionary, result_callback: Callable) -> void:
 	var character_name := str(request_payload.get("name", "MockHero"))
 	var created_character := {
 		"slot_id": str(request_payload.get("slot_id", "SLOT_01")),

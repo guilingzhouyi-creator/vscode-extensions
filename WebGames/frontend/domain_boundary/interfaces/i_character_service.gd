@@ -49,11 +49,11 @@ func preview_add_point(attributes_preview: Dictionary, attribute_key: String, re
 	}
 
 ## 异步创建权威角色契约 (对齐 CREATE_AUTHORITATIVE_CHARACTER)
-func create_character_async(account_id: String, token: String, request_payload: Dictionary, result_callback: Callable) -> void:
+func create_character_async(_account_id: String, _token: String, _request_payload: Dictionary, _result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "ICharacterService.create_character_async: pure virtual method must be implemented by subclass")
 
 ## 异步命途资质骰点契约 (对齐 preview UI 属性兼容)
-func roll_attributes_async(result_callback: Callable) -> void:
+func roll_attributes_async(_result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "ICharacterService.roll_attributes_async: pure virtual method must be implemented by subclass")
 
 ## 异步后端权威命途轮盘预览契约 (对齐 ROLL_CHARACTER_PREVIEW，返回 1~6 六维与身世/天赋)

@@ -17,14 +17,14 @@ func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) 
 	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步拉取当前战斗（首领血量、部位耐久与玩家状态）快照
-func get_combat_snapshot_async(battle_id: String, result_callback: Callable) -> void:
+func get_combat_snapshot_async(_battle_id: String, result_callback: Callable) -> void:
 	var combat_payload := MockDataCatalog.get_domain_data("combat")
 	MockBaseService.delayed_call(result_callback, { "success": true, "combat": combat_payload.duplicate(true) }, simulate_delay_ms)
 
 var _action_seed: int = 123456789
 
 ## 模拟异步技能释放，使用确定性 LCG 高位截断计算暴击与伤害数值
-func cast_skill_async(skill_id: String, target_id: String, result_callback: Callable) -> void:
+func cast_skill_async(skill_id: String, target_id: String, result_callback: Callable, _skill_parameters: Dictionary = {}) -> void:
 	_action_seed = (_action_seed * 1103515245 + 12345) & 0x7FFFFFFF
 	# 高位取模：LCG 低位模式随机性差，取中高 16 位截断换算
 	var critical_roll_ratio: float = float((_action_seed >> 8) % 1000) / 1000.0

@@ -12,6 +12,10 @@ class_name IQuestService
 extends RefCounted
 
 ## 任务状态跃迁（action: accept / abandon / submit）→ {success, quest, error_code}
-func transition_status(quest: Dictionary, action: String) -> Dictionary:
+func transition_status(_quest: Dictionary, _action: String) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IQuestService.transition_status: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
+
+## 接取悬赏目标（默认兼容回执）
+func accept_bounty(bounty_id: String, _reward_gold: int = 0) -> Dictionary:
+	return {"success": true, "bounty_id": bounty_id, "status": "ACTIVE"}

@@ -8,12 +8,6 @@
 class_name MockServiceContainer
 extends ServiceContainer
 
-const MockEscMenuService = preload("res://frontend/domain_boundary/mocks/mock_esc_menu_service.gd")
-const MockPrologueService = preload("res://frontend/domain_boundary/mocks/mock_prologue_service.gd")
-const MockHudSyncService = preload("res://frontend/domain_boundary/mocks/mock_hud_sync_service.gd")
-const MockLifecycleService = preload("res://frontend/domain_boundary/mocks/mock_lifecycle_service.gd")
-const MockGameSettingsService = preload("res://frontend/domain_boundary/mocks/mock_game_settings_service.gd")
-
 static var _instance: MockServiceContainer
 
 ## 获取并惰性装配模拟服务容器全局单例

@@ -27,23 +27,23 @@ static func build_preview_attribute_spread() -> Dictionary:
 	}
 
 ## 异步登录契约 (result_callback: func(result: Dictionary) -> void)
-func login_async(username: String, password_plain: String, result_callback: Callable) -> void:
+func login_async(_username: String, _password_plain: String, _result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.login_async: pure virtual method must be implemented by subclass")
 
 ## 异步注册契约 (对齐 AccountRegistrationDTO，可选注册后自动签发会话令牌)
-func register_async(username: String, password_plain: String, result_callback: Callable, _auto_login: bool = false) -> void:
+func register_async(_username: String, _password_plain: String, _result_callback: Callable, _auto_login: bool = false) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.register_async: pure virtual method must be implemented by subclass")
 
 ## 获取服务器列表契约
-func get_servers_async(result_callback: Callable) -> void:
+func get_servers_async(_result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.get_servers_async: pure virtual method must be implemented by subclass")
 
 ## 获取角色槽位列表契约
-func get_characters_async(account_id: String, result_callback: Callable) -> void:
+func get_characters_async(_account_id: String, _result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.get_characters_async: pure virtual method must be implemented by subclass")
 
 ## 创角请求契约
-func create_character_async(account_id: String, request_payload: Dictionary, result_callback: Callable) -> void:
+func create_character_async(_account_id: String, _request_payload: Dictionary, _result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.create_character_async: pure virtual method must be implemented by subclass")
 
 ## 六维资质骰点契约（返回 {success: true, attrs: {STR/AGI/CON/INT/WIS/CHA}}）
@@ -52,15 +52,15 @@ func roll_attribute_spread() -> Dictionary:
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
 ## 异步资质骰点契约（对齐 ROLL_CHARACTER_PREVIEW 动作）
-func roll_attributes_async(result_callback: Callable) -> void:
+func roll_attributes_async(_result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.roll_attributes_async: pure virtual method must be implemented by subclass")
 
 ## 异步注销/吊销令牌契约 (result_callback: func(result: Dictionary) -> void)
-func revoke_token(token: String, result_callback: Callable = Callable()) -> void:
+func revoke_token(_token: String, _result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.revoke_token: pure virtual method must be implemented by subclass")
 
 ## 异步退出账号契约 (对齐 LOGOUT_ACCOUNT)
-func logout_async(account_id: String, token: String, result_callback: Callable = Callable()) -> void:
+func logout_async(_account_id: String, _token: String, _result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.logout_async: pure virtual method must be implemented by subclass")
 
 ## 异步游客免密快捷登录契约 (对齐 LOGIN_GUEST)
@@ -76,5 +76,5 @@ func clear_slot_async(_account_id: String, _token: String, _slot_id: String, res
 		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步拉取账号首页视图模型契约 (对齐 GET_ACCOUNT_HOME_VIEW_MODEL)
-func get_account_home_async(account_id: String, token: String, result_callback: Callable = Callable(), _locale: String = "") -> void:
+func get_account_home_async(_account_id: String, _token: String, _result_callback: Callable = Callable(), _locale: String = "") -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.get_account_home_async: pure virtual method must be implemented by subclass")

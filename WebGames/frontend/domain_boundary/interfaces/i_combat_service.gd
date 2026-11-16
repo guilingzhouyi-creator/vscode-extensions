@@ -12,9 +12,9 @@ class_name ICombatService
 extends RefCounted
 
 ## 获取当前战斗快照 (BOSS血条、多部位状态、玩家状态)
-func get_combat_snapshot_async(battle_id: String, result_callback: Callable) -> void:
+func get_combat_snapshot_async(_battle_id: String, _result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "ICombatService.get_combat_snapshot_async: pure virtual method must be implemented by subclass")
 
 ## 释放技能动作模拟
-func cast_skill_async(skill_id: String, target_id: String, result_callback: Callable) -> void:
+func cast_skill_async(_skill_id: String, _target_id: String, _result_callback: Callable, _skill_parameters: Dictionary = {}) -> void:
 	EventBusCore.get_instance().emit_log("error", "ICombatService.cast_skill_async: pure virtual method must be implemented by subclass")

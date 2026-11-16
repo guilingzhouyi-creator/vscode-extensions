@@ -15,3 +15,7 @@ extends RefCounted
 func create_session() -> IChatCommandSession:
 	EventBusCore.get_instance().emit_log("error", "IChatCommandService.create_session: pure virtual method must be implemented by subclass")
 	return null
+
+## 分发执行聊天 / GM 指令（默认兼容回执）
+func execute_command(command_line: String) -> Dictionary:
+	return {"success": not command_line.strip_edges().is_empty(), "command": command_line}

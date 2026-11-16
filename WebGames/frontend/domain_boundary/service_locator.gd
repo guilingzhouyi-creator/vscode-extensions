@@ -11,11 +11,7 @@
 class_name ServiceLocator
 extends RefCounted
 
-const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
-const MockServiceContainer = preload("res://frontend/domain_boundary/mocks/mock_service_container.gd")
-const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
 const WorldGatewayFSMClass = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 
 ## 已解析的服务容器单例（按 service_mode 惰性初始化）
 static var _instance: ServiceContainer

@@ -17,21 +17,25 @@ func get_max_capacity() -> int:
 	return 0
 
 ## 标记指定邮件已读 → 新邮件数组
-func mark_read(mails: Array, mail_id: String) -> Array:
+func mark_read(mails: Array, _mail_id: String) -> Array:
 	EventBusCore.get_instance().emit_log("error", "IMailService.mark_read: pure virtual method must be implemented by subclass")
 	return mails
 
 ## 按 mail_id 集合批量删除 → 新邮件数组
-func delete_by_ids(mails: Array, mail_ids: Array) -> Array:
+func delete_by_ids(mails: Array, _mail_ids: Array) -> Array:
 	EventBusCore.get_instance().emit_log("error", "IMailService.delete_by_ids: pure virtual method must be implemented by subclass")
 	return mails
 
 ## 一键领取全部未领取附件 → {success, mails, claimed_count}
-func claim_all(mails: Array) -> Dictionary:
+func claim_all(_mails: Array) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMailService.claim_all: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
 ## 领取单封邮件附件 → {success, mails, mail_id}
-func claim_one(mails: Array, mail_id: String) -> Dictionary:
+func claim_one(_mails: Array, _mail_id: String) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMailService.claim_one: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
+
+## 分发发信或存草稿协议动作（默认兼容回执）
+func dispatch_mail_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

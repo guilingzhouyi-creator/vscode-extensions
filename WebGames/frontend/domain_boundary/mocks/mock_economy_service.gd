@@ -34,11 +34,14 @@ func calculate_total_copper(gold: int, silver: int, copper: int) -> int:
 func split_copper(total_copper: int) -> Dictionary:
 	var per_gold := int(get_rules().get("copper_per_gold", 10000))
 	var per_silver := int(get_rules().get("copper_per_silver", 100))
+	@warning_ignore("integer_division")
 	var gold := total_copper / per_gold
 	var remainder := total_copper % per_gold
+	@warning_ignore("integer_division")
+	var silver := remainder / per_silver
 	return {
 		"gold": gold,
-		"silver": remainder / per_silver,
+		"silver": silver,
 		"copper": remainder % per_silver,
 	}
 

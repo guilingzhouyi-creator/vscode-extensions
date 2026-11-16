@@ -37,7 +37,7 @@ func resume_game_async(result_callback: Callable) -> void:
 		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求安全存盘 (target_slot: "SLOT_01" 等, is_quicksave: bool)
-func request_save_async(target_slot: String, is_quicksave: bool, result_callback: Callable) -> void:
+func request_save_async(_target_slot: String, _is_quicksave: bool, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IEscMenuService.request_save_async: pure virtual method must be implemented by subclass")
 	if result_callback.is_valid():
 		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})

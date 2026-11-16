@@ -8,11 +8,6 @@
 class_name ServiceContainer
 extends RefCounted
 
-const IPrologueService = preload("res://frontend/domain_boundary/interfaces/i_prologue_service.gd")
-const IHudSyncService = preload("res://frontend/domain_boundary/interfaces/i_hud_sync_service.gd")
-const ILifecycleService = preload("res://frontend/domain_boundary/interfaces/i_lifecycle_service.gd")
-const IGameSettingsService = preload("res://frontend/domain_boundary/interfaces/i_game_settings_service.gd")
-
 # 一、通用服务注册表
 ## 服务实例注册表: service_name -> RefCounted
 var _services: Dictionary = {}

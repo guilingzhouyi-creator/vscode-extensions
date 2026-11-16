@@ -12,11 +12,15 @@ class_name IGrimoireService
 extends RefCounted
 
 ## 著书估价（按稿酬模式返回区间）：{success, min, max}
-func estimate_authoring_income(royalty_mode_index: int) -> Dictionary:
+func estimate_authoring_income(_royalty_mode_index: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IGrimoireService.estimate_authoring_income: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
 ## 版税汇总：{success, total}
-func sum_royalties(books: Array) -> Dictionary:
+func sum_royalties(_books: Array) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IGrimoireService.sum_royalties: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
+
+## 分发魔典编纂、编译与版税领取动作（默认兼容回执）
+func dispatch_grimoire_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

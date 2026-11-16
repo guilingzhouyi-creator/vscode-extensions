@@ -63,11 +63,11 @@ func get_servers_async(result_callback: Callable) -> void:
 	MockBaseService.delayed_call(result_callback, { "success": true, "servers": servers.duplicate(true) }, simulate_delay_ms)
 
 ## 模拟异步查询账号下角色槽位列表
-func get_characters_async(account_id: String, result_callback: Callable) -> void:
+func get_characters_async(_account_id: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(result_callback, { "success": true, "characters": _mock_characters.duplicate(true) }, simulate_delay_ms)
 
 ## 模拟异步创建角色并写入首个空闲槽位
-func create_character_async(account_id: String, request_payload: Dictionary, result_callback: Callable) -> void:
+func create_character_async(_account_id: String, request_payload: Dictionary, result_callback: Callable) -> void:
 	var character_name: String = str(request_payload.get("name", "")).strip_edges()
 	if character_name.is_empty():
 		MockBaseService.delayed_call(result_callback, { "success": false, "error_code": "ERR_NAME_EMPTY", "message": "角色名不能为空" }, simulate_delay_ms)
@@ -110,7 +110,7 @@ func revoke_token(token: String, result_callback: Callable = Callable()) -> void
 		MockBaseService.delayed_call(result_callback, { "success": true, "token": token }, simulate_delay_ms)
 
 ## 模拟异步退出当前登录账号
-func logout_async(account_id: String, token: String, result_callback: Callable = Callable()) -> void:
+func logout_async(account_id: String, _token: String, result_callback: Callable = Callable()) -> void:
 	if result_callback.is_valid():
 		MockBaseService.delayed_call(result_callback, { "success": true, "account_id": account_id }, simulate_delay_ms)
 
@@ -131,7 +131,7 @@ func clear_slot_async(_account_id: String, _token: String, slot_id: String, resu
 		MockBaseService.delayed_call(result_callback, {"success": true, "data": {"slot_id": slot_id}}, simulate_delay_ms)
 
 ## 模拟异步拉取账号首页展示视图模型
-func get_account_home_async(account_id: String, token: String, result_callback: Callable = Callable(), _locale: String = "") -> void:
+func get_account_home_async(account_id: String, _token: String, result_callback: Callable = Callable(), _locale: String = "") -> void:
 	var base_payload := MockDataCatalog.get_domain_data("account")
 	if result_callback.is_valid():
 		MockBaseService.delayed_call(result_callback, {

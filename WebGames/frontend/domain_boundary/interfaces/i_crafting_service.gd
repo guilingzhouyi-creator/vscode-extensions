@@ -12,6 +12,10 @@ class_name ICraftingService
 extends RefCounted
 
 ## 预测强化成功率（返回 {success, rate}）；衰减公式与钳制在服务层
-func preview_enhance_rate(target_level: int) -> Dictionary:
+func preview_enhance_rate(_target_level: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "ICraftingService.preview_enhance_rate: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
+
+## 分发锻造、强化与分解协议动作（默认兼容回执）
+func dispatch_crafting_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

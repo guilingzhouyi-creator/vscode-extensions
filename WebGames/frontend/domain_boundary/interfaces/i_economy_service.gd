@@ -17,36 +17,40 @@ func get_rules() -> Dictionary:
 	return {}
 
 ## 四元钱包 → 铜币总值（金/银/铜）
-func calculate_total_copper(gold: int, silver: int, copper: int) -> int:
+func calculate_total_copper(_gold: int, _silver: int, _copper: int) -> int:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_total_copper: pure virtual method must be implemented by subclass")
 	return 0
 
 ## 铜币总值 → 金/银/铜拆分（{gold, silver, copper}）
-func split_copper(total_copper: int) -> Dictionary:
+func split_copper(_total_copper: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.split_copper: pure virtual method must be implemented by subclass")
 	return {}
 
 ## 货币索引 → 单位铜值（0=金 1=银 2=铜 3=魔单晶）
-func get_currency_copper(currency_index: int) -> int:
+func get_currency_copper(_currency_index: int) -> int:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.get_currency_copper: pure virtual method must be implemented by subclass")
 	return 1
 
 ## 交易合计（卖出按回购折扣）
-func calculate_shop_total(base_price: int, quantity: int, is_sell: bool) -> int:
+func calculate_shop_total(_base_price: int, _quantity: int, _is_sell: bool) -> int:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_shop_total: pure virtual method must be implemented by subclass")
 	return 0
 
 ## 兑换率（源/目标铜值比）
-func calculate_exchange_rate(source_copper: int, target_copper: int) -> float:
+func calculate_exchange_rate(_source_copper: int, _target_copper: int) -> float:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_exchange_rate: pure virtual method must be implemented by subclass")
 	return 0.0
 
 ## 兑换结果
-func calculate_exchange_result(amount: int, exchange_rate: float) -> float:
+func calculate_exchange_result(_amount: int, _exchange_rate: float) -> float:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_exchange_result: pure virtual method must be implemented by subclass")
 	return 0.0
 
 ## 商品 7 日价格序列（确定性生成）
-func generate_price_series(commodity_key: String) -> Array:
+func generate_price_series(_commodity_key: String) -> Array:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.generate_price_series: pure virtual method must be implemented by subclass")
 	return []
+
+## 分发商店买卖、竞拍与兑换动作至后端经济域（默认兼容回执）
+func dispatch_economy_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

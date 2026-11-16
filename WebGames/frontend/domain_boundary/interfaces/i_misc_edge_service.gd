@@ -12,21 +12,25 @@ class_name IMiscEdgeService
 extends RefCounted
 
 ## 激活突变（槽位上限与重复校验）→ {success, mutations, reason}
-func activate_mutation(active_mutations: Array, mutation_entry: Dictionary, max_slots: int) -> Dictionary:
+func activate_mutation(_active_mutations: Array, _mutation_entry: Dictionary, _max_slots: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.activate_mutation: pure virtual method must be implemented by subclass")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
 
 ## 替换末位已激活突变 → {success, mutations, reason}
-func replace_last_mutation(active_mutations: Array, mutation_entry: Dictionary) -> Dictionary:
+func replace_last_mutation(_active_mutations: Array, _mutation_entry: Dictionary) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.replace_last_mutation: pure virtual method must be implemented by subclass")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
 
 ## 拾取掉落物 → {success, loot, item, reason}
-func pickup_loot(loot_entries: Array, loot_index: int) -> Dictionary:
+func pickup_loot(_loot_entries: Array, _loot_index: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.pickup_loot: pure virtual method must be implemented by subclass")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
 
 ## 命名类型费用（越界回退默认档）
-func get_name_type_fee(type_index: int) -> int:
+func get_name_type_fee(_type_index: int) -> int:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.get_name_type_fee: pure virtual method must be implemented by subclass")
 	return 0
+
+## 分发核名、更名、伪装、拾取与突变协议动作（默认兼容回执）
+func dispatch_misc_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

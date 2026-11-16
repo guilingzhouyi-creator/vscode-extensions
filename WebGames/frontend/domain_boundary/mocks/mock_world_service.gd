@@ -14,7 +14,7 @@ func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) 
 	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步拉取角色 HUD 状态快照副本
-func get_hud_snapshot_async(character_id: String, result_callback: Callable) -> void:
+func get_hud_snapshot_async(_character_id: String, result_callback: Callable) -> void:
 	var hud_snapshot_payload := MockDataCatalog.get_domain_data("hud_snapshot")
 	MockBaseService.delayed_call(
 		result_callback,
@@ -39,7 +39,7 @@ func get_map_landmarks_async(result_callback: Callable) -> void:
 	)
 
 ## 模拟异步进入世界网关并列出可用世界列表
-func enter_gateway_async(account_id: String, token: String, result_callback: Callable) -> void:
+func enter_gateway_async(account_id: String, _token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
 		result_callback,
 		{
@@ -51,7 +51,7 @@ func enter_gateway_async(account_id: String, token: String, result_callback: Cal
 	)
 
 ## 模拟异步探测运行模式就绪度报告
-func probe_modes_async(account_id: String, token: String, result_callback: Callable) -> void:
+func probe_modes_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
 		result_callback,
 		{
@@ -62,7 +62,7 @@ func probe_modes_async(account_id: String, token: String, result_callback: Calla
 	)
 
 ## 模拟异步拉取账号下历史世界档案列表
-func list_worlds_async(account_id: String, token: String, result_callback: Callable) -> void:
+func list_worlds_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
 		result_callback,
 		{
@@ -74,10 +74,10 @@ func list_worlds_async(account_id: String, token: String, result_callback: Calla
 
 ## 模拟异步选择运行模式并绑定账号槽位上下文
 func select_mode_async(
-	account_id: String,
-	token: String,
+	_account_id: String,
+	_token: String,
 	mode_id: int,
-	account_slots: Array,
+	_account_slots: Array,
 	result_callback: Callable,
 	_options: Dictionary = {}
 ) -> void:
@@ -92,8 +92,8 @@ func select_mode_async(
 
 ## 模拟异步选中既有世界档案或创建新世界档案
 func select_or_create_world_async(
-	account_id: String,
-	token: String,
+	_account_id: String,
+	_token: String,
 	world_id: String,
 	mode_id: int,
 	result_callback: Callable,
@@ -190,8 +190,8 @@ func delete_world_async(
 
 ## 模拟异步切换网关运行模式
 func switch_gateway_mode_async(
-	account_id: String,
-	token: String,
+	_account_id: String,
+	_token: String,
 	target_mode: int,
 	result_callback: Callable,
 	_options: Dictionary = {}
@@ -207,8 +207,8 @@ func switch_gateway_mode_async(
 
 ## 模拟异步退出当前世界并返回世界网关
 func exit_world_to_gateway_async(
-	account_id: String,
-	token: String,
+	_account_id: String,
+	_token: String,
 	result_callback: Callable,
 	_options: Dictionary = {}
 ) -> void:
@@ -248,7 +248,8 @@ func set_mod_selection_async(
 	_account_id: String,
 	_token: String,
 	selected_pack_ids: Array,
-	result_callback: Callable
+	result_callback: Callable,
+	_custom_roots: Array = []
 ) -> void:
 	MockBaseService.delayed_call(
 		result_callback,
@@ -261,11 +262,53 @@ func precheck_mod_stack_async(
 	_account_id: String,
 	_token: String,
 	enabled_pack_ids: Array,
-	result_callback: Callable
+	result_callback: Callable,
+	_custom_roots: Array = []
 ) -> void:
 	MockBaseService.delayed_call(
 		result_callback,
 		{"success": true, "data": {"enabled_pack_ids": enabled_pack_ids.duplicate(), "has_base_content_mod": not enabled_pack_ids.is_empty()}},
+		simulate_delay_ms
+	)
+
+## 模拟异步创建合规 MOD 目录骨架
+func create_mod_pack_async(
+	_account_id: String,
+	_token: String,
+	pack_spec: Dictionary,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"pack_id": String(pack_spec.get("pack_id", "mock_pack")), "created": true}},
+		simulate_delay_ms
+	)
+
+## 模拟异步将 MOD 目录打包为 .kmod 归档包
+func pack_mod_kmod_async(
+	_account_id: String,
+	_token: String,
+	_source_directory: String,
+	output_path: String,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"output_path": output_path, "packed": true}},
+		simulate_delay_ms
+	)
+
+## 模拟异步将 .kmod 或 MOD 目录安装至本地模组目录
+func install_mod_pack_async(
+	_account_id: String,
+	_token: String,
+	source_path: String,
+	target_root: String,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"source_path": source_path, "target_root": target_root, "installed": true}},
 		simulate_delay_ms
 	)
 
