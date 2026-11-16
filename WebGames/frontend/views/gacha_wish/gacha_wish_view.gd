@@ -15,7 +15,6 @@ extends BaseScreen
 const GachaWishTabsClass = preload("res://frontend/views/gacha_wish/gacha_wish_tabs.gd")
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
-const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
 
 # ==============================================================================
 # 抽卡规则（经 domain_boundary 服务只读获取，视图不做概率/保底/扣费计算）
@@ -75,21 +74,20 @@ var result_overlay_visible: bool = false
 # ==============================================================================
 
 # --- 顶部标题栏 ---
-@onready var _toggle_history_button: Button = %BtnToggleHistory
-@onready var _back_button: Button = %BtnBack
+@onready var toggle_history_button: Button = %BtnToggleHistory
+@onready var back_button: Button = %BtnBack
 
 # --- WISH_MAIN: 卡池切换 ---
-@onready var _banner_switch_box: HBoxContainer = %BannerSwitchHBox
+@onready var banner_switch_box: HBoxContainer = %BannerSwitchHBox
 
 # --- WISH_MAIN: 卡池封面 ---
-@onready var _label_banner_title: Label = %LabelBannerTitle
-@onready var _label_banner_subtitle: Label = %LabelBannerSubtitle
-@onready var _banner_cover_rect: TextureRect = %BannerCoverRect
-@onready var _label_cover_placeholder: Label = %LabelCoverPlaceholder
-@onready var _label_remaining_time: Label = %LabelRemainingTime
+@onready var label_banner_title: Label = %LabelBannerTitle
+@onready var label_banner_subtitle: Label = %LabelBannerSubtitle
+@onready var label_cover_placeholder: Label = %LabelCoverPlaceholder
+@onready var label_remaining_time: Label = %LabelRemainingTime
 
 # --- WISH_MAIN: UP 物品展示 ---
-@onready var _up_items_grid: GridContainer = %UpItemsGrid
+@onready var up_items_grid: GridContainer = %UpItemsGrid
 
 # --- WISH_MAIN: 保底进度 ---
 @onready var _pity_5star_bar: ProgressBar = %Pity5StarBar
@@ -99,27 +97,26 @@ var result_overlay_visible: bool = false
 
 # --- WISH_MAIN: 抽卡按钮区 ---
 @onready var _label_currency: Label = %LabelCurrency
-@onready var _single_pull_button: Button = %BtnSinglePull
+@onready var single_pull_button: Button = %BtnSinglePull
 @onready var _label_single_cost: Label = %LabelSingleCost
-@onready var _ten_pull_button: Button = %BtnTenPull
+@onready var ten_pull_button: Button = %BtnTenPull
 @onready var _label_ten_cost: Label = %LabelTenCost
 
 # --- PITY_HISTORY: 保底与历史侧面板 ---
-@onready var _history_panel: PanelContainer = %HistoryPanel
-@onready var _history_close_button: Button = %BtnHistoryClose
-@onready var _label_total_pulls: Label = %LabelTotalPulls
-@onready var _label_rarity_stats: Label = %LabelRarityStats
+@onready var history_panel: PanelContainer = %HistoryPanel
+@onready var history_close_button: Button = %BtnHistoryClose
+@onready var label_total_pulls: Label = %LabelTotalPulls
+@onready var label_rarity_stats: Label = %LabelRarityStats
 @onready var _label_probability: Label = %LabelProbability
-@onready var _history_item_list: ItemList = %HistoryItemList
+@onready var history_item_list: ItemList = %HistoryItemList
 
 # --- WISH_RESULT: 结果弹窗 ---
 @onready var _result_overlay: Control = %ResultOverlay
-@onready var _result_panel: PanelContainer = %ResultPanel
 @onready var _label_result_title: Label = %LabelResultTitle
-@onready var _result_items_grid: GridContainer = %ResultItemsGrid
-@onready var _result_skip_button: Button = %BtnResultSkip
-@onready var _result_detail_button: Button = %BtnResultDetail
-@onready var _result_pull_again_button: Button = %BtnResultPullAgain
+@onready var result_items_grid: GridContainer = %ResultItemsGrid
+@onready var result_skip_button: Button = %BtnResultSkip
+@onready var result_detail_button: Button = %BtnResultDetail
+@onready var result_pull_again_button: Button = %BtnResultPullAgain
 
 # ==============================================================================
 # 公开交互方法（卡池切换 / 抽卡预演 / 保底重置）
@@ -176,6 +173,13 @@ func _get_tabs():
 	return _tabs
 
 func _ready() -> void:
+	if ServiceLocator.get_mode() != "mock":
+		current_pity_counter = 0
+		pity_5star = 0
+		pity_4star = 0
+		var economy_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("economy")
+		var wallet_table: Dictionary = economy_snapshot.get("wallet", {}) as Dictionary
+		currency_primogems = int(wallet_table.get("mana_monocrystals", wallet_table.get("gold", 0)))
 	_apply_theme()
 	_load_mock_data()
 	_init_static_text()

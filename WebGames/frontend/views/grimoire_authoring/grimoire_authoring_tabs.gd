@@ -82,8 +82,8 @@ func init_static_text() -> void:
 		if binding_entry[0] != null:
 			UIIntermediary.resolve(binding_entry[0], binding_entry[1])
 
-	if view._authoring_title_input != null:
-		UIIntermediary.resolve_placeholder(view._authoring_title_input, "ui.fe13.authoring.title_ph")
+	if view.authoring_title_input != null:
+		UIIntermediary.resolve_placeholder(view.authoring_title_input, "ui.fe13.authoring.title_ph")
 	var decompile_success_label: Label = view.get_node_or_null("%s/DecLeftPanel/DecSuccessRow/DecSuccessLabel" % decompile_path)
 	if decompile_success_label != null:
 		UIIntermediary.resolve(decompile_success_label, "ui.fe13.decompile.success", {"percent": 65})
@@ -92,13 +92,13 @@ func init_static_text() -> void:
 func init_authoring_tab() -> void:
 	var view: GrimoireAuthoringView = _view
 	for style in cover_styles:
-		view._authoring_cover_option.add_item(UIIntermediary.text("ui.fe13.mock.cover." + style))
+		view.authoring_cover_option.add_item(UIIntermediary.text("ui.fe13.mock.cover." + style))
 	for audience in audiences:
-		view._authoring_audience_option.add_item(UIIntermediary.text("ui.fe13.mock.audience." + audience))
+		view.authoring_audience_option.add_item(UIIntermediary.text("ui.fe13.mock.audience." + audience))
 	for mode in royalty_modes:
 		view._authoring_royalty_mode_option.add_item(UIIntermediary.text("ui.fe13.mock.royalty_mode." + mode))
 	for publisher in publishers:
-		view._authoring_publisher_option.add_item(UIIntermediary.text("ui.fe13.mock.publisher." + publisher))
+		view.authoring_publisher_option.add_item(UIIntermediary.text("ui.fe13.mock.publisher." + publisher))
 	refresh_authoring_estimate()
 
 ## 根据选中的版税分配模式刷新预估版税收益区间
@@ -108,21 +108,23 @@ func refresh_authoring_estimate() -> void:
 	var estimate: Dictionary = ServiceLocator.get_instance().grimoire().estimate_authoring_income(royalty_index)
 	if not bool(estimate.get("success", false)):
 		return
-	UIIntermediary.resolve(view._authoring_estimate_label, "ui.fe13.authoring.estimate", {
+	UIIntermediary.resolve(view.authoring_estimate_label, "ui.fe13.authoring.estimate", {
 		"min": int(estimate.get("min", 0)),
 		"max": int(estimate.get("max", 0)),
 	})
 
-## 响应著书提交按钮，校验书名并给出出版提示
+## 响应著书提交按钮，校验书名后派发出版协议并刷新列表提示
 func on_auth_submit_pressed() -> void:
 	var view: GrimoireAuthoringView = _view
-	var title: String = view._authoring_title_input.text.strip_edges()
+	var title: String = view.authoring_title_input.text.strip_edges()
 	if title.is_empty():
 		NavManager.get_instance().show_toast(
 			UIIntermediary.text("ui.fe13.authoring.name_required"),
 			NavTypes.ToastLevel.WARNING
 		)
 		return
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("PUBLISH_GRIMOIRE", {"title": title})
+	view.authored_books.append({"title": title})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.authoring.submit_toast", {"title": title}),
 		NavTypes.ToastLevel.INFO
@@ -143,25 +145,25 @@ func init_royalty_tab() -> void:
 func refresh_royalty_detail() -> void:
 	var view: GrimoireAuthoringView = _view
 	if selected_book_index < 0 or selected_book_index >= royalty_books.size():
-		UIIntermediary.resolve(view._royalty_sales_label, "ui.fe13.royalty.sales_none")
-		UIIntermediary.resolve(view._royalty_rank_label, "ui.fe13.royalty.rank_none")
-		UIIntermediary.resolve(view._royalty_income_label, "ui.fe13.royalty.income_none")
+		UIIntermediary.resolve(view.royalty_sales_label, "ui.fe13.royalty.sales_none")
+		UIIntermediary.resolve(view.royalty_rank_label, "ui.fe13.royalty.rank_none")
+		UIIntermediary.resolve(view.royalty_income_label, "ui.fe13.royalty.income_none")
 		return
 	var book: Dictionary = royalty_books[selected_book_index]
-	UIIntermediary.resolve(view._royalty_sales_label, "ui.fe13.royalty.sales", {
+	UIIntermediary.resolve(view.royalty_sales_label, "ui.fe13.royalty.sales", {
 		"title": UIIntermediary.text(str(book.get("title_key", ""))),
 		"sales": int(book.get("sales", 0))
 	})
-	UIIntermediary.resolve(view._royalty_rank_label, "ui.fe13.royalty.rank", {"rank": int(book.get("rank", 0))})
-	UIIntermediary.resolve(view._royalty_income_label, "ui.fe13.royalty.income", {"amount": int(book.get("income", 0))})
+	UIIntermediary.resolve(view.royalty_rank_label, "ui.fe13.royalty.rank", {"rank": int(book.get("rank", 0))})
+	UIIntermediary.resolve(view.royalty_income_label, "ui.fe13.royalty.income", {"amount": int(book.get("income", 0))})
 
 ## 汇总全部著作待领取版税总额并刷新领取按钮文案
 func refresh_royalty_summary() -> void:
 	var view: GrimoireAuthoringView = _view
 	var summary: Dictionary = ServiceLocator.get_instance().grimoire().sum_royalties(royalty_books)
 	var total_income: int = int(summary.get("total", 0))
-	UIIntermediary.resolve(view._royalty_total_income_label, "ui.fe13.royalty.total_income", {"amount": total_income})
-	UIIntermediary.resolve(view._royalty_period_label, "ui.fe13.royalty.period")
+	UIIntermediary.resolve(view.royalty_total_income_label, "ui.fe13.royalty.total_income", {"amount": total_income})
+	UIIntermediary.resolve(view.royalty_period_label, "ui.fe13.royalty.period")
 	UIIntermediary.resolve(view._royalty_claim_button, "ui.fe13.royalty.claim_btn", {"amount": total_income})
 
 ## 按著作收益重绘版税对比柱状图（池化复用行节点）
@@ -181,14 +183,14 @@ func refresh_royalty_chart() -> void:
 		income_bar.value = float(book.get("income", 0))
 		var value_label := chart_row.get_child(2) as Label
 		value_label.text = UIIntermediary.text("ui.fe13.royalty.chart_value", {"amount": int(book.get("income", 0))})
-	for extra_index in range(royalty_books.size(), view._royalty_chart_container.get_child_count()):
-		view._royalty_chart_container.get_child(extra_index).visible = false
+	for extra_index in range(royalty_books.size(), view.royalty_chart_container.get_child_count()):
+		view.royalty_chart_container.get_child(extra_index).visible = false
 
 ## 获取或创建版税柱状图行节点（循环外分配）
 func _acquire_royalty_chart_row(index: int) -> HBoxContainer:
 	var view: GrimoireAuthoringView = _view
-	if index < view._royalty_chart_container.get_child_count():
-		return view._royalty_chart_container.get_child(index) as HBoxContainer
+	if index < view.royalty_chart_container.get_child_count():
+		return view.royalty_chart_container.get_child(index) as HBoxContainer
 	var chart_row := HBoxContainer.new()
 	chart_row.set("theme_override_constants/separation", 8)
 	var name_label := Label.new()
@@ -200,7 +202,7 @@ func _acquire_royalty_chart_row(index: int) -> HBoxContainer:
 	var value_label := Label.new()
 	value_label.custom_minimum_size = Vector2(100, 0)
 	chart_row.add_child(value_label)
-	view._royalty_chart_container.add_child(chart_row)
+	view.royalty_chart_container.add_child(chart_row)
 	return chart_row
 
 ## 响应著作列表选中切换当前版税详情展示
@@ -208,7 +210,7 @@ func on_roy_book_selected(book_index: int) -> void:
 	selected_book_index = book_index
 	refresh_royalty_detail()
 
-## 一键领取全部待结算版税并清零统计显示
+## 一键领取全部待结算版税，经后端结算金币并清零统计显示
 func on_roy_claim_pressed() -> void:
 	var total: int = 0
 	for book in royalty_books:
@@ -219,6 +221,7 @@ func on_roy_claim_pressed() -> void:
 			NavTypes.ToastLevel.WARNING
 		)
 		return
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("CLAIM_ROYALTIES", {"amount": total})
 	for book in royalty_books:
 		book["income"] = 0
 	refresh_royalty_detail()
@@ -249,23 +252,23 @@ func refresh_decompile_detail() -> void:
 
 	var difficulty: int = int(target.get("difficulty", 3))
 	var stars: String = "*".repeat(difficulty) + "-".repeat(5 - difficulty)
-	UIIntermediary.resolve(view._decompile_difficulty_label, "ui.fe13.decompile.difficulty", {"stars": stars, "level": difficulty})
+	UIIntermediary.resolve(view.decompile_difficulty_label, "ui.fe13.decompile.difficulty", {"stars": stars, "level": difficulty})
 
 	var success_rate: float = float(target.get("success_rate", 0.5))
-	view._decompile_success_bar.value = success_rate
+	view.decompile_success_bar.value = success_rate
 
 	var decompile_success_label: Label = view.get_node_or_null("MarginContainer/VBox/MainTabContainer/DecompileTab/DecLeftPanel/DecSuccessRow/DecSuccessLabel")
 	if decompile_success_label != null:
 		UIIntermediary.resolve(decompile_success_label, "ui.fe13.decompile.success", {"percent": int(success_rate * 100)})
 
-	view._decompile_material_list.clear()
+	view.decompile_material_list.clear()
 	for material_key in target.get("materials", []):
-		view._decompile_material_list.add_item(UIIntermediary.text("ui.fe13.mock.dec." + material_key))
+		view.decompile_material_list.add_item(UIIntermediary.text("ui.fe13.mock.dec." + material_key))
 
-	UIIntermediary.resolve(view._decompile_risk_label, "ui.fe13.decompile.risk", {"risk": UIIntermediary.text(decompile_key + ".risk")})
-	UIIntermediary.resolve(view._decompile_preview_label, "ui.fe13.decompile.preview", {"content": UIIntermediary.text(decompile_key + ".preview")})
+	UIIntermediary.resolve(view.decompile_risk_label, "ui.fe13.decompile.risk", {"risk": UIIntermediary.text(decompile_key + ".risk")})
+	UIIntermediary.resolve(view.decompile_preview_label, "ui.fe13.decompile.preview", {"content": UIIntermediary.text(decompile_key + ".preview")})
 
-## 响应开始反编译按钮并触发反编译提示反馈
+## 响应开始反编译按钮并派发后端反编译协议
 func on_dec_decompile_pressed() -> void:
 	var view: GrimoireAuthoringView = _view
 	var target_index: int = view._decompile_target_option.selected
@@ -276,6 +279,7 @@ func on_dec_decompile_pressed() -> void:
 		)
 		return
 	var target: Dictionary = decompile_targets[target_index]
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("DECOMPILE_GRIMOIRE", {"target_key": str(target.get("key", ""))})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.decompile.start_toast", {"key": str(target.get("key", ""))}),
 		NavTypes.ToastLevel.INFO

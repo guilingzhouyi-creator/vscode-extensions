@@ -13,7 +13,6 @@ class_name GachaWishTabs
 extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
-const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
 
@@ -31,20 +30,20 @@ func init_static_text() -> void:
 	var view: GachaWishView = _view
 	var bindings := [
 		[view.get_node("MainLayout/HeaderPanel/HeaderHBox/TitleLabel"), "ui.fe06.header.title"],
-		[view._toggle_history_button, "ui.fe06.header.history"],
-		[view._back_button, "ui.fe06.header.back"],
+		[view.toggle_history_button, "ui.fe06.header.history"],
+		[view.back_button, "ui.fe06.header.back"],
 		[view.get_node("MainLayout/BodyRow/WishMainPanel/BannerSwitchLabel"), "ui.fe06.banner.select_label"],
-		[view._label_cover_placeholder, "ui.fe06.banner.cover_placeholder"],
+		[view.label_cover_placeholder, "ui.fe06.banner.cover_placeholder"],
 		[view.get_node("MainLayout/BodyRow/WishMainPanel/UpItemsLabel"), "ui.fe06.up_items.label"],
 		[view.get_node("MainLayout/BodyRow/WishMainPanel/PitySection/PityLabelTitle"), "ui.fe06.pity.section_label"],
-		[view._single_pull_button, "ui.fe06.btn.single_pull"],
-		[view._ten_pull_button, "ui.fe06.btn.ten_pull"],
+		[view.single_pull_button, "ui.fe06.btn.single_pull"],
+		[view.ten_pull_button, "ui.fe06.btn.ten_pull"],
 		[view.get_node("MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryHeaderRow/HistoryTitleLabel"), "ui.fe06.history.title"],
-		[view._history_close_button, "ui.fe06.history.close"],
+		[view.history_close_button, "ui.fe06.history.close"],
 		[view.get_node("MainLayout/BodyRow/HistoryPanel/HistoryVBox/HistoryListLabel"), "ui.fe06.history.list_label"],
-		[view._result_skip_button, "ui.fe06.result.skip"],
-		[view._result_detail_button, "ui.fe06.result.detail"],
-		[view._result_pull_again_button, "ui.fe06.result.pull_again"]
+		[view.result_skip_button, "ui.fe06.result.skip"],
+		[view.result_detail_button, "ui.fe06.result.detail"],
+		[view.result_pull_again_button, "ui.fe06.result.pull_again"]
 	]
 	for binding_entry in bindings:
 		if binding_entry[0] != null:
@@ -53,14 +52,14 @@ func init_static_text() -> void:
 ## 绑定祈愿页面各按钮与面板切换信号
 func connect_signals() -> void:
 	var view: GachaWishView = _view
-	connect_managed(view._back_button.pressed, view._on_back_pressed)
-	connect_managed(view._toggle_history_button.pressed, on_toggle_history_pressed)
-	connect_managed(view._history_close_button.pressed, on_history_close_pressed)
-	connect_managed(view._single_pull_button.pressed, view._on_single_pull_pressed)
-	connect_managed(view._ten_pull_button.pressed, view._on_ten_pull_pressed)
-	connect_managed(view._result_skip_button.pressed, on_result_skip_pressed)
-	connect_managed(view._result_detail_button.pressed, on_result_detail_pressed)
-	connect_managed(view._result_pull_again_button.pressed, on_result_pull_again_pressed)
+	connect_managed(view.back_button.pressed, view._on_back_pressed)
+	connect_managed(view.toggle_history_button.pressed, on_toggle_history_pressed)
+	connect_managed(view.history_close_button.pressed, on_history_close_pressed)
+	connect_managed(view.single_pull_button.pressed, view._on_single_pull_pressed)
+	connect_managed(view.ten_pull_button.pressed, view._on_ten_pull_pressed)
+	connect_managed(view.result_skip_button.pressed, on_result_skip_pressed)
+	connect_managed(view.result_detail_button.pressed, on_result_detail_pressed)
+	connect_managed(view.result_pull_again_button.pressed, on_result_pull_again_pressed)
 
 ## 初始化卡池切换栏按钮并同步选中状态
 func init_banner_switch() -> void:
@@ -71,15 +70,15 @@ func init_banner_switch() -> void:
 		switch_button.visible = true
 		switch_button.text = UIIntermediary.text(str(banner.get("title", "ui.fe06.unknown")))
 		switch_button.set_meta("banner_id", str(banner.get("banner_id", "")))
-	for extra_index in range(view._banners.size(), view._banner_switch_box.get_child_count()):
-		view._banner_switch_box.get_child(extra_index).visible = false
+	for extra_index in range(view._banners.size(), view.banner_switch_box.get_child_count()):
+		view.banner_switch_box.get_child(extra_index).visible = false
 	refresh_banner_switch_buttons()
 
 ## 获取或创建卡池切换按钮（池化复用，点击按按钮元数据解析当前 banner_id）
 func _acquire_banner_switch_button(button_index: int) -> Button:
 	var view: GachaWishView = _view
-	if button_index < view._banner_switch_box.get_child_count():
-		return view._banner_switch_box.get_child(button_index) as Button
+	if button_index < view.banner_switch_box.get_child_count():
+		return view.banner_switch_box.get_child(button_index) as Button
 	var switch_button := KButtonClass.new()
 	switch_button.variant = KButtonClass.StyleVariant.SECONDARY
 	switch_button.toggle_mode = true
@@ -89,16 +88,16 @@ func _acquire_banner_switch_button(button_index: int) -> Button:
 		if not banner_identifier.is_empty():
 			view.switch_banner(banner_identifier)
 	)
-	view._banner_switch_box.add_child(switch_button)
+	view.banner_switch_box.add_child(switch_button)
 	return switch_button
 
 ## 按当前激活卡池 ID 刷新切换按钮高亮态
 func refresh_banner_switch_buttons() -> void:
 	var view: GachaWishView = _view
-	if not view._banner_switch_box:
+	if not view.banner_switch_box:
 		return
-	for banner_index in view._banner_switch_box.get_child_count():
-		var switch_button: Button = view._banner_switch_box.get_child(banner_index)
+	for banner_index in view.banner_switch_box.get_child_count():
+		var switch_button: Button = view.banner_switch_box.get_child(banner_index)
 		var banner_identifier: String = str(view._banners[banner_index].get("banner_id", ""))
 		switch_button.button_pressed = (banner_identifier == view.current_banner_id)
 
@@ -117,25 +116,25 @@ func refresh_banner_display() -> void:
 	var title_key := str(banner.get("title", "ui.fe06.banner.title_default"))
 	var subtitle_key := str(banner.get("subtitle", "ui.fe06.banner.subtitle_default"))
 	var remaining_key := str(banner.get("remaining_time", "ui.fe06.banner.remaining_default"))
-	if view._label_banner_title:
-		UIIntermediary.resolve(view._label_banner_title, title_key)
-	if view._label_banner_subtitle:
-		UIIntermediary.resolve(view._label_banner_subtitle, subtitle_key)
-	if view._label_remaining_time:
-		UIIntermediary.resolve(view._label_remaining_time, remaining_key)
+	if view.label_banner_title:
+		UIIntermediary.resolve(view.label_banner_title, title_key)
+	if view.label_banner_subtitle:
+		UIIntermediary.resolve(view.label_banner_subtitle, subtitle_key)
+	if view.label_remaining_time:
+		UIIntermediary.resolve(view.label_remaining_time, remaining_key)
 
 ## 刷新当前卡池 UP 角色与武器展示网格
 func refresh_up_items() -> void:
 	var view: GachaWishView = _view
-	if not view._up_items_grid:
+	if not view.up_items_grid:
 		return
 	var banner := get_current_banner()
 	var up_items: Array = banner.get("up_items", [])
 	for item_index in range(up_items.size()):
-		var cell := _acquire_up_item_cell(view._up_items_grid, item_index)
+		var cell := _acquire_up_item_cell(view.up_items_grid, item_index)
 		_configure_up_item_cell(cell, up_items[item_index] as Dictionary)
-	for extra_index in range(up_items.size(), view._up_items_grid.get_child_count()):
-		(view._up_items_grid.get_child(extra_index) as Control).visible = false
+	for extra_index in range(up_items.size(), view.up_items_grid.get_child_count()):
+		(view.up_items_grid.get_child(extra_index) as Control).visible = false
 
 func _make_card_label(text_value: String, font_size: int, font_color: Color) -> Label:
 	var label_node := Label.new()
@@ -178,8 +177,8 @@ func _configure_up_item_cell(panel: PanelContainer, item_entry: Dictionary) -> v
 func init_history_panel() -> void:
 	var view: GachaWishView = _view
 	view.history_panel_visible = false
-	if view._history_panel:
-		view._history_panel.visible = false
+	if view.history_panel:
+		view.history_panel.visible = false
 	refresh_history_stats()
 	refresh_history_list()
 
@@ -187,27 +186,27 @@ func init_history_panel() -> void:
 func on_toggle_history_pressed() -> void:
 	var view: GachaWishView = _view
 	view.history_panel_visible = not view.history_panel_visible
-	if view._history_panel:
-		view._history_panel.visible = view.history_panel_visible
+	if view.history_panel:
+		view.history_panel.visible = view.history_panel_visible
 
 ## 关闭抽卡历史记录侧面板
 func on_history_close_pressed() -> void:
 	var view: GachaWishView = _view
 	view.history_panel_visible = false
-	if view._history_panel:
-		view._history_panel.visible = false
+	if view.history_panel:
+		view.history_panel.visible = false
 
 ## 刷新累计祈愿次数及各星级出货统计比率
 func refresh_history_stats() -> void:
 	var view: GachaWishView = _view
-	if view._label_total_pulls:
-		UIIntermediary.resolve(view._label_total_pulls, "ui.fe06.history.total_pulls", {"count": view.total_pull_count})
-	if view._label_rarity_stats:
+	if view.label_total_pulls:
+		UIIntermediary.resolve(view.label_total_pulls, "ui.fe06.history.total_pulls", {"count": view.total_pull_count})
+	if view.label_rarity_stats:
 		var total: int = view.total_pull_count if view.total_pull_count > 0 else 1
 		var rank_5_count := int(view._rarity_counts.get("5", 0))
 		var rank_4_count := int(view._rarity_counts.get("4", 0))
 		var rank_3_count := int(view._rarity_counts.get("3", 0))
-		UIIntermediary.resolve(view._label_rarity_stats, "ui.fe06.history.rarity_stats", {
+		UIIntermediary.resolve(view.label_rarity_stats, "ui.fe06.history.rarity_stats", {
 			"r5": str(rank_5_count),
 			"r5_pct": "%.1f" % (float(rank_5_count) / float(total) * 100.0),
 			"r4": str(rank_4_count),
@@ -219,9 +218,9 @@ func refresh_history_stats() -> void:
 ## 刷新最近 50 条祈愿记录并按稀有度着色
 func refresh_history_list() -> void:
 	var view: GachaWishView = _view
-	if not view._history_item_list:
+	if not view.history_item_list:
 		return
-	view._history_item_list.clear()
+	view.history_item_list.clear()
 	var recent: Variant = view.wish_history_log.slice(maxi(0, view.wish_history_log.size() - 50), view.wish_history_log.size())
 	recent.reverse()
 	for entry in recent:
@@ -229,10 +228,10 @@ func refresh_history_list() -> void:
 		var display_name := UIIntermediary.text(name_key)
 		var rarity := str(entry.get("rarity", "3"))
 		var formatted_line := UIIntermediary.text("ui.fe06.history.item", {"rarity": rarity, "name": display_name})
-		view._history_item_list.add_item(formatted_line)
-		var added_index: int = view._history_item_list.item_count - 1
-		view._history_item_list.set_item_tooltip(added_index, formatted_line)
-		view._history_item_list.set_item_custom_fg_color(added_index, KRarityTag.get_rarity_color(int(rarity)))
+		view.history_item_list.add_item(formatted_line)
+		var added_index: int = view.history_item_list.item_count - 1
+		view.history_item_list.set_item_tooltip(added_index, formatted_line)
+		view.history_item_list.set_item_custom_fg_color(added_index, KRarityTag.get_rarity_color(int(rarity)))
 
 ## 初始化抽卡结果弹窗默认状态
 func init_result_overlay() -> void:
@@ -262,14 +261,14 @@ func hide_result_overlay() -> void:
 ## 按本次祈愿掉落数组刷新结果卡片网格
 func populate_result_grid(drops: Array) -> void:
 	var view: GachaWishView = _view
-	if not view._result_items_grid:
+	if not view.result_items_grid:
 		return
 	for drop_index in range(drops.size()):
-		var cell := _acquire_result_cell(view._result_items_grid, drop_index)
+		var cell := _acquire_result_cell(view.result_items_grid, drop_index)
 		_configure_result_cell(cell, drops[drop_index] as Dictionary)
-	for extra_index in range(drops.size(), view._result_items_grid.get_child_count()):
-		(view._result_items_grid.get_child(extra_index) as Control).visible = false
-	view._result_items_grid.tooltip_text = UIIntermediary.text("ui.fe06.result.count", {"count": drops.size()})
+	for extra_index in range(drops.size(), view.result_items_grid.get_child_count()):
+		(view.result_items_grid.get_child(extra_index) as Control).visible = false
+	view.result_items_grid.tooltip_text = UIIntermediary.text("ui.fe06.result.count", {"count": drops.size()})
 
 func _acquire_result_cell(grid: Container, cell_index: int) -> PanelContainer:
 	if cell_index < grid.get_child_count():
@@ -337,30 +336,43 @@ func on_result_pull_again_pressed() -> void:
 func load_mock_data() -> void:
 	var service: Variant = _view._gacha_service()
 	var rules: Dictionary = service.get_rules() if service != null else {}
-	var banners := [
-		{
-			"banner_id": "BANNER_LIMITED_WARRIOR",
-			"title": "ui.fe06.mock.banner.limited_warrior.title",
-			"subtitle": "ui.fe06.mock.banner.limited_warrior.subtitle",
-			"remaining_time": "ui.fe06.mock.banner.limited_warrior.remaining",
-			"up_items": [
-				{"name": "ui.fe06.mock.item.flame_knight", "rarity": "5", "is_recently_added": true, "is_new": true},
-				{"name": "ui.fe06.mock.item.dragon_spine_greatsword", "rarity": "5", "is_recently_added": false, "is_new": false},
-				{"name": "ui.fe06.mock.item.wind_shortbow", "rarity": "4", "is_recently_added": false, "is_new": false},
-			],
-		},
-		{
-			"banner_id": "BANNER_PERMANENT",
-			"title": "ui.fe06.mock.banner.permanent.title",
-			"subtitle": "ui.fe06.mock.banner.permanent.subtitle",
-			"remaining_time": "ui.fe06.mock.banner.permanent.remaining",
-			"up_items": [
-				{"name": "ui.fe06.mock.item.mithril_guardian", "rarity": "5", "is_recently_added": false, "is_new": false},
-				{"name": "ui.fe06.mock.item.arcane_staff", "rarity": "4", "is_recently_added": true, "is_new": true},
-				{"name": "ui.fe06.mock.item.healing_potion_l", "rarity": "3", "is_recently_added": false, "is_new": false},
-			],
-		},
-	]
+	var banners: Array = []
+	if ServiceLocator.get_mode() == "mock":
+		banners = [
+			{
+				"banner_id": "BANNER_LIMITED_WARRIOR",
+				"title": "ui.fe06.mock.banner.limited_warrior.title",
+				"subtitle": "ui.fe06.mock.banner.limited_warrior.subtitle",
+				"remaining_time": "ui.fe06.mock.banner.limited_warrior.remaining",
+				"up_items": [
+					{"name": "ui.fe06.mock.item.flame_knight", "rarity": "5", "is_recently_added": true, "is_new": true},
+					{"name": "ui.fe06.mock.item.dragon_spine_greatsword", "rarity": "5", "is_recently_added": false, "is_new": false},
+					{"name": "ui.fe06.mock.item.wind_shortbow", "rarity": "4", "is_recently_added": false, "is_new": false},
+				],
+			},
+			{
+				"banner_id": "BANNER_PERMANENT",
+				"title": "ui.fe06.mock.banner.permanent.title",
+				"subtitle": "ui.fe06.mock.banner.permanent.subtitle",
+				"remaining_time": "ui.fe06.mock.banner.permanent.remaining",
+				"up_items": [
+					{"name": "ui.fe06.mock.item.mithril_guardian", "rarity": "5", "is_recently_added": false, "is_new": false},
+					{"name": "ui.fe06.mock.item.arcane_staff", "rarity": "4", "is_recently_added": true, "is_new": true},
+					{"name": "ui.fe06.mock.item.healing_potion_l", "rarity": "3", "is_recently_added": false, "is_new": false},
+				],
+			},
+		]
+	else:
+		var banner_defaults: Dictionary = GameConfig.get_dict("domains.gacha", "banner_defaults", {})
+		var default_id := str(banner_defaults.get("banner_id", "BANNER_STANDARD_DEFAULT"))
+		banners = [{
+			"banner_id": default_id,
+			"title": str(banner_defaults.get("banner_title", default_id)),
+			"subtitle": str(banner_defaults.get("fallback_title", "")),
+			"remaining_time": "-",
+			"up_items": [],
+		}]
+		_view.current_banner_id = default_id
 	_view.apply_snapshot({"banners": banners, "pull_rules": rules})
 
 ## 统一页面标题栏构建

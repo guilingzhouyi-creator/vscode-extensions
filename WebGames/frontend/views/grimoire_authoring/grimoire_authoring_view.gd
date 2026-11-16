@@ -12,7 +12,6 @@
 class_name GrimoireAuthoringView
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const GrimoireAuthoringTabsClass = preload("res://frontend/views/grimoire_authoring/grimoire_authoring_tabs.gd")
 
 const RARITY_COMMON: String = "common"
@@ -36,7 +35,6 @@ const RARITY_COMMON: String = "common"
 
 # --- Tab 1: AST_EDITOR AST编辑器 ---
 @onready var _ast_node_toolbox: ItemList = $%AstNodeToolbox
-@onready var _ast_canvas_panel: PanelContainer = $%AstCanvasPanel
 @onready var _ast_property_name_label: Label = $%AstPropNameLabel
 @onready var _ast_property_type_label: Label = $%AstPropTypeLabel
 @onready var _ast_property_description_label: Label = $%AstPropDescLabel
@@ -45,32 +43,31 @@ const RARITY_COMMON: String = "common"
 @onready var _ast_test_button: Button = $%AstTestBtn
 
 # --- Tab 2: AUTHORING 著书 ---
-@onready var _authoring_title_input: LineEdit = $%AuthTitleInput
-@onready var _authoring_cover_option: OptionButton = $%AuthCoverOption
-@onready var _authoring_content_edit: TextEdit = $%AuthContentEdit
-@onready var _authoring_audience_option: OptionButton = $%AuthAudienceOption
+@onready var authoring_title_input: LineEdit = $%AuthTitleInput
+@onready var authoring_cover_option: OptionButton = $%AuthCoverOption
+@onready var authoring_audience_option: OptionButton = $%AuthAudienceOption
 @onready var _authoring_royalty_mode_option: OptionButton = $%AuthRoyaltyModeOption
-@onready var _authoring_publisher_option: OptionButton = $%AuthPublisherOption
-@onready var _authoring_estimate_label: Label = $%AuthEstimateLabel
+@onready var authoring_publisher_option: OptionButton = $%AuthPublisherOption
+@onready var authoring_estimate_label: Label = $%AuthEstimateLabel
 @onready var _authoring_submit_button: Button = $%AuthSubmitBtn
 
 # --- Tab 3: ROYALTY 版税 ---
 @onready var _royalty_book_list: ItemList = $%RoyBookList
-@onready var _royalty_sales_label: Label = $%RoySalesLabel
-@onready var _royalty_rank_label: Label = $%RoyRankLabel
-@onready var _royalty_income_label: Label = $%RoyIncomeLabel
-@onready var _royalty_chart_container: VBoxContainer = $%RoyChartContainer
-@onready var _royalty_total_income_label: Label = $%RoyTotalIncomeLabel
-@onready var _royalty_period_label: Label = $%RoyPeriodLabel
+@onready var royalty_sales_label: Label = $%RoySalesLabel
+@onready var royalty_rank_label: Label = $%RoyRankLabel
+@onready var royalty_income_label: Label = $%RoyIncomeLabel
+@onready var royalty_chart_container: VBoxContainer = $%RoyChartContainer
+@onready var royalty_total_income_label: Label = $%RoyTotalIncomeLabel
+@onready var royalty_period_label: Label = $%RoyPeriodLabel
 @onready var _royalty_claim_button: Button = $%RoyClaimBtn
 
 # --- Tab 4: DECOMPILE 反编译 ---
 @onready var _decompile_target_option: OptionButton = $%DecTargetOption
-@onready var _decompile_difficulty_label: Label = $%DecDifficultyLabel
-@onready var _decompile_success_bar: ProgressBar = $%DecSuccessBar
-@onready var _decompile_material_list: ItemList = $%DecMaterialList
-@onready var _decompile_risk_label: Label = $%DecRiskLabel
-@onready var _decompile_preview_label: Label = $%DecPreviewLabel
+@onready var decompile_difficulty_label: Label = $%DecDifficultyLabel
+@onready var decompile_success_bar: ProgressBar = $%DecSuccessBar
+@onready var decompile_material_list: ItemList = $%DecMaterialList
+@onready var decompile_risk_label: Label = $%DecRiskLabel
+@onready var decompile_preview_label: Label = $%DecPreviewLabel
 @onready var _decompile_confirm_button: Button = $%DecDecompileBtn
 
 # --- 底部操作栏 ---
@@ -149,8 +146,8 @@ func _render_from_snapshot() -> void:
 		authored_books = FrontendSnapshot.read_array(snapshot, "authored_books")
 
 ## 追加 AST 编辑器节点（映射 ast_editor_nodes）
-func add_editor_node(node_id: String, node_type: String, position: Vector2) -> Dictionary:
-	ast_editor_nodes.append({"node_id": node_id, "node_type": node_type, "position": position})
+func add_editor_node(node_id: String, node_type: String, node_position: Vector2) -> Dictionary:
+	ast_editor_nodes.append({"node_id": node_id, "node_type": node_type, "position": node_position})
 	return {"success": true, "node_id": node_id}
 
 ## 建立 AST 节点连接（映射 ast_editor_connections）
@@ -304,13 +301,14 @@ func _on_grimoire_selected(grimoire_index: int) -> void:
 	_selected_grimoire_index = grimoire_index
 	_refresh_library_detail()
 
-## 学习魔典按钮：未学习则置已学并刷新详情/列表及 Toast 反馈
+## 学习魔典按钮：未学习则派发学习协议并置已学，刷新详情/列表及 Toast 反馈
 func _on_lib_learn_pressed() -> void:
 	if _selected_grimoire_index < 0 or _selected_grimoire_index >= _filtered_grimoires.size():
 		return
 	var grimoire: Dictionary = _filtered_grimoires[_selected_grimoire_index]
 	if bool(grimoire.get("learned", false)):
 		return
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("LEARN_GRIMOIRE", {"grimoire_id": str(grimoire.get("id", ""))})
 	grimoire["learned"] = true
 	_refresh_library_detail()
 	_refresh_grimoire_list()
@@ -350,22 +348,25 @@ func _on_ast_node_selected(node_index: int) -> void:
 	_selected_ast_node_index = node_index
 	_refresh_ast_detail()
 
-## AST 保存草稿按钮（经 Toast 预设反馈，未接真实后端）
+## AST 保存草稿按钮：派发保存草稿指令并弹出提示
 func _on_ast_save_pressed() -> void:
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("SAVE_AST_DRAFT", {"node_count": ast_editor_nodes.size(), "connections": ast_editor_connections.size()})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.ast.save_toast"),
 		NavTypes.ToastLevel.INFO
 	)
 
-## AST 编译为魔典按钮（经 Toast 预设反馈，未接真实后端）
+## AST 编译为魔典按钮：派发编译协议并弹出提示
 func _on_ast_compile_pressed() -> void:
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("COMPILE_AST", {"nodes": ast_editor_nodes, "connections": ast_editor_connections})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.ast.compile_toast"),
 		NavTypes.ToastLevel.INFO
 	)
 
-## AST 测试运行按钮（经 Toast 预设反馈，未接真实后端）
+## AST 测试运行按钮：派发测试执行指令并弹出提示
 func _on_ast_test_pressed() -> void:
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("TEST_AST", {"nodes": ast_editor_nodes})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.ast.test_toast"),
 		NavTypes.ToastLevel.INFO
