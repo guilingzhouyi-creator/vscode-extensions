@@ -10,29 +10,6 @@
 class_name TestFullLifecycleChainAndEscFlowPipeline
 extends TestCase
 
-const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const AntiBridgeGuard = preload("res://backend/domains/world_gateway/anti_bridge_guard.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const EscMenuBackendService = preload("res://backend/domains/world_state/services/esc_menu_backend_service.gd")
-const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const AccountEntryView = preload("res://frontend/views/account_entry/account_entry_view.gd")
-const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
-const PrologueHandoffDTO = preload("res://backend/domains/character_creation/dto/prologue_handoff_dto.gd")
-const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	_reset_env()

@@ -9,19 +9,6 @@
 class_name TestDualDomainStoragePipeline
 extends TestCase
 
-const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
-const MinimumWorldStateDTO = preload("res://backend/domains/persistence_protocol/dto/minimum_world_state_dto.gd")
-const StorageMetricsDTO = preload("res://backend/domains/persistence_protocol/dto/storage_metrics_dto.gd")
-const PrimaryStorageEngine = preload("res://backend/domains/persistence_protocol/primary_storage_engine.gd")
-const AuxiliaryWorkerPool = preload("res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd")
-const CancellationToken = preload("res://backend/domains/persistence_protocol/cancellation_token.gd")
-const FrameBudgetDispatcher = preload("res://backend/domains/persistence_protocol/frame_budget_dispatcher.gd")
-const PreloadWindowGovernor = preload("res://backend/domains/persistence_protocol/preload_window_governor.gd")
-const ResourceDependencyDAG = preload("res://backend/domains/persistence_protocol/resource_dependency_dag.gd")
-const TargetedHotReloader = preload("res://backend/domains/persistence_protocol/targeted_hot_reloader.gd")
-const StorageObservability = preload("res://backend/domains/persistence_protocol/storage_observability.gd")
-const SaveManager = preload("res://backend/infrastructure/save_manager.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_primary_storage_fast_recovery())

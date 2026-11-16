@@ -16,24 +16,6 @@
 class_name TestClientProtocolSpaceAndBoundaryPipeline
 extends TestCase
 
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
-const MockServiceContainer = preload("res://frontend/domain_boundary/mocks/mock_service_container.gd")
-const RealAuthService = preload("res://frontend/domain_boundary/services/real_auth_service.gd")
-const RealWorldService = preload("res://frontend/domain_boundary/services/real_world_service.gd")
-const RealCharacterService = preload("res://frontend/domain_boundary/services/real_character_service.gd")
-const RealEscMenuService = preload("res://frontend/domain_boundary/services/real_esc_menu_service.gd")
-const MockAuthService = preload("res://frontend/domain_boundary/mocks/mock_auth_service.gd")
-const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const GameSettingsProtocolHandler = preload("res://backend/domains/game_settings/game_settings_protocol_handler.gd")
-const TestClientProtocolExtendedHelper = preload("res://tests/integration/pipelines/test_client_protocol_extended_helper.gd")
-const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_proto_01_real_auth_lifecycle_and_session_activation())

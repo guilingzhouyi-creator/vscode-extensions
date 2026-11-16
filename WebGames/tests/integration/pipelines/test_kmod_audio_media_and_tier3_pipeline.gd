@@ -15,16 +15,6 @@
 class_name TestKmodAudioMediaAndTier3Pipeline
 extends TestCase
 
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-const CutsceneAsyncLoader = preload("res://backend/infrastructure/media/cutscene_async_loader.gd")
-const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
-const LocalizationRegistryCatalog = preload("res://backend/domains/localization_i18n/localization_registry_catalog.gd")
-const StarterLoadoutDispatcher = preload("res://backend/domains/character_creation/starter_loadout_dispatcher.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const TestKmodMediaFixtureHelper = preload("res://tests/integration/pipelines/test_kmod_media_fixture_helper.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
-
 const SANDBOX_ROOT: String = TestKmodMediaFixtureHelper.SANDBOX_ROOT
 
 

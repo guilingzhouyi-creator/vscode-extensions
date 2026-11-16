@@ -281,8 +281,8 @@ static func file_name_next(_dir: DirAccess, _fn: String) -> void:
 ## TC-LG-11: LogFileExporter 配置热重载版本侦测自愈断言
 static func _test_lg_11_exporter_config_reload_reconstruction() -> Dictionary:
 	LogFileExporterClass.reset_for_test()
-	var exp := LogFileExporterClass.get_instance()
-	if exp == null:
+	var exporter_instance := LogFileExporterClass.get_instance()
+	if exporter_instance == null:
 		return {"test": "TC-LG-11", "passed": false, "error": "Failed to get exporter instance"}
 	var current_cfg_version: int = LogFileExporterClass._config_version
 	# 模拟配置热重载版本推进
@@ -414,8 +414,8 @@ static func _test_lg_18_event_bus_signal_forwarding_to_frontend() -> Dictionary:
 	var bus := EventBusCore.get_instance()
 	var cb := func(pkt: EventPacket):
 		if pkt.payload_dto is LogRecordDTO:
-			var rec := pkt.payload_dto as LogRecordDTO
-			received_msgs.append({"level": rec.level, "message": rec.message})
+			var packet_record := pkt.payload_dto as LogRecordDTO
+			received_msgs.append({"level": packet_record.level, "message": packet_record.message})
 	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
 
 	var rec := LogRecordDTOClass.new()

@@ -7,12 +7,6 @@
 class_name TestGameLifecyclePipeline
 extends TestCase
 
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const ShutdownResourceDescriptor = preload("res://backend/domains/lifecycle/shutdown_resource_descriptor.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_s1_01_lifecycle_model_enums())

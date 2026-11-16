@@ -126,7 +126,7 @@ static func _test_tertiary_timeline_advancement() -> Dictionary:
 		return {"test": "TC-COMBAT-TIME-02: 后续事件自动排期", "passed": false, "error": "Scheduled events empty"}
 
 	# 持续推进至 10000ms，验证紧张点亦被触发
-	var fired2 := engine.advance_time(7000)
+	var _fired2 := engine.advance_time(7000)
 	if engine.current_timeline_ms != 10000:
 		return {"test": "TC-COMBAT-TIME-02: 累加时间推进", "passed": false, "error": "Accumulated timeline mismatch"}
 
@@ -300,4 +300,4 @@ static func _test_timeline_two_phase_no_reschedule_loss() -> Dictionary:
 			monotonic = false
 			break
 	var passed = no_starvation and fired_total >= round_count and monotonic and engine.scheduled_events.size() > 0
-	return { "test": "TC-COMBAT-TIME-07: 两阶段排期不断供（重排期不丢失、单调向未来）", "passed": passed }
+	return {"test": "TC-COMBAT-TIME-07: 两阶段排期不断供（重排期不丢失、单调向未来）", "passed": passed}

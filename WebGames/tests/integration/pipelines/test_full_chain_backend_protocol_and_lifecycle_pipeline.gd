@@ -13,30 +13,6 @@
 class_name TestFullChainBackendProtocolAndLifecyclePipeline
 extends TestCase
 
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
-const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const PrologueHandoffDTO = preload("res://backend/domains/character_creation/dto/prologue_handoff_dto.gd")
-const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const EscMenuBackendService = preload("res://backend/domains/world_state/services/esc_menu_backend_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_p127_01_full_eleven_link_backend_protocol_e2e())

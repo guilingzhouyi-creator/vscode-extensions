@@ -6,18 +6,6 @@
 class_name TestEventBus2ZeroGCPipeline
 extends TestCase
 
-const EventPacket = preload("res://backend/infrastructure/event_bus/event_packet.gd")
-const EventCategoryMask = preload("res://backend/infrastructure/event_bus/event_category_mask.gd")
-const EventChannelDefinition = preload("res://backend/infrastructure/event_bus/event_channel_definition.gd")
-const VisualCueDTO = preload("res://backend/infrastructure/event_bus/visual_cue_dto.gd")
-const PingPongRingBuffer = preload("res://backend/infrastructure/event_bus/ping_pong_ring_buffer.gd")
-const EventPool = preload("res://backend/infrastructure/event_bus/event_pool.gd")
-const HeadlessSpatialHashGrid3D = preload("res://backend/infrastructure/event_bus/headless_spatial_hash_grid_3d.gd")
-const EventBusSubscriptionToken = preload("res://backend/infrastructure/event_bus/event_bus_subscription_token.gd")
-const IVisualPresentationAdapter = preload("res://backend/infrastructure/event_bus/i_visual_presentation_adapter.gd")
-const HeadlessPresentationMockAdapter = preload("res://backend/infrastructure/event_bus/headless_presentation_mock_adapter.gd")
-const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
-
 static var _test_subscriptions: Array[EventBusSubscriptionToken] = []
 
 static func _track_subscription(token: EventBusSubscriptionToken) -> EventBusSubscriptionToken:

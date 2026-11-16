@@ -13,12 +13,6 @@
 class_name TestAccountRegistrationAndRealReloadPipeline
 extends TestCase
 
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const AccountEntryView = preload("res://frontend/views/account_entry/account_entry_view.gd")
-
 const TEST_ACCOUNTS_PATH: String = "user://test_p131_accounts/account_registry.json"
 
 static func run_all_tests() -> Dictionary:

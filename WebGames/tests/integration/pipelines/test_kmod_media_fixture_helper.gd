@@ -12,15 +12,6 @@
 class_name TestKmodMediaFixtureHelper
 extends RefCounted
 
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-const CutsceneAsyncLoader = preload("res://backend/infrastructure/media/cutscene_async_loader.gd")
-const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
-const LocalizationRegistryCatalog = preload("res://backend/domains/localization_i18n/localization_registry_catalog.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const TestTier3ContentOverrideHelper = preload("res://tests/integration/pipelines/test_tier3_content_override_helper.gd")
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-
 const SANDBOX_ROOT: String = "user://test_kmod_media_sandbox/"
 
 
@@ -99,6 +90,7 @@ static func write_raw_file(file_path: String, data: PackedByteArray) -> void:
 
 ## 构造标准 RIFF/WAVE 单声道 PCM 样本字节流
 static func build_minimal_wav_bytes(sample_rate: int, bits_per_sample: int, sample_count: int) -> PackedByteArray:
+	@warning_ignore("integer_division")
 	var bytes_per_sample: int = bits_per_sample / 8
 	var data_size: int = sample_count * bytes_per_sample
 	var wav_buffer := PackedByteArray()

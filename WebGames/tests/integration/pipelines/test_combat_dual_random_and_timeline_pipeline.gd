@@ -89,7 +89,7 @@ static func _test_tr_02_special_modifier_zero_hand_state() -> Dictionary:
 	var spec2 := CombatHandDrawDTO.HandDrawSpecDTO.new()
 	spec2.current_round = 3
 	spec2.special_modifiers = [
-		{"modifier_id": "DEBUFF_SLOWNESS", "hand_count_delta": -10}
+		{"modifier_id": "DEBUFF_SLOWNESS", "hand_count_delta": - 10}
 	]
 	var res2 := CombatHandGenerator.draw_cards_for_turn(spec2, rng)
 	var clamp_zero_ok: bool = (res2.final_draw_count == 0) and res2.is_zero_hand_state
@@ -142,7 +142,7 @@ static func _test_tr_03_zero_hand_keepalive_timeline_progression() -> Dictionary
 	var p_part := CombatPipelineFSM.CombatParticipant.new()
 	p_part.participant_id = "HERO"
 	p_part.current_ap = 0 # AP 为 0
-	p_bar.cards.clear()   # 手牌为 0
+	p_bar.cards.clear() # 手牌为 0
 
 	var e_part := CombatPipelineFSM.CombatParticipant.new()
 	e_part.participant_id = "BOSS"
@@ -200,7 +200,7 @@ static func _test_tr_05_add_draw_bonus_cards_trigger() -> Dictionary:
 	e_part.current_ap = 5
 
 	# 步进 2500ms 跨越触发点
-	var step := coordinator.step_coordinator(2500, p_part, e_part)
+	var _step := coordinator.step_coordinator(2500, p_part, e_part)
 	var bonus_dispatched: bool = (p_bar.cards.size() == 2)
 	var pt_done: bool = pt.is_executed
 

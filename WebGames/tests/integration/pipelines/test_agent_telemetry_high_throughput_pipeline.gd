@@ -11,24 +11,6 @@
 class_name TestAgentTelemetryHighThroughputPipeline
 extends TestCase
 
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const AuthoritativeHudSnapshotDTO = preload("res://backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd")
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/agent_action_directive_dto.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-
-const AgentHudSliceSolver = preload("res://backend/domains/world_state/solvers/agent_hud_slice_solver.gd")
-const HomeActionSpaceSolver = preload("res://backend/domains/world_state/solvers/home_action_space_solver.gd")
-const HudCausalDeltaSolver = preload("res://backend/domains/world_state/solvers/hud_causal_delta_solver.gd")
-
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-const AgentTrajectoryRingBuffer = preload("res://backend/domains/world_state/services/agent_trajectory_ring_buffer.gd")
-const AgentAsyncDispatcher = preload("res://backend/domains/world_state/services/agent_async_dispatcher.gd")
-const BinaryTelemetryCodec = preload("res://backend/domains/world_state/services/binary_telemetry_codec.gd")
-const AgentHudSliceBridge = preload("res://backend/domains/world_state/services/agent_hud_slice_bridge.gd")
-const CompanionObserverBus = preload("res://backend/domains/narrative_orchestration/companion_observer_bus.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_deep_object_pool_conservation_and_preallocation())

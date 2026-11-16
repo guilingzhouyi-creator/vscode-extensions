@@ -11,17 +11,6 @@
 class_name TestClientProtocolExtendedHelper
 extends RefCounted
 
-const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
-const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
-
 ## 串联验证账号注册、网关准入、权威创角与序章完结主链路
 static func chain_entry_to_prologue(container: ServiceContainer, ctx: Dictionary) -> bool:
 	var reg := {}

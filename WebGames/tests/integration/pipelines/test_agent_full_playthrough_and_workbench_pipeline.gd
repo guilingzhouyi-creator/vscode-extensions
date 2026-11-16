@@ -10,17 +10,6 @@
 class_name TestAgentFullPlaythroughAndWorkbenchPipeline
 extends TestCase
 
-const ModManifestValidator = preload("res://backend/domains/character_creation/mod_manifest_validator.gd")
-const PrologueHandoffDTO = preload("res://backend/domains/character_creation/dto/prologue_handoff_dto.gd")
-const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const AgentPlaythroughSession = preload("res://backend/domains/character_creation/agent_playthrough_session.gd")
-const CompositeEventExtractor = preload("res://backend/domains/event_extractor/composite_event_extractor.gd")
-
 # ==============================================================================
 # 一、测试套件总入口与环境重置
 # ==============================================================================

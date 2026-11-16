@@ -42,23 +42,18 @@ func _initialize() -> void:
 		if res_path.ends_with(".uid") or "/.godot/" in res_path or res_path.ends_with("batch_syntax_checker.gd"):
 			continue
 		checked += 1
-		var script = load(res_path)
+		var script: Resource = load(res_path)
 		if script == null:
 			fails += 1
 			print("✗ %s (load failed)" % res_path)
 		elif script is GDScript:
-			# GDS 审查收敛：load() 对存在语法错误的脚本返回**非 null** 的 GDScript 对象
-			# （错误已记录在脚本自身），因此 `script == null` 与随后的 `reload()` 都会把
-			# 编译失败的脚本报成通过。`can_instantiate()` 是官方给出的「该脚本能否被实例化」
-			# 判据，编译失败时为 false——必须以它为准，否则本校验器恒绿。
-			if not script.can_instantiate():
+			var gd_script := script as GDScript
+			# GDS 审查收敛：load() 对存在语法错误的脚本返回非 null 的 GDScript 对象，
+			# `can_instantiate()` 在编译失败时为 false，必须以它为准。
+			# 避免对已实例化脚本重复调用 reload() 导致 ERR_ALREADY_IN_USE (22) 误报及重复告警。
+			if not gd_script.can_instantiate():
 				fails += 1
 				print("✗ %s (script did not compile)" % res_path)
-				continue
-			var err: int = script.reload()
-			if err != OK:
-				fails += 1
-				print("✗ %s (reload error: %d)" % [res_path, err])
 
 	print("【batch-syntax-check】批量检查 %d 个 .gd 文件，失败 %d 个（扫描目录: %s）" % [checked, fails, ", ".join(scan_dirs)])
 	quit(0 if fails == 0 else 1)

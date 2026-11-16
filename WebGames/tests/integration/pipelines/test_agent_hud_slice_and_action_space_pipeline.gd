@@ -11,27 +11,6 @@
 class_name TestAgentHudSliceAndActionSpacePipeline
 extends TestCase
 
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const AuthoritativeHudSnapshotDTO = preload("res://backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd")
-const ModeFeatureManifestDTO = preload("res://backend/domains/world_state/dto/mode_feature_manifest_dto.gd")
-const WorldCalendarEnvironmentDTO = preload("res://backend/domains/world_state/dto/world_calendar_environment_dto.gd")
-const ActiveQuestTrackerDTO = preload("res://backend/domains/world_state/dto/active_quest_tracker_dto.gd")
-
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/agent_action_directive_dto.gd")
-const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-const HudUiNoticeDTO = preload("res://backend/domains/world_state/dto/hud_ui_notice_dto.gd")
-
-const AgentHudSliceSolver = preload("res://backend/domains/world_state/solvers/agent_hud_slice_solver.gd")
-const HomeActionSpaceSolver = preload("res://backend/domains/world_state/solvers/home_action_space_solver.gd")
-const HudCausalDeltaSolver = preload("res://backend/domains/world_state/solvers/hud_causal_delta_solver.gd")
-const AgentActionExecutionSolver = preload("res://backend/domains/world_state/solvers/agent_action_execution_solver.gd")
-const AgentActionChannel = preload("res://backend/domains/world_state/services/agent_action_channel.gd")
-const AgentHudSliceBridge = preload("res://backend/domains/world_state/services/agent_hud_slice_bridge.gd")
-const CompanionObserverBus = preload("res://backend/domains/narrative_orchestration/companion_observer_bus.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_standard_telemetry_packet_topology_and_size())

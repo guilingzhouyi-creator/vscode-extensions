@@ -11,18 +11,6 @@
 class_name TestFullChainBackendHelper
 extends RefCounted
 
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-
 const TEST_ACCOUNTS_PATH: String = "user://test_p127_accounts/account_registry.json"
 const TEST_WORLDS_ROOT: String = "user://test_p127_worlds/"
 
