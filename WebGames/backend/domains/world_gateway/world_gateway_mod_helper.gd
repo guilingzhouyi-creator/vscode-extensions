@@ -11,9 +11,6 @@
 class_name WorldGatewayModHelper
 extends RefCounted
 
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 
 ## 从多样化 MOD 描述条目提取规范化 pack_id
 static func extract_pack_id(mod_entry: Variant) -> String:
@@ -37,13 +34,18 @@ static func index_packages_by_id(packages: Array[Dictionary]) -> Dictionary:
     return indexed
 
 
-## 从候选模组包集合中按启用的包 ID 列表筛选出实体包对象
+## 从候选模组包集合中按启用的包 ID 列表顺序筛选出实体包对象
 static func collect_enabled_candidate_packages(candidate_packs: Array, enabled_pack_identifiers: Array) -> Array:
-    var enabled_packages: Array = []
+    var packages_by_id: Dictionary = {}
     for raw_pack in candidate_packs:
         var package_id := extract_pack_id(raw_pack)
-        if not package_id.is_empty() and enabled_pack_identifiers.has(package_id):
-            enabled_packages.append(raw_pack)
+        if not package_id.is_empty() and not packages_by_id.has(package_id):
+            packages_by_id[package_id] = raw_pack
+    var enabled_packages: Array = []
+    for raw_identifier in enabled_pack_identifiers:
+        var clean_identifier := str(raw_identifier).strip_edges()
+        if packages_by_id.has(clean_identifier):
+            enabled_packages.append(packages_by_id[clean_identifier])
     return enabled_packages
 
 
@@ -91,6 +93,8 @@ static func format_installed_mods_report(
                 default_selected_ids.append(str(formatted_item.get("pack_id", "")))
             formatted_packages.append(formatted_item)
     var selected_ids_out: Array = selected_pack_ids.duplicate() if has_explicit_selection else default_selected_ids
+    if has_explicit_selection and not selected_pack_ids.is_empty():
+        formatted_packages = _reorder_packages_by_selection(formatted_packages, selected_pack_ids)
     return {
         "success": true,
         "packages": formatted_packages,
@@ -99,6 +103,23 @@ static func format_installed_mods_report(
         "selected_pack_ids": selected_ids_out,
         "active_pack_ids": active_mods.duplicate()
     }
+
+
+static func _reorder_packages_by_selection(packages: Array[Dictionary], selected_pack_ids: Array[String]) -> Array[Dictionary]:
+    var by_id: Dictionary = {}
+    for pack_entry in packages:
+        by_id[str(pack_entry.get("pack_id", ""))] = pack_entry
+    var ordered: Array[Dictionary] = []
+    var placed: Dictionary = {}
+    for pack_id in selected_pack_ids:
+        if by_id.has(pack_id) and not placed.has(pack_id):
+            ordered.append(by_id[pack_id])
+            placed[pack_id] = true
+    for pack_entry in packages:
+        var pack_id := str(pack_entry.get("pack_id", ""))
+        if not placed.has(pack_id):
+            ordered.append(pack_entry)
+    return ordered
 
 
 static func _format_installed_mod_summary(

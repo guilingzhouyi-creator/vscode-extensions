@@ -11,12 +11,6 @@
 class_name WorldGatewayRealmLockHelper
 extends RefCounted
 
-const WorldGatewayModHelper = preload("res://backend/domains/world_gateway/world_gateway_mod_helper.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
-const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 
 ## 联机权威校验通过后重建本地授权 MOD 描述符并重放 Tier 3 覆盖层
 static func mount_authorized_realm_packages(

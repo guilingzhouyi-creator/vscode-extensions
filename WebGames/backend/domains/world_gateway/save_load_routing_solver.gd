@@ -11,19 +11,6 @@
 class_name SaveLoadRoutingSolver
 extends RefCounted
 
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
-const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
-const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
-
 const ENTRY_PATH_PROLOGUE_REPLAY: int = 1
 const ENTRY_PATH_DIRECT_RESTORE: int = 2
 

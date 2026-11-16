@@ -16,7 +16,7 @@ const FALLBACK_REALM_ALPHA_PING_MS: int = 28
 const FALLBACK_REALM_BETA_PING_MS: int = 45
 
 ## 枚举可用联机界域卡片列表（只读轻量字典数组）
-static func list_realms(account_id: String = "") -> Array[Dictionary]:
+static func list_realms(_account_id: String = "") -> Array[Dictionary]:
 	var results: Array[Dictionary] = []
 	var raw_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})
 

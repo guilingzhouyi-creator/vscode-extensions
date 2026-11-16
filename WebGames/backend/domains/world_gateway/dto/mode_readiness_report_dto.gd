@@ -11,8 +11,6 @@
 class_name ModeReadinessReportDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var mode: int = 0
 var is_ready: bool = false
 var status_code: String = ""

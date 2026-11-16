@@ -11,8 +11,6 @@
 class_name WorldGatewayWorldCatalogHelper
 extends RefCounted
 
-const CrossWorldPerturbationBroker = preload("res://backend/domains/narrative_orchestration/cross_world_perturbation_broker.gd")
-
 
 ## 执行选择运行模式前的模组纪律与状态机安全守卫联合校验
 static func validate_mode_entry_guards(

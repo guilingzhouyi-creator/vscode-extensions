@@ -11,16 +11,6 @@
 class_name WorldGatewaySessionActionHelper
 extends RefCounted
 
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const ModeReadinessProbe = preload("res://backend/domains/world_gateway/mode_readiness_probe.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const EscMenuBackendService = preload("res://backend/domains/world_state/services/esc_menu_backend_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-
 
 ## 处理 ENTER_GATEWAY：初始化网关并附带底座内容包就绪探针结果
 static func handle_enter_gateway(

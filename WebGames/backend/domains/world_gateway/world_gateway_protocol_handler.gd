@@ -12,13 +12,6 @@
 class_name WorldGatewayProtocolHandler
 extends RefCounted
 
-const ModeReadinessProbe = preload("res://backend/domains/world_gateway/mode_readiness_probe.gd")
-const RemoteRealmDirectoryProvider = preload("res://backend/domains/world_gateway/remote_realm_directory_provider.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const EscMenuBackendService = preload("res://backend/domains/world_state/services/esc_menu_backend_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const WorldGatewaySessionActionHelper = preload("res://backend/domains/world_gateway/world_gateway_session_action_helper.gd")
-
 ## 分发客户端世界网关协议请求至状态机并返回统一响应包
 static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 	if request.action_type.begins_with("ESC_"):
@@ -154,4 +147,19 @@ static func _dispatch_mod_and_realm_action(
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, true, {"realms": realms}, "", "Remote realm directory retrieved successfully"
 			)
+		"CREATE_MOD_PACK":
+			return _wrap_mod_operation_response(request.request_id, WorldModPackageOpsHelper.create_mod_pack(request_payload), "MOD skeleton created")
+		"PACK_MOD_KMOD":
+			return _wrap_mod_operation_response(request.request_id, WorldModArchiveOpsHelper.pack_mod_kmod(request_payload), ".kmod archive built")
+		"INSTALL_MOD_PACK":
+			return _wrap_mod_operation_response(request.request_id, WorldModArchiveOpsHelper.install_mod_pack(request_payload), "MOD package installed")
 	return null
+
+
+static func _wrap_mod_operation_response(request_id: String, operation_outcome: Dictionary, success_message: String) -> UnifiedResponseEnvelopeDTO:
+	var succeeded := bool(operation_outcome.get("success", false))
+	return UnifiedProtocolFactory.create_response(
+		request_id, succeeded, operation_outcome,
+		"" if succeeded else str(operation_outcome.get("error_code", "ERR_MOD_WORKBENCH_OP")),
+		success_message if succeeded else str(operation_outcome.get("message", "MOD workbench operation failed"))
+	)

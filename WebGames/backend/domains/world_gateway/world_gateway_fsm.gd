@@ -11,16 +11,6 @@
 class_name WorldGatewayFSM
 extends RefCounted
 
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
-const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const WorldGatewayWorldCatalogHelper = preload("res://backend/domains/world_gateway/world_gateway_world_catalog_helper.gd")
-const WorldGatewayModHelper = preload("res://backend/domains/world_gateway/world_gateway_mod_helper.gd")
-const WorldGatewayRealmLockHelper = preload("res://backend/domains/world_gateway/world_gateway_realm_lock_helper.gd")
-
 var context: WorldGatewayContextDTO = null
 var _last_probe_reports: Dictionary = {}
 var active_mods: Array = []

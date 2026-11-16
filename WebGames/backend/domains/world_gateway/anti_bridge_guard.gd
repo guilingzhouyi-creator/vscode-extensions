@@ -20,8 +20,8 @@ const SECURITY_ERR_MULTIPLAYER_MOD_POISONING: String = "SECURITY_ERR_MULTIPLAYER
 
 ## 校验模式跃迁安全性（模式单向冻结、探针就绪报告、联机白名单资质）
 static func validate_mode_transition(
-	from_phase: int,
-	to_phase: int,
+	_from_phase: int,
+	_to_phase: int,
 	current_mode: int,
 	target_mode: int,
 	probe_report: Variant = null

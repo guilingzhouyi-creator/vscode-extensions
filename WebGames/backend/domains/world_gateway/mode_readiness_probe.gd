@@ -14,7 +14,6 @@ extends RefCounted
 const DOMAIN_WORLD_GATEWAY_CONFIG: String = "domains.world_gateway"
 const DEFAULT_SP_ROOT_DIR: String = "user://worlds/sp/"
 const DEFAULT_SIMULATED_PING_MS: int = 24
-const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
 
 ## 探测单机模式环境：校验本地存储目录可写性、配额可用性与基础内容 MOD 就绪态
 static func probe_single_player_environment() -> ModeReadinessReportDTO:

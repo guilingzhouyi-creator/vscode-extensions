@@ -38,7 +38,7 @@ static func is_multiplayer_placeholder(mode: int) -> bool:
 	return mode == MODE_MULTIPLAYER
 
 ## 判定是否旁路跳过网络心跳与远程轮询（单机模式与存根联机模式均应旁路，防止无谓开销）
-static func should_bypass_network_poll(mode: int) -> bool:
+static func should_bypass_network_poll(_mode: int) -> bool:
 	return true
 
 ## 判定是否旁路跳过远程权威同步（单机模式 100% 具备本地最高权威）

@@ -11,8 +11,6 @@
 class_name WorldArchiveSummaryDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var world_id: String = ""
 var world_name: String = ""
 var mode: int = 1
