@@ -21,7 +21,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_backend_i18n_isolation())
 	results.append(_test_event_state_decoupling())
 	results.append(_test_four_stage_progression_lifecycle())
-	results.append(_test_phase_50_dag_session_bridge())
+	results.append(_test_prologue_dag_session_bridge())
 
 	if not had_overlay:
 		TestCase.unmount_mod_overlay_for_test()
@@ -197,13 +197,13 @@ static func _test_event_state_decoupling() -> Dictionary:
 	return {"test": "TC-PRO-06: 结构化事件流输出与状态解耦（突变标记 + 广播可达）", "passed": passed}
 
 
-## TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环
+## TC-PRO-07: 四阶段单向不可逆状态跃迁与终态完结
 static func _test_four_stage_progression_lifecycle() -> Dictionary:
 	var opening := _make_opening("ACC_PRO_07", "CHAR_PRO_G", "风行开拓者")
 	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "HUMAN")
 	var ctx: CharacterPrologueContext = boot_res.get("context", null)
 	if ctx == null:
-		return {"test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": false}
+		return {"test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态完结", "passed": false}
 
 	# 初始处于阶段 1
 	var stage1_ok: bool = (ctx.current_stage == 1) and ctx.is_active and not ctx.is_completed
@@ -233,11 +233,11 @@ static func _test_four_stage_progression_lifecycle() -> Dictionary:
 		and (s5.get("error_code", "") == "PROLOGUE_ALREADY_COMPLETED")
 
 	var passed: bool = stage1_ok and stage2_ok and stage3_ok and stage4_ok and guard_ok
-	return {"test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": passed}
+	return {"test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态完结", "passed": passed}
 
 
 ## TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接
-static func _test_phase_50_dag_session_bridge() -> Dictionary:
+static func _test_prologue_dag_session_bridge() -> Dictionary:
 	var opening := _make_opening("ACC_PRO_08", "CHAR_PRO_H", "精灵使者")
 	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "ELF")
 	var ctx: CharacterPrologueContext = boot_res.get("context", null)

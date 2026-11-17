@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_client_protocol_extended_helper.gd
 # 架构定位: Integration Test Harness Helper
 # 依赖与触发: 由 TestClientProtocolSpaceAndBoundaryPipeline 调度执行
-# 职责说明: 承载 11 环保留交互接口端到端全链路串联与 HudEventBridge 常驻信道解包验证。
+# 职责说明: 承载 11 环保留交互接口端到端链路串联与 HudEventBridge 常驻信道解包验证。
 # 退出语义与设计依据: 客户端交互协议空间规约 (TC-PROTO-11 ~ TC-PROTO-12)
 # ==============================================================================
 
@@ -14,9 +14,9 @@ extends RefCounted
 ## 串联验证账号注册、网关准入、权威创角与序章完结主链路
 static func chain_entry_to_prologue(container: ServiceContainer, ctx: Dictionary) -> bool:
 	var reg := {}
-	container.auth().register_async("p128_chain_u11", "SecretPass128#11", func(r: Dictionary): reg.merge(r))
+	container.auth().register_async("proto_chain_u11", "SecretPassProto#11", func(r: Dictionary): reg.merge(r))
 	var login := {}
-	container.auth().login_async("p128_chain_u11", "SecretPass128#11", func(r: Dictionary): login.merge(r))
+	container.auth().login_async("proto_chain_u11", "SecretPassProto#11", func(r: Dictionary): login.merge(r))
 	ctx["account_id"] = String(login.get("account_id", reg.get("account_id", "")))
 	ctx["token"] = String(login.get("token", ""))
 	if not bool(login.get("success", false)) or not WorldSessionRuntimeService.has_authenticated_session():
@@ -117,7 +117,7 @@ static func test_proto_11_full_eleven_link_reserved_interfaces_chain(setup_fn: C
 	setup_fn.call()
 	ServiceLocator.set_mode("real")
 	var container := ServiceLocator.get_instance()
-	var ctx := {"world_id": "WORLD_P128_11"}
+	var ctx := {"world_id": "WORLD_PROTO_11"}
 	var ok_front := chain_entry_to_prologue(container, ctx)
 	var ok_mid := chain_hud_esc_settings(container, ctx) if ok_front else false
 	var ok_tail := chain_exit_switch_logout_quit(container, ctx) if ok_mid else false
@@ -131,7 +131,7 @@ static func test_proto_11_full_eleven_link_reserved_interfaces_chain(setup_fn: C
 ## TC-PROTO-12: HudEventBridge 常驻信道订阅、HP/时钟解包渲染与容器通道解耦验证
 static func test_proto_12_hud_event_bridge_stat_and_clock_unwrap(setup_fn: Callable, teardown_fn: Callable, bootstrap_fn: Callable) -> Dictionary:
 	setup_fn.call()
-	var env_ctx: Dictionary = bootstrap_fn.call("p128_user_12", "SecretPass128#12", "WORLD_P128_12", "HudBridgeHero")
+	var env_ctx: Dictionary = bootstrap_fn.call("proto_user_12", "SecretPassProto#12", "WORLD_PROTO_12", "HudBridgeHero")
 	var acc_id := String(env_ctx["account_id"])
 	var token := String(env_ctx["token"])
 	var char_id := String(env_ctx["character_id"])

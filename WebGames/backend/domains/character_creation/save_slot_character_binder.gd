@@ -44,7 +44,7 @@ static func commit_creation_and_bind_slot(
 	var baseline_stats := CharacterBaselineAttributeSolver.generate_baseline_attributes(race_definition)
 	var attribute_levels: Dictionary = baseline_stats.get("attribute_levels", {})
 
-	# 3. 构造角色档案与生理表/钱包实体（打通 Stage ④ -> Stage ⑥ HUD 同步）
+	# 3. 构造角色档案与生理表/钱包实体（打通创角至主页 HUD 同步）
 	var profile := CharacterProfile.new()
 	profile.character_id = new_character_id
 	profile.character_name = request.character_name

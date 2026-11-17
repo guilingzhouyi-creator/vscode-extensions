@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_authoritative_hud_and_mode_adaptation_pipeline.gd
 # 架构定位: Integration Test Pipeline / Acceptance Harness
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, account, lifecycle | 配置: config/domains/world_state/core.json
-# 职责说明: 全链路主页 HUD 六大业务支柱聚合与单机联机模式自适应无头集成测试流水线。
-#           覆盖 TC-HMA-01 ~ TC-HMA-12，验证轻重资产纯度 (<= 4KB)、存储隔离与全生命周期闭环。
+# 职责说明: 主页 HUD 六大业务支柱聚合与单机联机模式自适应无头集成测试流水线。
+#           覆盖 TC-HMA-01 ~ TC-HMA-12，验证轻重资产纯度 (<= 4KB)、存储隔离与全生命周期链路。
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -26,7 +26,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_light_heavy_asset_payload_purity())
 	results.append(test_storage_path_airtight_isolation())
 	results.append(test_four_domains_channel_mapping_purity())
-	return TestCase.pack_results("主页HUD六大支柱与网关模式自适应全链路流水线", results)
+	return TestCase.pack_results("主页HUD六大支柱与网关模式自适应流水线", results)
 
 ## -----------------------------------------------------------------------------
 ## TC-HMA-01: 六大支柱权威快照聚合与防零下限守卫
@@ -137,7 +137,7 @@ static func test_save_readiness_guard_block_and_allow() -> Dictionary:
 	return TestCase.make_result("TC-HMA-05: ESC 菜单保存安全守卫状态机阻断裁决", passed)
 
 ## -----------------------------------------------------------------------------
-## TC-HMA-06: 双轨 i18n 叙事模板占位符参数等价契约
+## TC-HMA-06: 双向 i18n 叙事模板占位符参数等价契约
 ## -----------------------------------------------------------------------------
 static func test_narrative_template_args_parity() -> Dictionary:
 	var expected_templates: Array = [
@@ -164,14 +164,14 @@ static func test_narrative_template_args_parity() -> Dictionary:
 			all_match = false
 			break
 
-	return TestCase.make_result("TC-HMA-06: 双轨 i18n 叙事模板占位符参数等价契约", all_match)
+	return TestCase.make_result("TC-HMA-06: 双向 i18n 叙事模板占位符参数等价契约", all_match)
 
 ## -----------------------------------------------------------------------------
-## TC-HMA-07: 全生命周期主干链路端到端闭环断言
+## TC-HMA-07: 全生命周期主干链路端到端断言
 ## -----------------------------------------------------------------------------
 static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	var store := {}
-	var username := "Phase118Pioneer"
+	var username := "ValanPioneer"
 	var password := "ValanSecure2026"
 
 	var reg_req := AccountRegistrationDTO.Request.new()
@@ -180,7 +180,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	reg_req.device_fingerprint = "FP_DEV_01"
 	var reg_resp := AuthService.register_account(reg_req, store)
 	if not reg_resp.success:
-		return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端闭环断言", false)
+		return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端断言", false)
 
 	var acc := AccountProfile.new()
 	acc.account_id = reg_resp.account_id
@@ -189,7 +189,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	var auth := AuthService.authenticate_local(username, password, acc)
 	var token := String(auth.get("token", ""))
 	if token.is_empty():
-		return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端闭环断言", false)
+		return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端断言", false)
 
 	# 网关选档: 单机模式
 	var gateway := WorldGatewayFSM.new(reg_resp.account_id)
@@ -217,7 +217,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	}
 	var create_res: Dictionary = CharacterCreationService.process_character_creation(char_req, slot_dict, {})
 	var opening: OpeningEventStreamDTO = create_res.get("opening_event", null)
-	var char_id: String = opening.character_id if opening != null else "CHAR_P118"
+	var char_id: String = opening.character_id if opening != null else "CHAR_VALAN"
 
 	# 进世界并聚合六支柱权威快照
 	gateway.attach_ready_character(char_id)
@@ -256,7 +256,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 		and hud_snap != null and bool(save_check.get("allowed", false)) and bool(path_check.get("safe", false)) \
 		and (shut_resp != null and shut_resp.is_success) and token_revoked
 
-	return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端闭环断言", passed)
+	return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端断言", passed)
 
 ## -----------------------------------------------------------------------------
 ## TC-HMA-08: 高频时钟与增量事件池化借还守恒断言

@@ -133,7 +133,7 @@ static func test_atomic_write_produces_backup() -> Dictionary:
 		"has_backup": has_backup, "no_tmp": no_tmp, "cur_round": cur_round, "restored_round": restored_round
 	}
 
-## 回归守护：存档组装器按清单顺序组装 payload.data，并经 SaveManager 端到端落盘回灌
+## 回归守护：存档组装器按清单顺序组装 payload.data，并经 SaveManager 端到端落盘加载
 static func test_save_assembler_manifest_order_roundtrip() -> Dictionary:
 	var banner := GachaBannerAggregate.new()
 	banner.current_pity_count = 77
@@ -176,7 +176,7 @@ static func test_save_assembler_manifest_order_roundtrip() -> Dictionary:
 		and rb.current_pity_count == 77 and rb.total_lifetime_pulls == 1234 \
 		and ri.item_id == "ASM_TEST_ITEM" and ri.mass_kg == 3.5
 	return {
-		"test": "TC-PERS-07: 存档组装器清单序组装与端到端回灌", "passed": passed,
+		"test": "TC-PERS-07: 存档组装器清单序组装与端到端读写校验", "passed": passed,
 		"saved": built.saved, "ordered": ordered
 	}
 
@@ -218,7 +218,7 @@ static func test_client_prediction_reconciliation() -> Dictionary:
 
 ## L6：restore_backup 恢复前可解析性预检——截断/损坏 .bak 拒绝覆盖正档（Inv-DF-4）
 static func test_restore_backup_rejects_corrupt() -> Dictionary:
-	var save_name := "P56_BAK_CORRUPT_DF4"
+	var save_name := "PERS_BAK_CORRUPT_DF4"
 	var ext := GameConfig.get_string("infrastructure.persistence", "save_extension", ".kalar_save")
 	var bak_suffix := GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_suffix", ".bak")
 	var dir := GameConfig.get_string("infrastructure.persistence", "save_dir", "user://saves/")
@@ -242,7 +242,7 @@ static func test_restore_backup_rejects_corrupt() -> Dictionary:
 
 ## L6：load_game format_version 方向闸门——未来版本存档拒绝直通（VERSION_TOO_NEW）
 static func test_load_version_direction_gate() -> Dictionary:
-	var save_name := "P56_VERSION_GATE_DF4"
+	var save_name := "PERS_VERSION_GATE_DF4"
 	var ext := GameConfig.get_string("infrastructure.persistence", "save_extension", ".kalar_save")
 	var path := GameConfig.get_string("infrastructure.persistence", "save_dir", "user://saves/") + save_name + ext
 

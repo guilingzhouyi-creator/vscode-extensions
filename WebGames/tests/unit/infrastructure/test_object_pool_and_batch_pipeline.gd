@@ -5,7 +5,7 @@
 # 跨域依赖: 上游: TestRegistry | 下游: ObjectPool, SoAEntityBuffer, HeadlessBatchPipeline, ObjectPoolManager | 配置: config/infrastructure/object_pool.json | 信号: 无
 # 职责说明: 高承压对象池与无头批处理流水线端到端验收测试套件：验证预分配、
 #           借出复位、双重归还拦截、溢出丢弃、万次吞吐零泄漏、SoA 对齐与管理器生命周期。
-# 设计依据: 演进 03 阶段4 高承压对象复用与批处理吞吐端到端验收测试矩阵
+# 设计依据: 高承压对象复用与批处理吞吐端到端验收测试矩阵
 # ==============================================================================
 
 class_name TestObjectPoolAndBatchPipeline extends RefCounted
@@ -38,7 +38,7 @@ static func run_all_tests() -> Dictionary:
 			break
 
 	return {
-		"domain": "演进 03: 高承压对象池与数据导向无头处理器架构",
+		"domain": "Infrastructure: 高承压对象池与数据导向无头处理器架构",
 		"all_passed": all_passed,
 		"results": results
 	}

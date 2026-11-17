@@ -86,7 +86,7 @@ static func test_recombination_stub_on() -> Dictionary:
 
 static func test_entitlement_gate() -> Dictionary:
 	var acc := AccountProfile.new()
-	acc.account_id = "ACC_P08"
+	acc.account_id = "ACC_WS_08"
 	var granted := EntitlementService.add_entitlement(acc, "offline")
 	var has_ok := EntitlementService.has_entitlement(acc, "offline")
 	var has_missing := not EntitlementService.has_entitlement(acc, "online")

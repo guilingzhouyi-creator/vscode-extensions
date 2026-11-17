@@ -36,7 +36,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_ls_20_log_json_four_sections_configuration())
 	results.append(_test_ls_21_log_retention_cleaner_expiration_and_protection())
 	results.append(_test_ls_22_backend_zero_print_statements_guard())
-	results.append(_test_ls_23_synergy_with_phase_66_error_base())
+	results.append(_test_ls_23_synergy_with_error_reporter())
 	results.append(_test_ls_24_full_integration_pipeline_regression())
 
 	var passed_cnt := 0
@@ -627,7 +627,7 @@ static func _test_ls_18_log_query_service_truncation_cap() -> Dictionary:
 		"details": "truncated=%s, total=%d, page_size=%d" % [str(res.truncated), res.total, res.records.size()]
 	}
 
-## TC-LS-19: 脱敏安全红线全链路断言 (落盘/内存/检索零明文)
+## TC-LS-19: 脱敏安全红线链路断言 (落盘/内存/检索零明文)
 static func _test_ls_19_redaction_security_redline_full_pipeline() -> Dictionary:
 	LogCollector.reset_state()
 	LogRingBuffer.reset_state()
@@ -675,7 +675,7 @@ static func _test_ls_19_redaction_security_redline_full_pipeline() -> Dictionary
 	LogRingBuffer.reset_state()
 
 	return {
-		"test": "TC-LS-19: 脱敏安全红线全链路断言 (落盘/内存/检索零明文)",
+		"test": "TC-LS-19: 脱敏安全红线链路断言 (落盘/内存/检索零明文)",
 		"passed": ok,
 		"details": "rec_token=%s, rec_has_pwd=%s, ring_ok=%s, query_ok=%s" % [rec_token, str(rec_has_pwd), str(ring_ok), str(query_ok)]
 	}
@@ -781,8 +781,8 @@ static func _test_ls_22_backend_zero_print_statements_guard() -> Dictionary:
 		"details": "hits_count=%d, hits=%s" % [print_hits.size(), str(print_hits)]
 	}
 
-## TC-LS-23: 与错误底座协同（错误码走 ErrorReporter，日志走 LogCollector）
-static func _test_ls_23_synergy_with_phase_66_error_base() -> Dictionary:
+## TC-LS-23: 与错误上报协同（错误码走 ErrorReporter，日志走 LogCollector）
+static func _test_ls_23_synergy_with_error_reporter() -> Dictionary:
 	var err_entry := ErrorCodeRegistry.lookup("ERR_ACCOUNT_NOT_FOUND")
 	var err_code_ok: bool = (err_entry != null and err_entry.code == "ERR_ACCOUNT_NOT_FOUND")
 
@@ -791,7 +791,7 @@ static func _test_ls_23_synergy_with_phase_66_error_base() -> Dictionary:
 	var rec_ok: bool = (rec.error_code == "" and rec.message == "Normal business event")
 
 	return {
-		"test": "TC-LS-23: 与错误底座协同断言",
+		"test": "TC-LS-23: 与错误上报协同断言",
 		"passed": err_code_ok and rec_ok,
 		"details": "err_code_ok=%s, rec_ok=%s" % [str(err_code_ok), str(rec_ok)]
 	}

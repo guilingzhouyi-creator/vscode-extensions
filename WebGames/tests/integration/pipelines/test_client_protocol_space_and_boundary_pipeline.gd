@@ -59,18 +59,18 @@ static func _teardown_env() -> void:
 				DirAccess.remove_absolute(vault_file)
 	TestFullChainBackendHelper.teardown_env()
 
-## TC-PROTO-01: RealAuthService 异步注册/登录全生命周期与后端全链路会话真源同步激活验证
+## TC-PROTO-01: RealAuthService 异步注册/登录生命周期与后端会话真源同步激活验证
 static func test_proto_01_real_auth_lifecycle_and_session_activation() -> Dictionary:
 	_setup_env()
 
 	var auth := RealAuthService.new()
 	var reg_res := {}
-	auth.register_async("p128_user_01", "SecretPass128#01", func(res: Dictionary): reg_res.merge(res))
+	auth.register_async("proto_user_01", "SecretPassProto#01", func(res: Dictionary): reg_res.merge(res))
 	var acc_id := String(reg_res.get("account_id", ""))
 	var ok_reg: bool = bool(reg_res.get("success", false)) and not acc_id.is_empty()
 
 	var login_res := {}
-	auth.login_async("p128_user_01", "SecretPass128#01", func(res: Dictionary): login_res.merge(res))
+	auth.login_async("proto_user_01", "SecretPassProto#01", func(res: Dictionary): login_res.merge(res))
 	var token := String(login_res.get("token", ""))
 	var ok_login: bool = bool(login_res.get("success", false)) and not token.is_empty()
 
@@ -85,17 +85,17 @@ static func test_proto_01_real_auth_lifecycle_and_session_activation() -> Dictio
 		"ok_reg": ok_reg, "ok_login": ok_login, "ok_sync": ok_sync
 	})
 
-## TC-PROTO-02: 令牌脱敏注销与会话真源清理双向闭环验证 (revoke_token & logout_async)
+## TC-PROTO-02: 令牌脱敏注销与会话真源清理双向验证 (revoke_token & logout_async)
 static func test_proto_02_register_safe_metadata_and_revoke_token() -> Dictionary:
 	_setup_env()
 
 	var auth := RealAuthService.new()
 	var reg_res := {}
-	auth.register_async("p128_user_02", "SecretPass128#02", func(res: Dictionary): reg_res.merge(res))
+	auth.register_async("proto_user_02", "SecretPassProto#02", func(res: Dictionary): reg_res.merge(res))
 	var acc_id := String(reg_res.get("account_id", ""))
 
 	var login_res := {}
-	auth.login_async("p128_user_02", "SecretPass128#02", func(res: Dictionary): login_res.merge(res))
+	auth.login_async("proto_user_02", "SecretPassProto#02", func(res: Dictionary): login_res.merge(res))
 	var token := String(login_res.get("token", ""))
 	var ok_active_1: bool = WorldSessionRuntimeService.has_authenticated_session()
 
@@ -107,7 +107,7 @@ static func test_proto_02_register_safe_metadata_and_revoke_token() -> Dictionar
 
 	# 2. 重新登录测试 logout_async
 	var login_res_2 := {}
-	auth.login_async("p128_user_02", "SecretPass128#02", func(res: Dictionary): login_res_2.merge(res))
+	auth.login_async("proto_user_02", "SecretPassProto#02", func(res: Dictionary): login_res_2.merge(res))
 	var token_2 := String(login_res_2.get("token", ""))
 	var ok_active_2: bool = WorldSessionRuntimeService.has_authenticated_session()
 
@@ -118,7 +118,7 @@ static func test_proto_02_register_safe_metadata_and_revoke_token() -> Dictionar
 
 	_teardown_env()
 	var passed: bool = ok_active_1 and ok_revoke and ok_cleared_1 and ok_active_2 and ok_logout and ok_cleared_2
-	return TestCase.make_result("TC-PROTO-02: 令牌脱敏注销与会话真源清理双向闭环验证", passed, {
+	return TestCase.make_result("TC-PROTO-02: 令牌脱敏注销与会话真源清理双向验证", passed, {
 		"ok_revoke": ok_revoke, "ok_cleared_1": ok_cleared_1, "ok_logout": ok_logout, "ok_cleared_2": ok_cleared_2
 	})
 
@@ -128,11 +128,11 @@ static func test_proto_03_get_account_home_view_model() -> Dictionary:
 
 	var auth := RealAuthService.new()
 	var reg_res := {}
-	auth.register_async("p128_user_03", "SecretPass128#03", func(res: Dictionary): reg_res.merge(res))
+	auth.register_async("proto_user_03", "SecretPassProto#03", func(res: Dictionary): reg_res.merge(res))
 	var acc_id := String(reg_res.get("account_id", ""))
 
 	var login_res := {}
-	auth.login_async("p128_user_03", "SecretPass128#03", func(res: Dictionary): login_res.merge(res))
+	auth.login_async("proto_user_03", "SecretPassProto#03", func(res: Dictionary): login_res.merge(res))
 	var token := String(login_res.get("token", ""))
 
 	var home_res := {}
@@ -160,11 +160,11 @@ static func test_proto_04_service_locator_gateway_delegation() -> Dictionary:
 	var ok_init: bool = ServiceLocator.get_active_gateway() == null and WorldSessionRuntimeService.get_gateway() == null
 
 	# 创建并激活网关
-	var gw: RefCounted = ServiceLocator.create_and_activate_gateway("ACC_P128_GW_04")
+	var gw: RefCounted = ServiceLocator.create_and_activate_gateway("ACC_PROTO_GW_04")
 	var ok_create: bool = gw != null
 	var ok_gw_loc: bool = ServiceLocator.get_active_gateway() == gw
 	var ok_gw_runtime: bool = (WorldSessionRuntimeService.get_gateway() == gw)
-	var ok_acc_runtime: bool = WorldSessionRuntimeService.get_active_account_id() == "ACC_P128_GW_04"
+	var ok_acc_runtime: bool = WorldSessionRuntimeService.get_active_account_id() == "ACC_PROTO_GW_04"
 
 	# 清理并验证真源同步重置
 	ServiceLocator.clear_active_gateway()
@@ -183,11 +183,11 @@ static func test_proto_05_real_world_service_gateway_flow() -> Dictionary:
 
 	var auth := RealAuthService.new()
 	var reg_res := {}
-	auth.register_async("p128_user_05", "SecretPass128#05", func(res: Dictionary): reg_res.merge(res))
+	auth.register_async("proto_user_05", "SecretPassProto#05", func(res: Dictionary): reg_res.merge(res))
 	var acc_id := String(reg_res.get("account_id", ""))
 
 	var login_res := {}
-	auth.login_async("p128_user_05", "SecretPass128#05", func(res: Dictionary): login_res.merge(res))
+	auth.login_async("proto_user_05", "SecretPassProto#05", func(res: Dictionary): login_res.merge(res))
 	var token := String(login_res.get("token", ""))
 
 	var world_svc := RealWorldService.new()
@@ -204,7 +204,7 @@ static func test_proto_05_real_world_service_gateway_flow() -> Dictionary:
 
 	# 3. 选档/建档进入世界
 	var sel_res := {}
-	world_svc.select_or_create_world_async(acc_id, token, "WORLD_P128_05", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(res: Dictionary): sel_res.merge(res))
+	world_svc.select_or_create_world_async(acc_id, token, "WORLD_PROTO_05", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(res: Dictionary): sel_res.merge(res))
 	var ok_sel: bool = bool(sel_res.get("success", false))
 
 	# 4. 查询世界档案列表
@@ -224,16 +224,16 @@ static func test_proto_06_real_character_service_authoritative_creation() -> Dic
 
 	var auth := RealAuthService.new()
 	var reg_res := {}
-	auth.register_async("p128_user_06", "SecretPass128#06", func(res: Dictionary): reg_res.merge(res))
+	auth.register_async("proto_user_06", "SecretPassProto#06", func(res: Dictionary): reg_res.merge(res))
 	var acc_id := String(reg_res.get("account_id", ""))
 
 	var login_res := {}
-	auth.login_async("p128_user_06", "SecretPass128#06", func(res: Dictionary): login_res.merge(res))
+	auth.login_async("proto_user_06", "SecretPassProto#06", func(res: Dictionary): login_res.merge(res))
 	var token := String(login_res.get("token", ""))
 
 	var world_svc := RealWorldService.new()
 	world_svc.enter_gateway_async(acc_id, token, func(_r): pass)
-	world_svc.select_or_create_world_async(acc_id, token, "WORLD_P128_06", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(_r): pass)
+	world_svc.select_or_create_world_async(acc_id, token, "WORLD_PROTO_06", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(_r): pass)
 
 	var char_svc := RealCharacterService.new()
 
@@ -247,9 +247,9 @@ static func test_proto_06_real_character_service_authoritative_creation() -> Dic
 	# 2. 权威创角测试
 	var create_res := {}
 	char_svc.create_character_async(acc_id, token, {
-		"name": "ValenP128",
+		"name": "ValenProto",
 		"slot_index": 1,
-		"world_id": "WORLD_P128_06",
+		"world_id": "WORLD_PROTO_06",
 		"race": "HUMAN",
 		"request_seed": 20261110
 	}, func(res: Dictionary): create_res.merge(res))
@@ -289,7 +289,7 @@ static func _bootstrap_in_world_character(username: String, pwd: String, world_i
 ## TC-PROTO-07: RealEscMenuService 系统菜单可用状态感知与安全存盘守卫回执验证
 static func test_proto_07_real_esc_menu_service_and_save_guard() -> Dictionary:
 	_setup_env()
-	_bootstrap_in_world_character("p128_user_07", "SecretPass128#07", "WORLD_P128_07", "SaveHeroP128")
+	_bootstrap_in_world_character("proto_user_07", "SecretPassProto#07", "WORLD_PROTO_07", "SaveHeroProto")
 
 	var esc_svc := RealEscMenuService.new()
 
@@ -316,7 +316,7 @@ static func test_proto_07_real_esc_menu_service_and_save_guard() -> Dictionary:
 ## TC-PROTO-08: HudEventBridge 六大信道全覆盖、主动快照拉取与幂等解绑验证
 static func test_proto_08_hud_event_bridge_six_channels_and_pull_snapshot() -> Dictionary:
 	_setup_env()
-	_bootstrap_in_world_character("p128_user_08", "SecretPass128#08", "WORLD_P128_08", "BridgeHeroP128")
+	_bootstrap_in_world_character("proto_user_08", "SecretPassProto#08", "WORLD_PROTO_08", "BridgeHeroProto")
 
 	var bridge := HudEventBridge.get_instance()
 
@@ -341,7 +341,7 @@ static func test_proto_08_hud_event_bridge_six_channels_and_pull_snapshot() -> D
 ## TC-PROTO-09: 退出世界退回网关与活跃世界禁切模式解耦闭关验证
 static func test_proto_09_exit_world_to_gateway_and_mode_switch() -> Dictionary:
 	_setup_env()
-	var env_ctx := _bootstrap_in_world_character("p128_user_09", "SecretPass128#09", "WORLD_P128_09", "SwitchHeroP128")
+	var env_ctx := _bootstrap_in_world_character("proto_user_09", "SecretPassProto#09", "WORLD_PROTO_09", "SwitchHeroProto")
 	var acc_id := String(env_ctx["account_id"])
 	var token := String(env_ctx["token"])
 	var world_svc: RealWorldService = env_ctx["world_svc"]
@@ -363,7 +363,7 @@ static func test_proto_09_exit_world_to_gateway_and_mode_switch() -> Dictionary:
 
 	_teardown_env()
 	var passed: bool = ok_blocked and ok_exit and ok_switched
-	return TestCase.make_result("TC-PROTO-09: 退出世界退回网关与活跃世界禁切模式解耦闭环验证", passed, {
+	return TestCase.make_result("TC-PROTO-09: 退出世界退回网关与活跃世界禁切模式解耦验证", passed, {
 		"ok_blocked": ok_blocked, "ok_exit": ok_exit, "ok_switched": ok_switched
 	})
 
@@ -398,7 +398,7 @@ static func test_proto_10_real_service_container_wiring_and_isolation() -> Dicti
 		"ok_container": ok_container, "ok_types": ok_types, "ok_mock": ok_mock, "ok_mock_auth": ok_mock_auth
 	})
 
-## TC-PROTO-13: GameSettings 协议闭环与游客/清槽及异常诚实失败验证
+## TC-PROTO-13: GameSettings 协议回归与游客/清槽及异常诚实失败验证
 static func test_proto_13_game_settings_protocol_and_honest_failures() -> Dictionary:
 	_setup_env()
 	var container := ServiceLocator.get_instance()
@@ -407,7 +407,7 @@ static func test_proto_13_game_settings_protocol_and_honest_failures() -> Dictio
 	var ok_unauth_fail := not bool(unauth_pro.get("success", true)) and str(unauth_pro.get("error_code", "")) == "ERR_UNAUTHORIZED"
 
 	var guest := {}
-	container.auth().login_guest_async("DEV_P128_13", func(r: Dictionary): guest.merge(r))
+	container.auth().login_guest_async("DEV_PROTO_13", func(r: Dictionary): guest.merge(r))
 	var g_acc := String(guest.get("account_id", ""))
 	var g_tok := String(guest.get("token", ""))
 	var ok_guest := bool(guest.get("success", false)) and not g_tok.is_empty()
@@ -428,7 +428,7 @@ static func test_proto_13_game_settings_protocol_and_honest_failures() -> Dictio
 
 	_teardown_env()
 	var passed := ok_unauth_fail and ok_honest_fail and ok_guest and ok_pending and ok_confirmed and ok_reset
-	return TestCase.make_result("TC-PROTO-13: GameSettings协议闭环与游客及失败诚实反馈验证", passed, {
+	return TestCase.make_result("TC-PROTO-13: GameSettings协议回归与游客及失败诚实反馈验证", passed, {
 		"ok_unauth_fail": ok_unauth_fail, "ok_honest_fail": ok_honest_fail, "ok_guest": ok_guest, "ok_pending": ok_pending, "ok_confirmed": ok_confirmed, "ok_reset": ok_reset
 	})
 

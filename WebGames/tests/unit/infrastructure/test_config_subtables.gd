@@ -3,9 +3,9 @@
 # 文件路径: res://tests/unit/infrastructure/test_config_subtables.gd
 # 架构定位: Multi-table Subdomain Routing & Resolution Test Suite
 # 跨域依赖: 上游: TestRegistry | 下游: GameConfig, ConfigRouterEngine, ConfigRouteDTO, StorageResourceCatalog
-# 职责说明: 演进 01 多配置表路由架构验收测试套件：验证点分命名空间解析、
+# 职责说明: 多配置表路由架构验收测试套件：验证点分命名空间解析、
 #           兼容别名智能重定向、跨子表键寻址、get_many 分流聚合与细粒度热重载。
-# 设计依据: 演进 01 超大型子域多配置表目录拆分与泛化路由架构阶段4验收指标
+# 设计依据: 超大型子域多配置表目录拆分与泛化路由架构验收指标
 # ==============================================================================
 
 class_name TestConfigSubtablesDomain extends RefCounted
@@ -80,7 +80,7 @@ static func test_subtable_has_key() -> Dictionary:
 	var has_buff: bool = GameConfig.has("domains.combat", "buff_types/bleed/name")
 	var has_none: bool = not GameConfig.has("domains.combat", "nonexistent/impossible/path")
 	var passed: bool = has_mech and has_dmg and has_buff and has_none
-	return { "test": "TC-SUB-04: has 跨子表存在性探测与默认兜底", "passed": passed }
+	return { "test": "TC-SUB-04: has 跨子表存在性探测与默认回退", "passed": passed }
 
 static func test_subtable_hot_reload() -> Dictionary:
 	var res := GameConfig.reload_subtable("domains.combat.damage_formulas")
