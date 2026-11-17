@@ -408,22 +408,22 @@ static func _scan_config_keys_in_files(
 static func test_compatibility_retirement_backend_clean() -> Dictionary:
 	var violations: Array[String] = []
 
-	# 1. 断言旧文案表物理不存在 (R-03)
+	# 1. 断言旧文案表物理不存在
 	if FileAccess.file_exists("res://config/descriptions/items.json"):
 		violations.append("config/descriptions/items.json 必须彻底删除")
 	if FileAccess.file_exists("res://config/narratives/events.json"):
 		violations.append("config/narratives/events.json 必须彻底删除")
 
-	# 2. 断言行动卡别名文件物理不存在 (R-06)
+	# 2. 断言行动卡别名文件物理不存在
 	if FileAccess.file_exists("res://backend/domains/magic_system/action_card_definition.gd"):
 		violations.append("backend/domains/magic_system/action_card_definition.gd 必须彻底删除")
 
-	# 3. 断言 domains.json 零 legacy_test_path 死字段残留 (R-07)
+	# 3. 断言 domains.json 零 legacy_test_path 死字段残留
 	var domains_json_str := FileAccess.get_file_as_string(MANIFEST_FILE)
 	if domains_json_str.contains("legacy_test_path"):
 		violations.append("domains.json 严禁残留 legacy_test_path 字段")
 
-	# 4. 断言 backend/ 全域零旧路径符号引用 (R-03, R-04, R-06)
+	# 4. 断言 backend/ 全域零旧路径符号引用
 	#    经 _strip_comments 去注释后扫描——注释中的历史词形（如头注释提及旧别名）不是真实引用，
 	#    与本文件既有字面量扫描同一剥离单源，杜绝子串误报脆弱点。
 	var backend_files := _collect_gd_files(BACKEND_DIR)
@@ -436,7 +436,7 @@ static func test_compatibility_retirement_backend_clean() -> Dictionary:
 		if content.contains("_legacy_fallback"):
 			violations.append("%s: 含有 _legacy_fallback 残留引用" % file_path)
 
-	# 5. 断言魔法基线解析器 registry 参数必填（去 = null，R-05；签名断言同样去注释后匹配）
+	# 5. 断言魔法基线解析器 registry 参数必填（去 = null；签名断言同样去注释后匹配）
 	var tier_resolver := _strip_comments(FileAccess.get_file_as_string("res://backend/domains/item_namespace_registry/magic_ability_tier_resolver.gd"))
 	if tier_resolver.contains("infer_tier_candidates(rank: int, registry: MagicTierRegistry = null)"):
 		violations.append("magic_ability_tier_resolver.gd: infer_tier_candidates 必须移除 = null")

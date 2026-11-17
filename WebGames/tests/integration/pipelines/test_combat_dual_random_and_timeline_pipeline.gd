@@ -27,7 +27,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_tr_06_cross_round_pending_modifier_consumption())
 	results.append(_test_tr_07_client_view_desensitization())
 	results.append(_test_tr_08_deterministic_rng_repeatability())
-	# R-03（TC-CT-09）：空转引擎等价旧 null 场景
+	# TC-CT-09：空转引擎等价旧 null 场景
 	results.append(_test_idle_engine_null_equivalence())
 
 	var passed_cnt := 0
@@ -245,7 +245,7 @@ static func _test_tr_06_cross_round_pending_modifier_consumption() -> Dictionary
 
 	var passed: bool = mod_applied and count_expanded and consumed_ok and not_reapplied
 	return {
-		"test": "TC-TR-06: 跨回合修饰符显式介入下一回合事件密度与排期生成（单次消费标记闭环）",
+		"test": "TC-TR-06: 跨回合修饰符显式介入下一回合事件密度与排期生成（单次消费标记）",
 		"passed": passed
 	}
 
@@ -312,7 +312,7 @@ static func _test_tr_08_deterministic_rng_repeatability() -> Dictionary:
 	}
 
 
-## R-03（TC-CT-09）：引擎必填化等价性——空转引擎零调度事件/快照态完整。
+## TC-CT-09：引擎必填化等价性——空转引擎零调度事件/快照态完整。
 static func _test_idle_engine_null_equivalence() -> Dictionary:
 	var rng := DeterministicRNGClass.from_seed(20260912)
 	var p_bar := ActionCardStagingBar.new()

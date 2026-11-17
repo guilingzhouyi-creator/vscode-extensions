@@ -16,7 +16,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_entitlements_seal_tamper())
 	# 会话有界化：过期优先清理（TC-ACC-SESSION-01）
 	results.append(test_session_cap_pruning())
-	# R-02（TC-ACC-09）：单轨加盐口令鉴权与反序列化默认值重设
+	# TC-ACC-09：单向加盐口令鉴权与反序列化默认值重设
 	results.append(test_salt_single_track_authentication())
 
 	var all_passed: bool = true

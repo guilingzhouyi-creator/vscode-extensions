@@ -15,7 +15,7 @@ static func run_all_tests() -> Dictionary:
 	# 新增：投递 mail_id 唯一化 + 悬挂补偿通道
 	results.append(_test_mail_id_unique_burst())
 	results.append(_test_compensation_releases_stale_pending())
-	# 修复回归：容量兜底绝不逐出在锁条目
+	# 修复回归：容量上限策略绝不逐出在锁条目
 	results.append(_test_capacity_fallback_preserves_active_lockouts())
 
 	var passed_cnt := 0
@@ -81,7 +81,7 @@ static func _test_rate_limit_and_lockout() -> Dictionary:
 		"passed": passed
 	}
 
-## 修复回归（红证：修复前容量兜底逐出 keys()[0]，灌满表后
+## 修复回归（修复前容量上限策略逐出 keys()[0]，灌满表后
 ## 可静默解除在锁账户的防爆破锁，受害者可被立即继续爆破）：
 ## 表满且剩余条目全部在锁时，_record_failure 必须放弃记录新失败（fail-closed），
 ## 绝不逐出锁定条目；存在过期条目时 purge 腾位后新失败可正常落账。
@@ -92,7 +92,7 @@ static func _test_capacity_fallback_preserves_active_lockouts() -> Dictionary:
 	for i in range(5000):
 		rate_limit["ACC_LOCKED_%05d" % i] = { "count": 5, "lock_until_utc": now + 3600 }
 
-	# 新账户触发容量兜底：purge 无过期条目可清，剩余全在锁 → 必须放弃记录、不逐出
+	# 新账户触发容量上限回退：purge 无过期条目可清，剩余全在锁 → 必须放弃记录、不逐出
 	CDKeyRedemptionSolver._record_failure("ACC_NEW", now, rate_limit)
 
 	var size_ok: bool = rate_limit.size() == 5000
@@ -112,7 +112,7 @@ static func _test_capacity_fallback_preserves_active_lockouts() -> Dictionary:
 
 	var passed: bool = size_ok and not_recorded and victim_ok and recorded_ok
 	return {
-		"test": "TC-CDKEY-03: 频控容量兜底绝不逐出在锁条目（防爆破锁回归）",
+		"test": "TC-CDKEY-03: 频控容量上限绝不逐出在锁条目（防爆破锁回归）",
 		"passed": passed
 	}
 
@@ -146,7 +146,7 @@ static func _test_reward_dispatch_via_mail_equivalent() -> Dictionary:
 
 	var passed: bool = res.get("success", false) and res.get("has_attachment", false) and mail_ok and reject_ok
 	return {
-		"test": "TC-CDKEY-03: 礼包奖励经邮件发放等价断言（附件字段与防错卫语句，R-04）",
+		"test": "TC-CDKEY-03: 礼包奖励经邮件发放等价断言（附件字段与防错卫语句）",
 		"passed": passed
 	}
 

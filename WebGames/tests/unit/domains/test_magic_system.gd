@@ -159,7 +159,7 @@ static func _test_bnd_defined_result() -> Dictionary:
 
 # ---------- 阶段2 ----------
 
-## 测试夹具：直接构造权威行动卡实体（R-06：行动卡别名退役）
+## 测试夹具：直接构造权威行动卡实体（行动卡统一为 CombatActionCardEntity）
 static func _make_cast_card(card_id: String, casts: int, magic_ref: String = "") -> PhysicalVerbRegistry.CombatActionCardEntity:
 	var card := PhysicalVerbRegistry.CombatActionCardEntity.new()
 	card.card_id = card_id
@@ -211,7 +211,7 @@ static func _test_seal_release_cycle() -> Dictionary:
 	var release_again = SealFsm.apply_release(seals, "ACC_MAGE", "FIRE_NOVA")
 	var again_ok: bool = not release_again.get("success", false)
 	var passed = sealed_ok and dup_ok and playable_while_sealed and release_ok and again_ok
-	return {"test": "TC-MAGIC-S2-03: 封印→解放闭环（状态常驻建模、重复封印拒绝、清理）", "passed": passed}
+	return {"test": "TC-MAGIC-S2-03: 封印→解放流程（状态常驻建模、重复封印拒绝、清理）", "passed": passed}
 
 static func _test_seal_slot_and_repeat() -> Dictionary:
 	var seals := {}
@@ -294,7 +294,7 @@ static func _test_delay_cancel_on_holder_lost() -> Dictionary:
 
 static func _test_physical_damage_via_real_pipeline() -> Dictionary:
 	# TC-CARD-S2-02：物理行动卡伤害必须等于真实侵彻管线输出（非虚拟 base×rank）
-	var card := _make_cast_card("CARD_SLASH", 1)  # verb_type 由 card_defaults 兜底（SLASH）
+	var card := _make_cast_card("CARD_SLASH", 1)  # verb_type 由 card_defaults 默认填充（SLASH）
 	card.verb_type = "SLASH"
 	var ctx := {"weapon_mass_kg": 3.0, "weapon_velocity": 8.0, "edge_sharpness": 1.5, "effective_armor": 5.0}
 	var res = MagicSettlementSolver.resolve_attack(card, 2, ctx)
@@ -310,7 +310,7 @@ static func _test_physical_damage_via_real_pipeline() -> Dictionary:
 # ---------- 收编验收（TC-CARD-S2-01/04/05） ----------
 
 static func _test_combat_card_authority() -> Dictionary:
-	# TC-CARD-S2-01：行动卡权威载体唯一（直构 CombatActionCardEntity，别名已退役，R-06）
+	# TC-CARD-S2-01：行动卡权威载体唯一（直构 CombatActionCardEntity）
 	var combat := PhysicalVerbRegistry.CombatActionCardEntity.new()
 	combat.card_id = "CARD_SEAL_X"
 	combat.card_name = "CARD_SEAL_X"
@@ -324,7 +324,7 @@ static func _test_combat_card_authority() -> Dictionary:
 		if effect is Dictionary and str(effect.get("kind", "")) == "seal":
 			effects_ok = true
 	var passed = is_combat and category_ok and effects_ok and (combat.card_id == "CARD_SEAL_X")
-	return {"test": "TC-CARD-S2-01: 行动卡权威载体唯一（直构 CombatActionCardEntity，R-06）", "passed": passed}
+	return {"test": "TC-CARD-S2-01: 行动卡权威载体唯一（直构 CombatActionCardEntity）", "passed": passed}
 
 static func _test_ap_stagger_validator() -> Dictionary:
 	# TC-CARD-S2-04：AP<0 硬直禁止主动攻击卡，仅防御卡（PARRY 等）放行

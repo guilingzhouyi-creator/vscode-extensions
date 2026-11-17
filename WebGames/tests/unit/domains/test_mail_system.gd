@@ -72,7 +72,7 @@ static func _test_attachment_claiming_and_overflow_protection() -> Dictionary:
 	]
 
 	var res = MailDeliveryPipeline.claim_single_mail(mail, wallet, inv, catalog)
-	# 未登记附件（ITEM_GHOST）安全留存显式断言：仍留邮件内可修复后重试（R-04 后领取端唯一校验点）
+	# 未登记附件（ITEM_GHOST）安全留存显式断言：仍留邮件内可修复后重试（领取端唯一校验点）
 	var ghost_retained := false
 	for item_dict in mail.attachment_items:
 		if str(item_dict.get("template_id", "")) == "ITEM_GHOST":

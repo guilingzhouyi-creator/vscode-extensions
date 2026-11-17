@@ -115,9 +115,9 @@ const SuiteSnapshotEngineeringHarnessPipeline = preload("res://tests/integration
 const SuiteDualDomainStoragePipeline = preload("res://tests/integration/pipelines/test_dual_domain_storage_pipeline.gd")
 # 统一资源索引中心与配置系统异步流式加载全链路流水线
 const SuiteResourceCatalogAndAsyncConfigPipeline = preload("res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd")
-# 演进 03: 高承压对象池与数据导向无头处理器架构
+# 高承压对象池与数据导向无头处理器架构
 const SuiteObjectPoolAndBatchPipeline = preload("res://tests/unit/infrastructure/test_object_pool_and_batch_pipeline.gd")
-# 演进 01: 超大型子域多配置表目录拆分与泛化路由架构
+# 超大型子域多配置表目录拆分与泛化路由架构
 const SuiteConfigSubtablesDomain = preload("res://tests/unit/infrastructure/test_config_subtables.gd")
 # 内存泄漏生命周期防御与引用解环流水线
 const SuiteMemoryLeakLifecycle = preload("res://tests/unit/infrastructure/test_memory_leak_lifecycle.gd")

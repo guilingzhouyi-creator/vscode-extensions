@@ -98,7 +98,7 @@ static func _test_ability_tier_independent() -> Dictionary:
 		"passed": passed
 	}
 
-## 测试用 MagicTierRegistry 装配（R-05：registry 必填后统一经此装配）
+## 测试用 MagicTierRegistry 装配（registry 必填后统一经此装配）
 static func _make_tier_registry() -> MagicTierRegistry:
 	var registry := MagicTierRegistry.new()
 	registry.reload_configuration()
@@ -137,7 +137,7 @@ static func _test_reference_label() -> Dictionary:
 		"passed": passed
 	}
 
-static func _make_ready_registry_and_resolve_r5() -> Dictionary:
+static func _make_ready_registry_and_resolve() -> Dictionary:
 	var registry := MagicTierRegistry.new()
 	registry.reload_configuration()
 	var resolver := MagicBaselineResolver.new(registry)
@@ -148,9 +148,9 @@ static func _make_ready_registry_and_resolve_r5() -> Dictionary:
 		MagicTierSnapshot.ProfessionRank.SENIOR_MAGE)
 	return {"registry": registry, "resolver": resolver, "result": result}
 
-## TC-MD-06: 消费方零回归（registry 双体系不变量就绪 + baseline 解析 + 强度兜底 + mana_gate）
+## TC-MD-06: 消费方零回归（registry 双体系不变量就绪 + baseline 解析 + 默认强度系数 + mana_gate）
 static func _test_consumer_zero_regression() -> Dictionary:
-	var bundle := _make_ready_registry_and_resolve_r5()
+	var bundle := _make_ready_registry_and_resolve()
 	var registry: MagicTierRegistry = bundle["registry"]
 	var resolver: MagicBaselineResolver = bundle["resolver"]
 	var result: Dictionary = bundle["result"]
@@ -163,7 +163,7 @@ static func _test_consumer_zero_regression() -> Dictionary:
 	var gate_ok: bool = registry.is_mana_gate_passed(MagicTierSnapshot.ManaAptitude.MANA_ADAPTOR)
 	var passed = ready_ok and tier_ok and resolve_ok and fallback_ok and gate_ok
 	return {
-		"test": "TC-MD-06: 消费方零回归（双体系不变量就绪/基线解析/强度兜底 1.0/mana_gate 保持）",
+		"test": "TC-MD-06: 消费方零回归（双体系不变量就绪/基线解析/默认强度系数 1.0/mana_gate 保持）",
 		"passed": passed
 	}
 
@@ -271,13 +271,13 @@ static func _test_rank_to_level_invalid_explicit() -> Dictionary:
 	var passed = invalid == 0 and valid == 7
 	return { "test": "TC-M3-02: rank_to_level 非法值显式错误（0 哨兵，合法 7 保持）", "passed": passed }
 
-## TC-M3-03: rank 反查索引与弱映射解析一致性（装配期索引，R-05）
+## TC-M3-03: rank 反查索引与弱映射解析一致性（装配期索引）
 static func _test_index_consistency() -> Dictionary:
 	var registry := _make_tier_registry()
 	var idx: Array = registry.query_tier_candidates(5)
 	var old: Array = MagicAbilityTierResolver.infer_tier_candidates(5, registry)
 	var passed = idx == old and idx == [2]
-	return { "test": "TC-M3-03: 索引查询与弱映射解析一致（5 阶→[2] 英雄级，R-05）", "passed": passed }
+	return { "test": "TC-M3-03: 索引查询与弱映射解析一致（5 阶→[2] 英雄级）", "passed": passed }
 
 ## TC-M3-04: 档次索引确定性（装配期反查——2→LOW/5→MID）
 static func _test_band_index_consistency() -> Dictionary:

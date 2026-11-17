@@ -14,7 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_singleton_reset())
 	return TestCase.pack_results("frontend_error_domain", results)
 
-## R-12：mock 侧错误码前缀同域 ERR_*（经 0ms 同步回调注入，反例可证伪）
+## mock 侧错误码前缀同域 ERR_*（经 0ms 同步回调注入，反例可证伪）
 static func _test_error_code_domain_unified() -> Dictionary:
 	var auth := MockAuthService.new(0)
 	var login_sink: Array = []
@@ -31,7 +31,7 @@ static func _test_error_code_domain_unified() -> Dictionary:
 	ok = ok and TestCase.assert_true(code_name.begins_with("ERR_"), "角色名错误码前缀 ERR_: %s" % code_name)
 	return TestCase.make_result("error_code_domain_unified", ok, {"login_code": code_login, "name_code": code_name})
 
-## R-11：槽位 ID 两位定宽（槽位 ≥10 不破 SLOT_01 格式）
+## 槽位 ID 两位定宽（槽位 ≥10 不破 SLOT_01 格式）
 static func _test_slot_id_two_digit() -> Dictionary:
 	var auth := MockAuthService.new(0)
 	for i in range(10):
@@ -46,7 +46,7 @@ static func _test_slot_id_two_digit() -> Dictionary:
 	var ok := TestCase.assert_eq(offenders.size(), 0, "槽位 ID 两位定宽: %s" % str(offenders))
 	return TestCase.make_result("slot_id_two_digit", ok, {"offenders": offenders})
 
-## R-25：未登记域 / EMPTY 夹具返回空，使「非空」断言恢复可证伪；真实域仍完整
+## 未登记域 / EMPTY 夹具返回空，使「非空」断言恢复可证伪；真实域仍完整
 static func _test_mock_catalog_falsifiable() -> Dictionary:
 	var unknown := MockDataCatalog.get_domain_data("__unregistered__")
 	var ok := TestCase.assert_true(unknown.is_empty(), "未登记域返回空, 非空断言可证伪")
@@ -59,7 +59,7 @@ static func _test_mock_catalog_falsifiable() -> Dictionary:
 	ok = ok and TestCase.assert_gt(account.size(), 0, "真实域仍返回完整数据集")
 	return TestCase.make_result("mock_catalog_falsifiable", ok)
 
-## R-26：Mock 单例 / 角色集可重置，用例零残留
+## Mock 单例 / 角色集可重置，用例零残留
 static func _test_singleton_reset() -> Dictionary:
 	var first := MockServiceContainer.get_instance()
 	var ok := TestCase.assert_not_null(first, "容器单例可构造")

@@ -14,7 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_post_migration_validation_failure())
 	results.append(test_domain_level_independent_migration())
 	results.append(test_migration_traceability_steps())
-	# R-01（TC-SM-09）：UID 单轨迁移判定器
+	# TC-SM-09：UID 单向迁移判定器
 	results.append(test_legacy_uid_audit_detector())
 
 	var all_passed: bool = true

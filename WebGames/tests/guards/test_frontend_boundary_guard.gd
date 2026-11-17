@@ -250,7 +250,7 @@ static func _test_no_eventbus_subscribe_in_views() -> Dictionary:
 	var ok := TestCase.assert_eq(offenders.size(), 0, "视图禁止 EventBusCore 订阅: %s" % str(offenders))
 	return TestCase.make_result("no_eventbus_subscribe_in_views", ok, {"offenders": offenders})
 
-## 8. frontend 内 Color(r,g,b,a) 字面量（DesignTokens 除外）须为 0 (R-18)
+## 8. frontend 内 Color(r,g,b,a) 字面量（DesignTokens 除外）须为 0
 static func _test_no_hardcoded_color_outside_tokens() -> Dictionary:
 	var re := RegEx.new()
 	re.compile("Color\\(\\s*[-+0-9.]")
@@ -338,7 +338,7 @@ static func _test_ui_audio_bridge_placeholder_alive() -> Dictionary:
 static func _test_frontend_compatibility_retirement() -> Dictionary:
 	# 1. 断言 frontend/mocks 目录不存在
 	var dir := DirAccess.open("res://frontend/mocks")
-	var dir_ok := TestCase.assert_null(dir, "frontend/mocks 目录必须彻底删除 (R-01)")
+	var dir_ok := TestCase.assert_null(dir, "frontend/mocks 目录必须彻底删除")
 
 	# 2. 断言 frontend/ 全域零 skeleton_mock / MOCK_PATH / _fill_params 引用
 	#    经 TestArchitectureGuardDomain._strip_comments 去注释后扫描（剥离单源复用，

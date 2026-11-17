@@ -37,7 +37,7 @@ static func _test_i18n_counter_examples() -> Dictionary:
 	ok = ok and TestCase.assert_eq(PlaceholderFiller.fill("{timestamp}", {"timestamp": "2026-09-11"}), "2026-09-11", "timestamp 不误命中时长")
 	return TestCase.make_result("i18n_counter_examples", ok)
 
-## R-02：resolve 路径须真正触达千分位格式化（单引擎收敛后不再空转）
+## resolve 路径须真正触达千分位格式化（单引擎收敛后不再空转）
 static func _test_i18n_formatters_reachable() -> Dictionary:
 	var s := UITextResolver.resolve("ui.fe05.wallet.gold", {"amount": 5000})
 	var ok := TestCase.assert_true(s.contains("5,000"), "resolve 路径触达千分位格式化: %s" % s)
@@ -47,7 +47,7 @@ static func _test_i18n_formatters_reachable() -> Dictionary:
 	ok = ok and TestCase.assert_true(relic_text != "ui.fe12.mat_category.relic" and not relic_text.is_empty(), "relic 材料分类词条已装配: %s" % relic_text)
 	return TestCase.make_result("i18n_formatters_reachable", ok)
 
-## R-03/R-09/R-29：视图模型空值 / 非有限 / 越界防御读取零崩溃，日志有界
+## 视图模型空值 / 非有限 / 越界防御读取零崩溃，日志有界
 static func _test_view_model_defensive_read() -> Dictionary:
 	var vm := CombatViewModel.new()
 	vm.update_from_snapshot({"boss_parts": null})
@@ -59,7 +59,7 @@ static func _test_view_model_defensive_read() -> Dictionary:
 	ok = ok and TestCase.assert_lte(vm.battle_logs.size(), CombatViewModel.MAX_BATTLE_LOGS, "战报日志有界不超上限")
 	return TestCase.make_result("view_model_defensive_read", ok)
 
-## R-04/R-05：未注册 Screen 跳转失败路径栈深不变，无孤儿节点
+## 未注册 Screen 跳转失败路径栈深不变，无孤儿节点
 static func _test_nav_stack_consistency_on_failure() -> Dictionary:
 	var nav := NavManager.get_instance()
 	var before := nav.get_stack_depth()
@@ -68,7 +68,7 @@ static func _test_nav_stack_consistency_on_failure() -> Dictionary:
 	ok = ok and TestCase.assert_eq(nav.get_stack_depth(), before, "失败路径栈深不变")
 	return TestCase.make_result("nav_stack_consistency_on_failure", ok)
 
-## R-01 / TC-FE-ROB-03：连续压入超上限 Toast 不死循环，子节点数 ≤ MAX_TOASTS
+## TC-FE-ROB-03：连续压入超上限 Toast 不死循环，子节点数 ≤ MAX_TOASTS
 static func _test_toast_eviction_no_hang() -> Dictionary:
 	var tree := Engine.get_main_loop() as SceneTree
 	var layer := ToastLayer.new()
