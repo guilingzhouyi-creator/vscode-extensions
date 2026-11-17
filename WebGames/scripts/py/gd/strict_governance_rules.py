@@ -25,7 +25,7 @@ STRICT_HEADER_FIELDS = (
     "退出语义与设计依据:",
 )
 FORBIDDEN_JARGON_RE = re.compile(
-    r"(?:\bR-\d+\b|\bphase[\s_]*\d+\b|\bST\d+\b|\bp\d{2,3}\b|兜底|数据桩|双轨|洗脱|防投毒|速通|防伪|水化|脱水|回灌|施工|案卷)",
+    r"(?:\bR-\d+\b|\bphase[\s_]*\d+\b|\bST\d+\b|\bp\d{2,3}\b|演进[\s_]*\d+|兜底|数据桩|双轨|洗脱|防投毒|速通|防伪|水化|脱水|回灌|施工|案卷|铁律|降维|底座|全链路|闭环)",
     re.IGNORECASE,
 )
 PERCENTILE_ALLOW_RE = re.compile(r"^p(?:50|95|99)$", re.IGNORECASE)

@@ -216,7 +216,7 @@ static func _test_band_name_key() -> Dictionary:
 
 ## TC-RB-05: 消费方接入（registry 档次互斥全覆盖不变量就绪 + get_band_baseline + resolve rank_band）
 static func _test_band_consumer_integration() -> Dictionary:
-	var bundle := _make_ready_registry_and_resolve_r5()
+	var bundle := _make_ready_registry_and_resolve()
 	var registry: MagicTierRegistry = bundle["registry"]
 	var result: Dictionary = bundle["result"]
 	var ready_ok: bool = registry.is_ready()

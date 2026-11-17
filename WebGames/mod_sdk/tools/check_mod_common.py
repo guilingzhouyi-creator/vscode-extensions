@@ -89,8 +89,8 @@ def _load_trait_costs(cap_data: dict[str, Any]) -> dict[str, int]:
                 for trait_id, trait_meta in traits_cfg.items():
                     if isinstance(trait_meta, dict) and isinstance(trait_meta.get("cost"), int):
                         cost_map[str(trait_id)] = int(trait_meta["cost"])
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            sys.stderr.write(f"[WARN] 读取 {cc_core} 失败，回退默认天赋花费映射: {exc}\n")
     official_destinies = webgames_root / "mods" / "official_kalar" / "destinies.json"
     if official_destinies.is_file():
         try:
@@ -100,8 +100,8 @@ def _load_trait_costs(cap_data: dict[str, Any]) -> dict[str, int]:
                     tid = str(trait_meta.get("trait_id") or trait_meta.get("id") or "")
                     if tid:
                         cost_map[tid] = int(trait_meta["cost"])
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            sys.stderr.write(f"[WARN] 读取 {official_destinies} 失败，跳过官方天赋花费覆盖: {exc}\n")
     return cost_map
 
 

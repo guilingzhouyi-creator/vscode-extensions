@@ -121,6 +121,12 @@ def _test_arch_log_and_crypto_evasion() -> list[str]:
         if res13["passed"] or len(res13["violations"]) < 2:
             failures.append(f"TC-ARCH-13 对抗样本逃逸: {res13}")
 
+        (root / "config" / "infrastructure").mkdir(parents=True, exist_ok=True)
+        (root / "config" / "infrastructure" / "log.json").write_text("{broken json", encoding="utf-8")
+        res12_corrupt = check_tc_arch_12(ctx, _make_result, _strip_comments_stub)
+        if res12_corrupt["passed"] or not any("log.json 解析异常" in v for v in res12_corrupt["violations"]):
+            failures.append(f"TC-ARCH-12 损坏 JSON 静默吞没逃逸: {res12_corrupt}")
+
         sec_findings: list[str] = []
         sec_file = root / "bad_secret.gd"
         sec_file.write_text(f'const {k_tok}: String = "synthetic_plain_secret_9876"\n', encoding="utf-8")
@@ -171,7 +177,7 @@ def _test_gd_strict_style_evasion() -> list[str]:
         bad_gd.write_text(
             "# 模块归属: Test\n"
             "# 文件路径: res://backend/domains/probe/stale_name.gd\n"
-            "# 职责说明: R-18 临时语义测试\n"
+            "# 职责说明: R-18 与全链路底座闭环校验\n"
             "class_name WrongClassName extends RefCounted\n"
             "class CacheHelper:\n"
             "\tvar min_lv: int = 1\n"
@@ -191,6 +197,9 @@ def _test_gd_strict_style_evasion() -> list[str]:
         for tag in ("STYLE-HDR-001", "STYLE-CLS-001", "STYLE-DOC-001", "STYLE-JRG-001", "STYLE-NAM-002"):
             if tag not in joined:
                 failures.append(f"gd/style_rules 对抗样本未拦截 {tag} (实得: {violations})")
+        for jargon_tok in ("全链路", "底座", "闭环"):
+            if jargon_tok not in joined:
+                failures.append(f"gd/style_rules 新增禁忌黑话未拦截 {jargon_tok} (实得: {violations})")
         for cryptic in ("min_lv", "「ch」", "「data」", "「dir」", "「a」", "「ok」"):
             if cryptic not in joined:
                 failures.append(f"gd/style_rules 未拦截隐蔽命名 {cryptic} (实得: {violations})")

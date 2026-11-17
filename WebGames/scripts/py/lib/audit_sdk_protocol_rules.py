@@ -146,8 +146,17 @@ def _check_request_envelope_parity(
             suggestion="在 schema properties 中补充缺失字段",
           )
         )
-    except Exception:
-      pass
+    except Exception as exc:
+      findings.append(
+        AuditFinding(
+          rule_id="SDK-PROTOCOL-SCHEMA-PARSE-ERR",
+          file_path="WebGames/mod_sdk/schemas/client_request_envelope.schema.json",
+          line=1,
+          severity=SEVERITY_ERROR,
+          message=f"解析 client_request_envelope.schema.json 异常: {exc}",
+          suggestion="修复 Schema 文件 JSON 格式并确保 properties 节点合法",
+        )
+      )
 
 
 def _check_esc_action_enum_parity(

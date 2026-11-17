@@ -100,8 +100,8 @@ def check_tc_arch_09(ctx: Any, make_result: Callable[[str, list[str]], dict[str,
   if narr_file.exists():
     try:
       narr_errors = json.loads(narr_file.read_text(encoding="utf-8"))
-    except Exception:
-      pass
+    except Exception as exc:
+      violations.append(f"解析 narratives/errors.json 异常: {exc}")
 
   # 1. 校验 catalog 内所有条目的 message_key 是否在 narratives/errors.json 落地
   for code, entry in catalog_errors.items():
@@ -251,8 +251,8 @@ def check_tc_arch_12(
             violations.append(
               f"res://config/infrastructure/persistence.json: messages.{mk} 使用裸格式符「{mv}」，须改为 {{param}} 命名占位符"
             )
-    except Exception:
-      pass
+    except Exception as exc:
+      violations.append(f"res://config/infrastructure/persistence.json 解析异常: {exc}")
 
   # 校验合规标准英文文本库：MSG_* 严禁混入中文或裸 %s/%d/{0} 占位符
   base_msg_file: Path = ctx.root / "backend" / "infrastructure" / "logging" / "system_base_messages.gd"
@@ -279,8 +279,8 @@ def check_tc_arch_12(
               violations.append(
                 f"res://config/infrastructure/log.json: {section_key}.{ek} 禁止使用裸 %s/%d/{{0}} 占位符「{ev}」"
               )
-    except (OSError, ValueError):
-      pass
+    except (OSError, ValueError) as exc:
+      violations.append(f"res://config/infrastructure/log.json 解析异常: {exc}")
 
   return make_result("TC-ARCH-12: 英文日志与错误动态占位符注入规范断言", violations)
 
