@@ -220,7 +220,7 @@ static func test_log_collector_caller_capture_toggle() -> Dictionary:
 		"detail": "disabled_empty=%s, enabled_ok=%s" % [str(disabled_empty), str(enabled_ok)]
 	}
 
-## TC-RM-39: LogFileExporter 批处理暂存与紧急刷盘屏障断言
+## TC-RM-39: LogFileExporter 批处理缓冲与紧急刷盘屏障断言
 static func test_log_file_exporter_batch_and_critical_flush() -> Dictionary:
 	LogFileExporter.reset_for_test()
 	var test_dir := "user://test_batch_logs_tc39"
@@ -267,7 +267,7 @@ static func test_log_file_exporter_batch_and_critical_flush() -> Dictionary:
 	LogFileExporter.reset_for_test()
 
 	return {
-		"test": "TC-RM-39: LogFileExporter 批处理暂存与紧急刷盘屏障断言",
+		"test": "TC-RM-39: LogFileExporter 批处理缓冲与紧急刷盘屏障断言",
 		"passed": buffered_ok and flushed_ok,
 		"detail": "buffered_ok=%s, flushed_ok=%s" % [str(buffered_ok), str(flushed_ok)]
 	}

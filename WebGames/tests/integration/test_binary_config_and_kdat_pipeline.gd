@@ -1,9 +1,9 @@
 # ==============================================================================
-# 模块归属: 集成测试层 (Integration · 高纯度二进制流与GameConfig双轨流水线)
+# 模块归属: 集成测试层 (Integration · 高纯度二进制流与GameConfig双格式流水线)
 # 文件路径: res://tests/integration/test_binary_config_and_kdat_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: BinaryConfigReader, KDataHeaderDTO, KDataTOCEntryDTO, GameConfig
-# 职责说明: .kdat 容器规范、魔数拦截、CRC32 防篡改、TLV 往返等价、双轨加载与单包融合验收测试套件
+# 职责说明: .kdat 容器规范、魔数拦截、CRC32 防篡改、TLV 往返等价、双格式加载与单包融合验收测试套件
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -234,14 +234,14 @@ static func test_tc_kdat_05_monolithic_bundle_and_toc_lookup() -> Dictionary:
 		"toc_ok": toc_ok
 	})
 
-## TC-KDAT-06: 双轨自适应机制与全域架构契约闭合
+## TC-KDAT-06: 双格式自适应机制与全域架构契约闭合
 static func test_tc_kdat_06_dual_track_and_architecture_closure() -> Dictionary:
 	# 验证 GameConfig 常量契约存在
 	var has_ext: bool = not GameConfig.EXT_KDAT.is_empty() and GameConfig.EXT_KDAT == ".kdat"
 	var has_bundle: bool = not GameConfig.PATH_CONFIG_BUNDLE.is_empty()
 
 	var passed: bool = has_ext and has_bundle
-	return make_result("TC-KDAT-06: 双轨自适应机制与全域架构契约闭合", passed, {
+	return make_result("TC-KDAT-06: 双格式自适应机制与全域架构契约闭合", passed, {
 		"has_ext": has_ext,
 		"has_bundle": has_bundle
 	})
@@ -304,7 +304,7 @@ static func test_tc_kdat_08_encrypted_stream_and_client_secret_vault() -> Dictio
 		"stream_ok": stream_ok
 	})
 
-## TC-KDAT-09: 首发单机零网络快道与联机占位快速失败隔离 (RunModeIsolationSolver)
+## TC-KDAT-09: 首发单机零网络快道与联机预留存根快速失败隔离 (RunModeIsolationSolver)
 static func test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolation() -> Dictionary:
 	# 1. 单机模式判定与网络旁路
 	var is_sp := RunModeIsolationSolver.is_offline_single_player(WorldGatewayModel.GameMode.SINGLE_PLAYER)
@@ -318,7 +318,7 @@ static func test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolati
 		and bool(sp_caps.get("zero_latency_fast_path", false)) \
 		and not bool(sp_caps.get("network_active", true))
 
-	# 3. 联机占位快速失败自检
+	# 3. 联机预留存根快速失败自检
 	var is_mp := RunModeIsolationSolver.is_multiplayer_placeholder(WorldGatewayModel.GameMode.MULTIPLAYER)
 	var mp_caps := RunModeIsolationSolver.evaluate_mode_capabilities(WorldGatewayModel.GameMode.MULTIPLAYER)
 	var mp_caps_ok: bool = bool(mp_caps.get("stub_reserved", false)) \
@@ -341,7 +341,7 @@ static func test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolati
 	var passed: bool = is_sp and is_not_mp and bypass_poll and bypass_auth and caps_ok \
 		and is_mp and mp_caps_ok and mp_dispatch_fail_fast and stub_sp_ok and stub_mp_ok
 
-	return make_result("TC-KDAT-09: 首发单机零网络快道与联机占位快速失败隔离", passed, {
+	return make_result("TC-KDAT-09: 首发单机零网络快道与联机预留存根快速失败隔离", passed, {
 		"sp_ok": is_sp and caps_ok,
 		"mp_fail_fast_ok": is_mp and mp_caps_ok and mp_dispatch_fail_fast,
 		"stub_integration_ok": stub_sp_ok and stub_mp_ok

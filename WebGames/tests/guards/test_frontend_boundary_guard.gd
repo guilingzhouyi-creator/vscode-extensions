@@ -2,7 +2,7 @@
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端可视化边界长效全域架构护栏
 # 文件路径: res://tests/guards/test_frontend_boundary_guard.gd
 # 职责: 静态审查 frontend 下所有视图与模块的基类继承、后端直连、裸随机、节点路径、
-#       配置语义白名单外零直读、Color字面量单一真源、legacy清零、对象池契约与音效占位
+#       配置语义白名单外零直读、Color字面量单一真源、legacy清零、对象池契约与音效桥接
 # ==============================================================================
 class_name TestFrontendBoundaryGuard
 extends TestCase
@@ -219,7 +219,7 @@ static func _test_views_no_relative_node_paths() -> Dictionary:
 	return TestCase.make_result("views_no_relative_node_paths", ok, {"offenders": offenders})
 
 # ==============================================================================
-# 6~12 深入边界加固 (配置/颜色/事件总线/legacy删除/对象池/音频占位)
+# 6~12 深入边界加固 (配置/颜色/事件总线/legacy删除/对象池/音频桥接)
 # ==============================================================================
 
 ## 6. 白名单外「视图直读 GameConfig 业务数值点 = 0」(B1)
@@ -324,10 +324,10 @@ static func _test_kvirtual_list_pool_contract() -> Dictionary:
 	list.free()
 	return TestCase.make_result("kvirtual_list_pool_contract", ok)
 
-## 12. UIAudioBridge 单例占位存活 (B3)
+## 12. UIAudioBridge 单例存活 (B3)
 static func _test_ui_audio_bridge_placeholder_alive() -> Dictionary:
 	var bridge := UIAudioBridge.get_instance()
-	var ok := TestCase.assert_not_null(bridge, "UIAudioBridge 单例占位可用 (B3)")
+	var ok := TestCase.assert_not_null(bridge, "UIAudioBridge 单例可用 (B3)")
 	var hits: Array = []
 	bridge.play_sfx.connect(func(_t: int, _v: float) -> void: hits.append(1))
 	bridge.play_click()

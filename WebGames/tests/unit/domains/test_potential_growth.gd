@@ -105,7 +105,7 @@ static func test_respec_preserves_dynamic_adjustments() -> Dictionary:
 	wallet.mana_monocrystals = 5
 
 	var res = AttributeRespecPipeline.execute_heart_core_respec(sheet, engine, wallet, 0)
-	# 洗点洗 L1 等级与 L2 阅历重塑层；L3 动态实际值保留（等级回 1、潜能全额返还、动态 +5 不逆转）
+	# 洗点洗 L1 等级与 L2 阅历系数层；L3 动态实际值保留（等级回 1、潜能全额返还、动态 +5 不逆转）
 	var passed = res.success \
 		and (sheet.get_level("STR") == AttributeConversionEngine.min_level()) \
 		and (engine.unassigned_potential_points == 4) \

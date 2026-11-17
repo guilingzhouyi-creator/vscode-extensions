@@ -1,7 +1,7 @@
 # ==============================================================================
-# 单元测试：用户会话生命周期与主页HUD双轨同步流水线
+# 单元测试：用户会话生命周期与主页HUD双向同步流水线
 # 文件路径: res://tests/integration/pipelines/test_session_lifecycle_and_hud_sync_pipeline.gd
-# 职责: 覆盖「注册 ➔ 登录 ➔ 进世界 HUD 首帧快照 ➔ 会话注销」全闭环无头断言，
+# 职责: 覆盖「注册 ➔ 登录 ➔ 进世界 HUD 首帧快照 ➔ 会话注销」全流程无头断言，
 #       验证快照真实溯源（零臆造）、除数下限守卫、广播载荷契约（args/category_key）。
 # 需求源: 阶段4（S4：TestSessionLifecycleAndHudSyncPipeline，8 用例）
 # ==============================================================================
@@ -22,7 +22,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_unwired_slots_explicit_reservation_no_default_binding())
 	results.append(test_session_context_pool_and_pruning_lifecycle())
 
-	return TestCase.pack_results("用户会话生命周期与主页HUD双轨同步流水线", results)
+	return TestCase.pack_results("用户会话生命周期与主页HUD双向同步流水线", results)
 
 ## 事件捕获辅助：挂接/卸载 DOMAIN_EVENT_GENERIC 信道监听（零残留，返回解绑闭包）
 static func _capture_events(callback: Callable) -> Callable:
@@ -199,9 +199,9 @@ static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 		and channels.has(HudEventContract.channel_hud_snapshot()) \
 		and channels.has(HudEventContract.channel_auth_session_revoked()) \
 		and snapshot != null and snapshot.account_id == reg.account_id
-	return {"test": "TC-HDS-06: 全生命周期无头闭环", "passed": passed}
+	return {"test": "TC-HDS-06: 全生命周期无头流程", "passed": passed}
 
-# ---- TC-HDS-07：叙事模板-载荷 args 契约一致（%s 占位与 args 对齐） ----
+# ---- TC-HDS-07：叙事模板-载荷 args 契约一致（%s 参数槽与 args 对齐） ----
 static func test_narrative_template_args_contract() -> Dictionary:
 	var pairs := [
 		["account.registered", "【鉴权】开拓者 %s 已在当前世界成功建立身份档案。", 1],
@@ -242,7 +242,7 @@ static func test_session_bounded_and_no_residual_subscription() -> Dictionary:
 	return {"test": "TC-HDS-08: 会话有界与订阅零残留", "passed": passed}
 
 # ==============================================================================
-# 十阶段全链路无头辅助与测试用例 (TC-HDS-09 ~ TC-HDS-11)
+# 十阶段端到端无头辅助与测试用例 (TC-HDS-09 ~ TC-HDS-11)
 # ==============================================================================
 
 static func _register_ten_stage_hooks(hooks_called: Array) -> void:
@@ -435,7 +435,7 @@ static func test_ten_stage_custom_hook_conduction_pipeline() -> Dictionary:
 		TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = reg.success and pro_ok and stages_ok and hooks_ok and shutdown_ok
-	return {"test": "TC-HDS-09: 十阶段全链路端到端无头串联与自定义Hook导通", "passed": passed}
+	return {"test": "TC-HDS-09: 十阶段端到端无头串联与自定义Hook导通", "passed": passed}
 
 # ---- TC-HDS-10：未接线插槽显式预留与防静默默认值绑定 ----
 static func test_unwired_slots_explicit_reservation_no_default_binding() -> Dictionary:
@@ -464,7 +464,7 @@ static func test_unwired_slots_explicit_reservation_no_default_binding() -> Dict
 
 	SessionFlowContextDTO.release(ctx)
 	var passed: bool = guard_blocked and name_guarded and world_guarded and pro_guarded
-	return {"test": "TC-HDS-10: 未接线插槽显式预留与零默认值防伪绑定", "passed": passed}
+	return {"test": "TC-HDS-10: 未接线插槽显式预留与零默认值校验绑定", "passed": passed}
 
 # ---- TC-HDS-11：会话上下文对象池借还、复位守恒与快照修剪 ----
 static func test_session_context_pool_and_pruning_lifecycle() -> Dictionary:

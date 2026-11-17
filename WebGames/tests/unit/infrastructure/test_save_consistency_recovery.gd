@@ -61,7 +61,7 @@ static func test_inventory_item_reference_integrity() -> Dictionary:
 		"uid_matches": uid_matches
 	}
 
-## TC-SV-13: 物品定义缺失兜底重建（Inv-SV-3）
+## TC-SV-13: 物品定义缺失默认重建（Inv-SV-3）
 static func test_item_definition_fallback_rebuild() -> Dictionary:
 	# 构造缺省定义字段的物品字典载荷
 	var sparse_data := {
@@ -70,12 +70,12 @@ static func test_item_definition_fallback_rebuild() -> Dictionary:
 	}
 	var rebuilt := ItemEntity.deserialize(sparse_data)
 	var has_uid := (rebuilt.item_uid == "uid_sparse_123")
-	# 默认质量/体积从 item_defaults 兜底恢复
+	# 默认质量/体积从 item_defaults 回退恢复
 	var mass_valid := (rebuilt.mass_kg > 0.0)
 
 	var passed := has_uid and mass_valid
 	return {
-		"test": "TC-SV-13: 缺失配置定义的持有物品实例兜底重建断言",
+		"test": "TC-SV-13: 缺失配置定义的持有物品实例默认重建断言",
 		"passed": passed,
 		"mass_valid": mass_valid
 	}
@@ -164,7 +164,7 @@ static func test_missing_field_use_default() -> Dictionary:
 	var is_valid := bool(val_res.get("is_valid", false))
 	var sanitized: Dictionary = val_res.get("sanitized", {})
 
-	# 缺失的域按策略补充空字典或默认占位
+	# 缺失的域按策略补充空字典或默认结构
 	var passed := is_valid and sanitized.has("inventory")
 	return {
 		"test": "TC-SV-28: 存档缺失字段/数据域按配置使用默认值恢复断言",

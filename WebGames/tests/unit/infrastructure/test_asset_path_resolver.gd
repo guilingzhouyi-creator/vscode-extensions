@@ -7,7 +7,7 @@
 #           验证统一 URI 协议解析（official://, mod://, res://, user://）；
 #           验证工程版与发行版运行环境判定与测试隔离覆写机制；
 #           验证防路径穿越（Anti-Path Traversal）与标识符清洗等刚性安全防线。
-# 退出语义与设计依据: 工业级三级级联安全路径隔离与双模式环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
+# 退出语义与设计依据: 三级级联安全路径隔离与双模式环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
 # ==============================================================================
 
 class_name TestAssetPathResolver

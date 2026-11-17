@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: TestRegistry | 下游: CutsceneRequestDTO, CutsceneAsyncLoader, CutsceneHookRegistry, CutsceneOrchestrator, CutscenePlayerView, NarrativeDagExecutionEngine
 # 职责说明: 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎全链路验收集成测试套件；
 #           全面断言参数化 DTO、非阻塞流式装载、LRU 缓存、Hook 路由拦截、长按跳过互锁、
-#           无艺术资产时的文字占位演播（Text Placeholder）与主线程纯通用调用闭环。
+#           无艺术资产时的文字替补演播（Text Fallback）与主线程纯通用调用流程。
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -100,7 +100,7 @@ static func test_tc_cs_02_async_loader_nonblocking_and_lru_cache() -> Dictionary
 	var test3_kept: bool = loader.is_resource_ready("res://assets/video/test3.ogv")
 	var lru_ok: bool = test1_evicted and test2_kept and test3_kept
 
-	# 3. 生产模式无艺术资源时优雅降级为文字占位（不悬挂卡死）
+	# 3. 生产模式无艺术资源时优雅降级为文字替补（不悬挂卡死）
 	loader.set_deterministic_mode(false)
 	var fallback_called: Array[bool] = [false]
 	var fallback_res: Array[Resource] = [Resource.new()]
@@ -131,7 +131,7 @@ static func test_tc_cs_02_async_loader_nonblocking_and_lru_cache() -> Dictionary
 static func test_tc_cs_03_hook_registry_and_narrative_interception() -> Dictionary:
 	var registry := CutsceneHookRegistry.new()
 
-	# 1. 注册资产清单（含文字占位元数据）
+	# 1. 注册资产清单（含文字替补元数据）
 	var manifest := CutsceneManifestDTO.new()
 	manifest.cutscene_id = "cs_prologue"
 	manifest.video_resource_path = "res://assets/video/prologue.ogv"
@@ -139,7 +139,7 @@ static func test_tc_cs_03_hook_registry_and_narrative_interception() -> Dictiona
 	manifest.default_skippable = true
 	manifest.is_placeholder = true
 	manifest.placeholder_title = "序章觉醒演播"
-	manifest.placeholder_text = "【文字占位】天穹之上泛起赤色微光..."
+	manifest.placeholder_text = "【文字替补】天穹之上泛起赤色微光..."
 	registry.register_manifest(manifest)
 
 	# 2. 注册前置 Hook
@@ -220,7 +220,7 @@ static func test_tc_cs_04_orchestrator_lifecycle_and_skip_interlock() -> Diction
 	var auto_finish_ok: bool = not orch.is_playing()
 
 	var passed: bool = start_ok and step_ok and skip_ok and parse_ok and auto_finish_ok
-	return make_result("TC-CS-04: 主线程通用调用与生命周期闭环", passed, {
+	return make_result("TC-CS-04: 主线程通用调用与生命周期流转", passed, {
 		"start_ok": start_ok,
 		"step_ok": step_ok,
 		"skip_ok": skip_ok,
@@ -228,7 +228,7 @@ static func test_tc_cs_04_orchestrator_lifecycle_and_skip_interlock() -> Diction
 		"auto_finish_ok": auto_finish_ok
 	})
 
-## TC-CS-05: 表现层视口装配、文字占位演播驱动与字幕快照单向注入
+## TC-CS-05: 表现层视口装配、文字替补演播驱动与字幕快照单向注入
 static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 	var view := CutscenePlayerView.new()
 	var presenter := CutscenePresenterClass.new()
@@ -242,7 +242,7 @@ static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 		func(): skip_called[0] = true
 	)
 
-	# 1. 模拟收到全域开始播放事件（无艺术物理资源，触发文字占位演示）
+	# 1. 模拟收到全域开始播放事件（无艺术物理资源，触发文字替补演示）
 	presenter.handle_cutscene_started({
 		"cutscene_id": "cs_ui_placeholder",
 		"is_placeholder": true,
@@ -258,7 +258,7 @@ static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 	var placeholder_box: Control = view.get_node_or_null("PlaceholderContainer")
 	var placeholder_active: bool = placeholder_box != null and placeholder_box.visible
 
-	# 2. 模拟经过 1.2 秒帧推进，断言文字占位演示自动推进至完结并触发信号
+	# 2. 模拟经过 1.2 秒帧推进，断言文字替补演示自动推进至完结并触发信号
 	view._process(1.2)
 	var placeholder_finished_ok: bool = finish_called[0]
 
@@ -293,7 +293,7 @@ static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 
 	var bridge_ok: bool = bridge_attached_ok and bridge_consuming_ok and dynamic_view_created and bridge_finished_ok and bridge_clean_ok
 	var passed: bool = view_shown and placeholder_active and placeholder_finished_ok and bridge_ok
-	return make_result("TC-CS-05: 表现层视口装配、文字占位演播驱动与总线消费桥接", passed, {
+	return make_result("TC-CS-05: 表现层视口装配、文字替补演播驱动与总线消费桥接", passed, {
 		"view_shown": view_shown,
 		"placeholder_active": placeholder_active,
 		"placeholder_finished_ok": placeholder_finished_ok,

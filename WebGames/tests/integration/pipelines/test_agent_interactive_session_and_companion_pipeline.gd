@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_agent_interactive_session_and_companion_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: AgentPlaythroughSession, CompanionObserverBus, CompanionBlackboxRecorder, ModWorkbenchView | 配置: config/domains/*.json | 信号: CompanionObserverBus
-# 职责说明: 全链路验证长程交互式Agent推演会话生命周期、单步分支选择与突变结算、决策快照回滚与状态恢复、非侵入式伴侣观察总线广播与有界队列、现场黑匣子诊断转储及前端工坊轻量占位契约。
+# 职责说明: 验证长程交互式Agent推演会话生命周期、单步分支选择与突变结算、决策快照回滚与状态恢复、非侵入式伴侣观察总线广播与有界队列、现场黑匣子诊断转储及前端工坊轻量待命接口契约。
 # 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (智能体试玩会话与伴侣观察总线架构规范)
 # ==============================================================================
 
@@ -199,7 +199,7 @@ static func test_companion_blackbox_recorder_diagnostic_dump() -> Dictionary:
 		"dump_ok": dump_ok
 	})
 
-## TC-AIS-06: 前端工坊占位接口完整性与零异常验证
+## TC-AIS-06: 前端工坊轻量接口完整性与零异常验证
 static func test_frontend_workbench_view_stub_contract() -> Dictionary:
 	var view := ModWorkbenchView.new()
 	var initial_state: Dictionary = view.get_workbench_state()
@@ -221,7 +221,7 @@ static func test_frontend_workbench_view_stub_contract() -> Dictionary:
 
 	view.free()
 	var passed: bool = init_ok and bound_ok and snap_ok
-	return make_result("TC-AIS-06: 前端工坊占位接口完整性与零异常验证", passed, {
+	return make_result("TC-AIS-06: 前端工坊轻量接口完整性与零异常验证", passed, {
 		"init_ok": init_ok,
 		"bound_ok": bound_ok,
 		"snap_ok": snap_ok

@@ -152,7 +152,7 @@ static func test_fifo_budget_trim_oldest() -> Dictionary:
 	return {"test": "TC-CFG-07: FifoBudget 最旧先出单次裁剪（溢出裁/未溢出零操作/无界）", "passed": passed}
 
 
-## 中性基座非空展示默认值、零 MOD 失败闭环保留空 ID 与基础设施/前端新键校验
+## 中性基座非空展示默认值、零 MOD 失败拦截保留空 ID 与基础设施/前端新键校验
 static func test_neutral_display_defaults_and_extended_keys() -> Dictionary:
 	var violations: Array[String] = []
 	var forbidden := ["卡拉尔", "瓦尔兰", "阿尔托莉雅"]
