@@ -197,6 +197,29 @@ def check_multi_ui_policy_conflicts(
             ))
 
 
+def _load_mod_json_for_multi(
+    json_path: Path,
+    prefixed_name: str,
+    reported_files: set[str],
+    all_diags: list[DiagnosticItem],
+) -> dict[str, Any] | None:
+    """加载多包联合预检所需的 JSON 对象；若单包检查尚未报错且解析失败则补充诊断。"""
+    if not json_path.is_file():
+        return None
+    try:
+        loaded = json.loads(json_path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else None
+    except (json.JSONDecodeError, OSError) as exc:
+        if prefixed_name not in reported_files:
+            all_diags.append(DiagnosticItem(
+                code="ERR_JSON_INVALID",
+                file_path=prefixed_name,
+                detail=f"多包联合预检读取 JSON 失败: {exc}",
+                fix_suggestion=f"请检查 {prefixed_name} 的 UTF-8 编码与 JSON 语法完整性",
+            ))
+        return None
+
+
 def validate_multi_mods(mod_dirs: list[Path]) -> tuple[bool, list[DiagnosticItem]]:
     """执行多包单包合规检查与跨包联合冲突预检。"""
     from check_mod import validate_mod
@@ -205,32 +228,21 @@ def validate_multi_mods(mod_dirs: list[Path]) -> tuple[bool, list[DiagnosticItem
 
     for mod_dir in mod_dirs:
         _, single_diags = validate_mod(mod_dir)
+        reported_files: set[str] = set()
         for d in single_diags:
             prefixed_file = f"{mod_dir.name}/{d.file}" if not d.file.startswith(str(mod_dir)) else d.file
+            reported_files.add(prefixed_file)
             all_diags.append(DiagnosticItem(d.code, prefixed_file, d.detail, d.fix_suggestion))
 
         if not mod_dir.is_dir():
             continue
 
-        manifest_path = mod_dir / "pack.json"
-        destiny_path = mod_dir / "destinies.json"
-        manifest: dict[str, Any] = {}
-        if manifest_path.is_file():
-            try:
-                loaded_m = json.loads(manifest_path.read_text(encoding="utf-8"))
-                if isinstance(loaded_m, dict):
-                    manifest = loaded_m
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        destiny: dict[str, Any] | None = None
-        if destiny_path.is_file():
-            try:
-                loaded_d = json.loads(destiny_path.read_text(encoding="utf-8"))
-                if isinstance(loaded_d, dict):
-                    destiny = loaded_d
-            except (json.JSONDecodeError, OSError):
-                pass
+        manifest = _load_mod_json_for_multi(
+            mod_dir / "pack.json", f"{mod_dir.name}/pack.json", reported_files, all_diags
+        ) or {}
+        destiny = _load_mod_json_for_multi(
+            mod_dir / "destinies.json", f"{mod_dir.name}/destinies.json", reported_files, all_diags
+        )
 
         pack_id = str(manifest.get("pack_id") or mod_dir.name)
         pack_records.append({

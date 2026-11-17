@@ -39,7 +39,7 @@ static func teardown_for_tests() -> void:
 static func _on_mod_i18n_domain_packet(domain_packet: Variant) -> void:
 	var wrapper: Dictionary = domain_packet.payload_data if domain_packet != null and domain_packet.get("payload_data") is Dictionary else {}
 	var channel := String(wrapper.get("channel", ""))
-	if channel == "engine.teardown_completed":
+	if channel == "lifecycle.teardown_completed":
 		UITextResolver.get_instance().clear_mod_translations()
 		teardown_for_tests()
 		return

@@ -126,6 +126,13 @@
       "name": "LIFECYCLE_SHUTDOWN_STARTED",
       "legacy": "lifecycle.shutdown_started",
       "category": "CORE_STATE"
+    },
+    {
+      "id": 1028,
+      "name": "LIFECYCLE_TEARDOWN_COMPLETED",
+      "legacy": "lifecycle.teardown_completed",
+      "category": "CORE_STATE",
+      "narrative": false
     }
   ],
   "errors": {

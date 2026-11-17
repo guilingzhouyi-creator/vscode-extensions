@@ -32,6 +32,7 @@ const HUD_WALLET_MUTATED: int         = 0x0303
 const AUTH_REGISTERED: int            = 0x0401
 const AUTH_LOGIN_SUCCEEDED: int       = 0x0402
 const LIFECYCLE_SHUTDOWN_STARTED: int = 0x0403
+const LIFECYCLE_TEARDOWN_COMPLETED: int = 0x0404
 
 # ---- 五、系统遥测信道 (0x0500 ~ 0x050F) ----
 const SYSTEM_HEARTBEAT_TICK: int      = 0x0501

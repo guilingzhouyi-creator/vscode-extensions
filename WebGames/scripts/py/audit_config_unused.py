@@ -43,11 +43,12 @@ RESERVED_NARRATIVES: set[str] = {
 
 GETTER_RE = re.compile(
     r'GameConfig\.(?:get_int|get_float|get_string|get_bool|get_dict|get_array|get_table|get_value)'
-    r'\(\s*"([a-z0-9_.]+)"'
+    r'\(\s*"([a-zA-Z0-9_.]+)"'
 )
 MSG_RE = re.compile(r'GameConfig\.msg\(\s*"([a-z0-9_]+)"')
 NARRATIVE_RE = re.compile(r'(?:render_narrative|emit_narrative_by_key)\(\s*"([a-z0-9_]+)/')
-FULLNAME_RE = re.compile(r'"(infrastructure|domains|frontend|narratives|items)(?:\.[a-z0-9_]+)+"')
+FULLNAME_RE = re.compile(r'"(infrastructure|domains|frontend|narratives|items|i18n|copywriting)(?:\.[a-zA-Z0-9_]+)+"')
+RES_CONFIG_RE = re.compile(r'"res://config/([A-Za-z0-9_/]+)\.json"')
 # 契约对齐：配置驱动频道引用识别——<domain_id>.<event_name> 形态（如 account.registered）
 # 首段必须是 domains.json 已登记领域 id，解析为对 narratives.<首段> 的动态叙事引用。
 CHANNEL_RE = re.compile(r"^([a-z][a-z0-9_]*)\.([a-z0-9_]+(?:\.[a-z0-9_]+)*)$")
@@ -156,6 +157,8 @@ def _scan_single_gd_file(
         dynamic.add("narratives." + m.group(1))
     for m in FULLNAME_RE.finditer(text):
         weak.add(m.group(0).strip('"'))
+    for m in RES_CONFIG_RE.finditer(text):
+        referenced.add(m.group(1).replace("/", "."))
 
 
 def _collect_gd_references() -> tuple[set[str], set[str], set[str]]:

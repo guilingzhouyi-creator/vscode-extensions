@@ -175,7 +175,7 @@ static func _test_s2_04_shutdown_pipeline_execution() -> Dictionary:
 	var callable: Callable = func(pkt: EventPacket):
 		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
 		var ch := str(w.get("channel", ""))
-		if ch.begins_with("lifecycle.") or ch.begins_with("engine."):
+		if ch.begins_with("lifecycle."):
 			received_events.append(ch)
 
 	var tok := EventBusCore.get_instance().on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, callable)
@@ -195,7 +195,7 @@ static func _test_s2_04_shutdown_pipeline_execution() -> Dictionary:
 	var ok_events: bool = (
 		received_events.has("lifecycle.shutdown_started") and
 		received_events.has("lifecycle.inputs_frozen") and
-		received_events.has("engine.teardown_completed") and
+		received_events.has("lifecycle.teardown_completed") and
 		received_events.has("lifecycle.shutdown_completed")
 	)
 
@@ -265,7 +265,7 @@ static func _test_s3_03_teardown_eventbus_broadcast() -> Dictionary:
 
 	var callable: Callable = func(pkt: EventPacket):
 		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		if str(w.get("channel", "")) == "engine.teardown_completed":
+		if str(w.get("channel", "")) == "lifecycle.teardown_completed":
 			box[0] = true
 
 	var tok := EventBusCore.get_instance().on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, callable)

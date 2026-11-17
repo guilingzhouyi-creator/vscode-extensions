@@ -268,8 +268,8 @@ static func teardown() -> Dictionary:
 	# 复位装配标记
 	_is_assembled = false
 
-	# 广播引擎反装配完成事件（统一 EventBus 接入）
-	EventBusCore.get_instance().emit_domain_event("engine.teardown_completed", {
+	# 广播生命周期拆卸完成事件（与 contracts.json / event_bus_config.json 对齐）
+	EventBusCore.get_instance().emit_domain_event("lifecycle.teardown_completed", {
 		"timestamp_utc": int(Time.get_unix_time_from_system()),
 		"teared_down_subsystems": teared_down
 	})
