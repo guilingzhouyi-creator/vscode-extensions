@@ -551,6 +551,30 @@ def check_tc_arch_06(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   return make_result("TC-ARCH-06: 代码读取的配置键在表中真实存在", violations)
 
 
+RETIRED_COMPAT_SYMBOLS: tuple[str, ...] = (
+  "dispatch_rewards_direct",
+  "ActionCardDefinition",
+  "_legacy_fallback",
+  "allow_stateless_compat_for_unregistered_tokens",
+  "stateless_compat_defaults",
+  "_is_protected_request",
+  "_dispatch_agent_action_compat",
+  "migrate_push_error",
+  "bind_dual_payload",
+  "_legacy_channel_to_id",
+  "HudStatusSnapshotDTO",
+  "to_legacy_snapshot",
+  "pull_basic_hud_snapshot",
+  "allow_default_fallback",
+  "should_allow_default_fallback",
+  "unwired_policy",
+  "require_explicit_save_slot",
+  "item_template_id",
+  "mod_tier",
+  "_normalize_items",
+)
+
+
 def _check_legacy_deleted_files(ctx: ArchitectureAuditContext, violations: list[str]) -> None:
   """断言旧表与废弃定义文件已被物理删除。"""
   if (ctx.root / "config/descriptions/items.json").exists():
@@ -559,21 +583,20 @@ def _check_legacy_deleted_files(ctx: ArchitectureAuditContext, violations: list[
     violations.append("config/narratives/events.json 必须彻底删除")
   if (ctx.root / "backend/domains/magic_system/action_card_definition.gd").exists():
     violations.append("backend/domains/magic_system/action_card_definition.gd 必须彻底删除")
+  if (ctx.root / "backend/domains/world_state/dto/hud_status_snapshot_dto.gd").exists():
+    violations.append("backend/domains/world_state/dto/hud_status_snapshot_dto.gd 必须彻底删除")
   if "legacy_test_path" in MANIFEST_FILE.read_text(encoding="utf-8"):
     violations.append("domains.json 严禁残留 legacy_test_path 字段")
 
 
 def _check_legacy_source_references(ctx: ArchitectureAuditContext, violations: list[str]) -> None:
-  """断言后端源码中无 dispatch_rewards_direct 等历史兼容别名残留。"""
-  for gd_file in ctx.backend_files:
+  """断言前后端源码中无历史兼容别名、双轨字段与回退开关残留。"""
+  for gd_file in [*ctx.backend_files, *ctx.frontend_gd_files]:
     _, code = ctx.gd_sources[gd_file]
-    rel = "res://" + gd_file.relative_to(ctx.root).as_posix()
-    if "dispatch_rewards_direct" in code:
-      violations.append(f"{rel}: 含有 dispatch_rewards_direct 残留引用")
-    if "ActionCardDefinition" in code:
-      violations.append(f"{rel}: 含有 ActionCardDefinition 残留引用")
-    if "_legacy_fallback" in code:
-      violations.append(f"{rel}: 含有 _legacy_fallback 残留引用")
+    rel = RES_PREFIX + gd_file.relative_to(ctx.root).as_posix()
+    for sym in RETIRED_COMPAT_SYMBOLS:
+      if sym in code:
+        violations.append(f"{rel}: 含有 {sym} 残留引用")
 
 
 def check_tc_arch_07(ctx: ArchitectureAuditContext) -> dict[str, Any]:

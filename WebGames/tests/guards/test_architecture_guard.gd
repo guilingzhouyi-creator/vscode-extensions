@@ -405,6 +405,29 @@ static func _scan_config_keys_in_files(
 # ------------------------------------------------------------------------------
 # TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零）
 # ------------------------------------------------------------------------------
+const RETIRED_COMPAT_SYMBOLS: Array[String] = [
+	"dispatch_rewards_direct",
+	"ActionCardDefinition",
+	"_legacy_fallback",
+	"allow_stateless_compat_for_unregistered_tokens",
+	"stateless_compat_defaults",
+	"_is_protected_request",
+	"_dispatch_agent_action_compat",
+	"migrate_push_error",
+	"bind_dual_payload",
+	"_legacy_channel_to_id",
+	"HudStatusSnapshotDTO",
+	"to_legacy_snapshot",
+	"pull_basic_hud_snapshot",
+	"allow_default_fallback",
+	"should_allow_default_fallback",
+	"unwired_policy",
+	"require_explicit_save_slot",
+	"item_template_id",
+	"mod_tier",
+	"_normalize_items",
+]
+
 static func test_compatibility_retirement_backend_clean() -> Dictionary:
 	var violations: Array[String] = []
 
@@ -414,27 +437,25 @@ static func test_compatibility_retirement_backend_clean() -> Dictionary:
 	if FileAccess.file_exists("res://config/narratives/events.json"):
 		violations.append("config/narratives/events.json 必须彻底删除")
 
-	# 2. 断言行动卡别名文件物理不存在
+	# 2. 断言已退役旧 DTO/别名文件物理不存在
 	if FileAccess.file_exists("res://backend/domains/magic_system/action_card_definition.gd"):
 		violations.append("backend/domains/magic_system/action_card_definition.gd 必须彻底删除")
+	if FileAccess.file_exists("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd"):
+		violations.append("backend/domains/world_state/dto/hud_status_snapshot_dto.gd 必须彻底删除")
 
 	# 3. 断言 domains.json 零 legacy_test_path 死字段残留
 	var domains_json_str := FileAccess.get_file_as_string(MANIFEST_FILE)
 	if domains_json_str.contains("legacy_test_path"):
 		violations.append("domains.json 严禁残留 legacy_test_path 字段")
 
-	# 4. 断言 backend/ 全域零旧路径符号引用
-	#    经 _strip_comments 去注释后扫描——注释中的历史词形（如头注释提及旧别名）不是真实引用，
-	#    与本文件既有字面量扫描同一剥离单源，杜绝子串误报脆弱点。
-	var backend_files := _collect_gd_files(BACKEND_DIR)
-	for file_path in backend_files:
+	# 4. 断言 backend/ 与 frontend/ 全域零已退役兼容符号引用（去注释单源扫描）
+	var scan_files: Array[String] = _collect_gd_files(BACKEND_DIR)
+	scan_files.append_array(_collect_gd_files(FRONTEND_DIR))
+	for file_path in scan_files:
 		var content := _strip_comments(FileAccess.get_file_as_string(file_path))
-		if content.contains("dispatch_rewards_direct"):
-			violations.append("%s: 含有 dispatch_rewards_direct 残留引用" % file_path)
-		if content.contains("ActionCardDefinition"):
-			violations.append("%s: 含有 ActionCardDefinition 残留引用" % file_path)
-		if content.contains("_legacy_fallback"):
-			violations.append("%s: 含有 _legacy_fallback 残留引用" % file_path)
+		for symbol in RETIRED_COMPAT_SYMBOLS:
+			if content.contains(symbol):
+				violations.append("%s: 含有 %s 残留引用" % [file_path, symbol])
 
 	# 5. 断言魔法基线解析器 registry 参数必填（去 = null；签名断言同样去注释后匹配）
 	var tier_resolver := _strip_comments(FileAccess.get_file_as_string("res://backend/domains/item_namespace_registry/magic_ability_tier_resolver.gd"))
