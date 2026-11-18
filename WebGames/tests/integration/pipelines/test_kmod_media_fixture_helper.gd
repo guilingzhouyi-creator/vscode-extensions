@@ -26,7 +26,6 @@ static func write_custom_realm_kmod(kmod_path: String, wav_bytes: PackedByteArra
 		"pack_name": "Custom Realm TC",
 		"version": "1.0.0",
 		"pack_profile": "TOTAL_CONVERSION",
-		"mod_tier": "TOTAL_CONVERSION",
 		"priority": 300,
 		"is_active": true
 	})

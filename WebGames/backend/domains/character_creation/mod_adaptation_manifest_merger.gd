@@ -63,11 +63,9 @@ static func build_adapted_manifest(
         "creation_rules": accumulator["creation_rules"],
         "origins_pool": accumulator["origins_pool"],
         "origins_catalog": origins_catalog,
-        "origins": origins_catalog,
         "origin_race_map": accumulator["origin_race_map"],
         "birth_region_map": accumulator["birth_region_map"],
         "traits": traits_map,
-        "traits_catalog": traits_map,
         "paired_presets": accumulator["paired_presets"],
         "starter_kits": accumulator["starter_kits"],
         "race_kit_map": accumulator["race_kit_map"],
@@ -169,8 +167,8 @@ static func _register_custom_origin(origin_entry: Dictionary, pack_id: String, a
         "pack_id": pack_id
     })
 
-    var race_id: String = str(origin_entry.get("race_id", origin_entry.get("race", ""))).strip_edges()
-    var region_id: String = str(origin_entry.get("birth_region_id", "")).strip_edges()
+    var race_id: String = str(origin_entry.get("race", "")).strip_edges()
+    var region_id: String = str(origin_entry.get("birth_region", "")).strip_edges()
     var kit_id: String = str(origin_entry.get("starter_kit_id", "")).strip_edges()
     var dag_id: String = str(origin_entry.get("prologue_dag_id", "")).strip_edges()
 
@@ -178,10 +176,9 @@ static func _register_custom_origin(origin_entry: Dictionary, pack_id: String, a
     catalog_entry["origin_id"] = origin_id
     if not race_id.is_empty():
         catalog_entry["race"] = race_id
-        catalog_entry["race_id"] = race_id
         origin_race_map[origin_id] = race_id
     if not region_id.is_empty():
-        catalog_entry["birth_region_id"] = region_id
+        catalog_entry["birth_region"] = region_id
         birth_region_map[origin_id] = region_id
     catalog_entry["pack_id"] = pack_id
     origins_catalog[origin_id] = catalog_entry

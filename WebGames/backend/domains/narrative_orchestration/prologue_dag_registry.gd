@@ -173,7 +173,7 @@ static func _lookup_origin_bound_dag_id(origin_id: String, manifest: Dictionary)
         if not mapped.is_empty():
             return mapped
 
-    var origins_catalog: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
+    var origins_catalog: Dictionary = manifest.get("origins_catalog", {})
     if origins_catalog.has(origin_id):
         var origin_entry: Variant = origins_catalog.get(origin_id)
         if origin_entry is Dictionary:

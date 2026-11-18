@@ -50,7 +50,7 @@ static func build_creation_ui_snapshot(
         "available_races": (adapted_manifest.get("races_catalog", {}) as Dictionary).duplicate(true),
         "available_origins": available_origins,
         "available_trait_pairs": available_trait_pairs,
-        "traits_catalog": traits.duplicate(true)
+        "traits": traits.duplicate(true)
     }
 
 
@@ -66,8 +66,8 @@ static func _append_ui_origin_snapshot_item(
     out_origins.append({
         "origin_id": origin_id,
         "name": str(origin_config.get("name", origin_id)),
-        "race_id": str(origin_race_map.get(origin_id, origin_config.get("race_id", origin_config.get("race", "")))),
-        "birth_region_id": str(birth_region_map.get(origin_id, origin_config.get("birth_region_id", ""))),
+        "race_id": str(origin_race_map.get(origin_id, origin_config.get("race", ""))),
+        "birth_region_id": str(birth_region_map.get(origin_id, origin_config.get("birth_region", ""))),
         "desc": str(origin_config.get("desc", "")),
         "weight": int(pool_entry.get("weight", origin_config.get("weight", 20))),
         "initial_gold": int(origin_config.get("initial_gold", 0)),

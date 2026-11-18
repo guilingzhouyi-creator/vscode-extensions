@@ -162,7 +162,7 @@ static func _pick_origin_from_pool(rng: DeterministicRNG, pool: Array) -> String
     return fallback
 
 static func _get_merged_origins_catalog(manifest: Dictionary) -> Dictionary:
-    var catalog_variant: Variant = manifest.get("origins_catalog", manifest.get("origins", null))
+    var catalog_variant: Variant = manifest.get("origins_catalog", null)
     if catalog_variant is Dictionary and not (catalog_variant as Dictionary).is_empty():
         return catalog_variant as Dictionary
     return GameConfig.get_dict("domains.character_creation", "origins", {})
@@ -181,7 +181,7 @@ static func _resolve_race_with_mod(origin_id: String, origin_config: Dictionary,
         var mapped_race: String = str(race_map.get(origin_id, "")).strip_edges()
         if not mapped_race.is_empty():
             return mapped_race
-    var config_race: String = str(origin_config.get("race_id", origin_config.get("race", ""))).strip_edges()
+    var config_race: String = str(origin_config.get("race", "")).strip_edges()
     if not config_race.is_empty():
         return config_race
     var creation_rules: Dictionary = manifest.get("creation_rules", {})
@@ -212,7 +212,7 @@ static func _resolve_birth_region_with_mod(origin_id: String, origin_config: Dic
         var mapped_region: String = str(region_map.get(origin_id, "")).strip_edges()
         if not mapped_region.is_empty():
             return mapped_region
-    var config_region: String = str(origin_config.get("birth_region_id", "")).strip_edges()
+    var config_region: String = str(origin_config.get("birth_region", "")).strip_edges()
     if not config_region.is_empty():
         return config_region
     var creation_rules: Dictionary = manifest.get("creation_rules", {})
@@ -310,7 +310,7 @@ static func _resolve_traits_with_mod(
     if pairs.is_empty():
         pairs = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/traits_allocation/paired_presets", [])
 
-    var all_traits_config: Dictionary = manifest.get("traits", manifest.get("traits_catalog", {}))
+    var all_traits_config: Dictionary = manifest.get("traits", {})
     if all_traits_config.is_empty():
         all_traits_config = GameConfig.get_dict("domains.character_creation", "traits", {})
 

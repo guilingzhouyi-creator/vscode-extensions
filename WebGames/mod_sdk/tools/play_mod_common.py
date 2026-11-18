@@ -304,8 +304,7 @@ def load_and_merge_assets(mod_paths: list[Path]) -> dict[str, Any]:
         pack_data = safe_load_json(mod_dir / "pack.json")
         if isinstance(pack_data, dict):
             profile = str(pack_data.get("pack_profile", "")).strip().upper()
-            mod_tier = str(pack_data.get("mod_tier", "")).strip().upper()
-            if profile == "TOTAL_CONVERSION" or mod_tier == "TOTAL_CONVERSION":
+            if profile == "TOTAL_CONVERSION":
                 has_total_conversion = True
         dest_data = safe_load_json(mod_dir / "destinies.json")
         if isinstance(dest_data, dict):

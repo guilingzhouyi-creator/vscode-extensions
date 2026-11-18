@@ -164,7 +164,7 @@ static func _validate_custom_traits(custom_traits: Dictionary, diagnostic_entrie
 			)
 			continue
 		var trait_map: Dictionary = raw_trait
-		var raw_type: String = str(trait_map.get("type", trait_map.get("polarity", ""))).strip_edges().to_upper()
+		var raw_type: String = str(trait_map.get("type", "")).strip_edges().to_upper()
 		var trait_cost: int = int(trait_map.get("cost", 0))
 		var is_polarity_valid: bool = (
 			VALID_TRAIT_TYPES.has(raw_type)
@@ -233,8 +233,8 @@ static func _validate_single_preset_pair(
 
 	var positive_config: Dictionary = combined_traits.get(positive_identifier, {})
 	var negative_config: Dictionary = combined_traits.get(negative_identifier, {})
-	var positive_type: String = str(positive_config.get("type", positive_config.get("polarity", ""))).strip_edges().to_upper()
-	var negative_type: String = str(negative_config.get("type", negative_config.get("polarity", ""))).strip_edges().to_upper()
+	var positive_type: String = str(positive_config.get("type", "")).strip_edges().to_upper()
+	var negative_type: String = str(negative_config.get("type", "")).strip_edges().to_upper()
 	var positive_cost: int = int(positive_config.get("cost", 0))
 	var negative_cost: int = int(negative_config.get("cost", 0))
 

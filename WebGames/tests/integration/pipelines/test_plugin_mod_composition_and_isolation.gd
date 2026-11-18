@@ -103,10 +103,9 @@ static func test_cyclic_dependency_rejection() -> Dictionary:
 		"pack_name": "Cycle Alpha",
 		"version": "1.0.0",
 		"pack_profile": "TOTAL_CONVERSION",
-		"mod_tier": "TOTAL_CONVERSION",
 		"dependencies": ["mod_cycle_beta"],
 		"custom_origins": [{
-			"origin_id": "CYCLE_ORIGIN_A", "name": "A", "race_id": "SYNTH",
+			"origin_id": "CYCLE_ORIGIN_A", "name": "A", "race": "SYNTH",
 			"weight": 10, "starter_kit_id": "KIT_C_A", "prologue_dag_id": "DAG_C_A"
 		}],
 		"custom_starter_kits": {"KIT_C_A": {"initial_gold": 10, "initial_items": []}},
@@ -121,7 +120,6 @@ static func test_cyclic_dependency_rejection() -> Dictionary:
 		"pack_name": "Cycle Beta",
 		"version": "1.0.0",
 		"pack_profile": "CONTENT_ADDON",
-		"mod_tier": "EXPANSION",
 		"dependencies": ["mod_cycle_alpha"]
 	}
 	var cycle_res := ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list([pack_a, pack_b], ["*"])

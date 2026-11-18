@@ -119,8 +119,6 @@ static func from_dto(serialized_manifest: Dictionary, fallback_pack_id: String =
     manifest_dto.version = str(serialized_manifest.get("version", "1.0.0"))
     manifest_dto.priority = int(serialized_manifest.get("priority", 100))
     var raw_profile: String = str(serialized_manifest.get("pack_profile", "")).strip_edges().to_upper()
-    if raw_profile.is_empty() and str(serialized_manifest.get("mod_tier", "")).strip_edges().to_upper() == "TOTAL_CONVERSION":
-        raw_profile = "TOTAL_CONVERSION"
     manifest_dto.pack_profile = raw_profile if not raw_profile.is_empty() else "CONTENT_ADDON"
     manifest_dto.is_official = bool(serialized_manifest.get("is_official", manifest_dto.pack_profile == "OFFICIAL_BASE"))
     manifest_dto.content_sha256 = str(serialized_manifest.get("content_sha256", "")).strip_edges()
@@ -152,8 +150,7 @@ static func from_dto(serialized_manifest: Dictionary, fallback_pack_id: String =
     _populate_dict_array(serialized_manifest.get("paired_presets", []), manifest_dto.paired_presets)
     _populate_indexed_dict(serialized_manifest.get("custom_starter_kits", {}), manifest_dto.custom_starter_kits, "kit_id", Callable(DestinyModManifestDTO, "_normalize_kit_dict"))
 
-    var raw_rules: Variant = serialized_manifest.get("custom_routing_rules", serialized_manifest.get("routing_rules", []))
-    _populate_dict_array(raw_rules, manifest_dto.custom_routing_rules)
+    _populate_dict_array(serialized_manifest.get("custom_routing_rules", []), manifest_dto.custom_routing_rules)
     return manifest_dto
 
 # ==============================================================================
@@ -201,14 +198,6 @@ static func _populate_origins_array(raw_value: Variant, target: Array[Dictionary
 static func _normalize_origin_entry(entry: Dictionary, default_id: String = "") -> void:
     if not entry.has("origin_id") and not default_id.is_empty():
         entry["origin_id"] = default_id
-    if entry.has("race") and not entry.has("race_id"):
-        entry["race_id"] = entry["race"]
-    elif entry.has("race_id") and not entry.has("race"):
-        entry["race"] = entry["race_id"]
-    if entry.has("birth_region") and not entry.has("birth_region_id"):
-        entry["birth_region_id"] = entry["birth_region"]
-    elif entry.has("birth_region_id") and not entry.has("birth_region"):
-        entry["birth_region"] = entry["birth_region_id"]
 
 static func _populate_indexed_dict(raw_value: Variant, target: Dictionary, id_key: String, normalizer: Callable) -> void:
     target.clear()
@@ -232,61 +221,15 @@ static func _populate_indexed_dict(raw_value: Variant, target: Dictionary, id_ke
                 normalizer.call(entry_map)
                 target[str(entry_key)] = entry_map
 
-static func _normalize_race_dict(race_entry: Dictionary) -> void:
-    if race_entry.has("id") and not race_entry.has("race_id"):
-        race_entry["race_id"] = race_entry["id"]
-    elif race_entry.has("race_id") and not race_entry.has("id"):
-        race_entry["id"] = race_entry["race_id"]
+static func _normalize_race_dict(_race_entry: Dictionary) -> void:
+    pass
 
 
-static func _normalize_trait_dict(trait_entry: Dictionary) -> void:
-    if trait_entry.has("polarity"):
-        var polarity_text: String = str(trait_entry.get("polarity", "")).to_upper()
-        if polarity_text.contains("POS"):
-            trait_entry["type"] = "POSITIVE"
-        elif polarity_text.contains("NEG"):
-            trait_entry["type"] = "NEGATIVE"
-        elif not trait_entry.has("type"):
-            trait_entry["type"] = polarity_text
-    elif not trait_entry.has("polarity") and trait_entry.has("type"):
-        trait_entry["polarity"] = trait_entry["type"]
-
-static func _normalize_kit_gold(kit: Dictionary) -> void:
-    var has_initial_gold: bool = kit.has("initial_gold")
-    var has_bonus: bool = kit.has("bonus_gold")
-    if has_initial_gold and not has_bonus:
-        kit["bonus_gold"] = kit["initial_gold"]
-    elif has_bonus and not has_initial_gold:
-        kit["initial_gold"] = kit["bonus_gold"]
-    elif not has_initial_gold and not has_bonus:
-        kit["initial_gold"] = 0
-        kit["bonus_gold"] = 0
-
-static func _build_items_from_init(initial_items: Array) -> Array[Dictionary]:
-    var new_items: Array[Dictionary] = []
-    for item_entry in initial_items:
-        if item_entry is Dictionary:
-            var canonical_id: String = str(item_entry.get("canonical_id", item_entry.get("item_id", "")))
-            var item_count: int = int(item_entry.get("count", item_entry.get("quantity", 1)))
-            var slot_name: String = str(item_entry.get("slot", "INVENTORY"))
-            new_items.append({"item_id": canonical_id, "quantity": item_count, "slot": slot_name})
-    return new_items
-
-static func _build_init_from_items(items_array: Array) -> Array[Dictionary]:
-    var converted_initial_items: Array[Dictionary] = []
-    for item_entry in items_array:
-        if item_entry is Dictionary:
-            var canonical_id: String = str(item_entry.get("item_id", item_entry.get("canonical_id", "")))
-            var item_count: int = int(item_entry.get("quantity", item_entry.get("count", 1)))
-            converted_initial_items.append({"canonical_id": canonical_id, "count": item_count})
-    return converted_initial_items
+static func _normalize_trait_dict(_trait_entry: Dictionary) -> void:
+    pass
 
 static func _normalize_kit_dict(kit: Dictionary) -> void:
-    _normalize_kit_gold(kit)
-    var has_initial_items := kit.has("initial_items") and kit["initial_items"] is Array
-    var has_items := kit.has("items") and kit["items"] is Array
-
-    if has_initial_items and not has_items:
-        kit["items"] = _build_items_from_init(kit["initial_items"] as Array)
-    elif has_items and not has_initial_items:
-        kit["initial_items"] = _build_init_from_items(kit["items"] as Array)
+    if not kit.has("initial_gold"):
+        kit["initial_gold"] = 0
+    if not (kit.has("initial_items") and kit["initial_items"] is Array):
+        kit["initial_items"] = []

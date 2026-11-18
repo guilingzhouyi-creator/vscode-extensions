@@ -6,7 +6,7 @@
   "engine_api_version": "1.0.0",
   "priority": 150,
   "tier": "TIER_2_AUDIOVISUAL",
-  "mod_tier": "AUDIO_VISUAL",
+  "pack_profile": "CONTENT_ADDON",
   "dependencies": [],
   "incompatible_packs": [],
   "semantic_tags": [

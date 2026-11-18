@@ -59,7 +59,6 @@ static func test_empty_and_addon_only_precheck_rejected() -> Dictionary:
 		"version": "1.0.0",
 		"author": "ZeroGuardTest",
 		"pack_profile": "CONTENT_ADDON",
-		"mod_tier": "EXPANSION",
 		"custom_traits": {
 			"ZMF_EXTRA_TRAIT": {"name": "附加特质", "type": "POSITIVE", "cost": 1, "desc": "仅附加定义"}
 		},

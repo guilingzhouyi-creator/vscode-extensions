@@ -17,7 +17,7 @@ class_name InnateTraitRegistry extends RefCounted
 ## 读取全量特质词条表（优先使用已适配 MOD 清单，其次读取运行期覆写后的 domains.character_creation traits 段）
 static func _traits(adapted_mod_manifest: Dictionary = {}) -> Dictionary:
 	var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
-	var mod_traits: Variant = manifest.get("traits", manifest.get("traits_catalog", {}))
+	var mod_traits: Variant = manifest.get("traits", {})
 	if mod_traits is Dictionary and not (mod_traits as Dictionary).is_empty():
 		return mod_traits as Dictionary
 	return GameConfig.get_dict("domains.character_creation", "traits", {})

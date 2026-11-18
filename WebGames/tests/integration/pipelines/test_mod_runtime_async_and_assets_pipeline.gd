@@ -168,7 +168,7 @@ static func test_tc_mraa_01_bilingual_i18n_hot_reload_and_restore() -> Dictionar
 	var mod_dir := SANDBOX_ROOT.path_join("mod_sample_i18n")
 	TestTier3ContentOverrideHelper.write_json_file(mod_dir.path_join("pack.json"), {
 		"pack_id": "mod_sample_i18n", "pack_name": "Sample I18N Pack", "version": "1.0.0",
-		"pack_profile": "CONTENT_ADDON", "mod_tier": "EXPANSION", "priority": 260, "is_active": true
+		"pack_profile": "CONTENT_ADDON", "priority": 260, "is_active": true
 	})
 	TestTier3ContentOverrideHelper.write_json_file(mod_dir.path_join("i18n/zh_CN.json"), {"ui.sample_mod.banner": "星界工坊"})
 	TestTier3ContentOverrideHelper.write_json_file(mod_dir.path_join("i18n/en_US.json"), {"ui.sample_mod.banner": "Astral Workshop"})
@@ -363,7 +363,7 @@ static func _build_custom_routing_mod_package() -> Dictionary:
 	var rules := [{"rule_id": "R_MOD_HIGH", "priority": 999, "origin_id": "BORDER_CITIZEN", "dag_id": "DAG_MOD_ALT"}]
 	TestTier3ContentOverrideHelper.write_json_file(route_dir.path_join("pack.json"), {
 		"pack_id": "mod_sample_route", "pack_name": "Sample Route", "version": "1.0.0",
-		"pack_profile": "CONTENT_ADDON", "mod_tier": "EXPANSION", "priority": 350, "is_active": true,
+		"pack_profile": "CONTENT_ADDON", "priority": 350, "is_active": true,
 		"prologue_routing_rules": rules
 	})
 	TestTier3ContentOverrideHelper.write_json_file(route_dir.path_join("routing_rules.json"), {
@@ -387,7 +387,7 @@ static func _write_domain_tables_kmod(kmod_path: String) -> String:
 		return kmod_path
 	_pack_json_entry(packer, "pack.json", {
 		"pack_id": "mod_sample_domains", "pack_name": "Sample Domains", "version": "1.0.0",
-		"pack_profile": "TOTAL_CONVERSION", "mod_tier": "TOTAL_CONVERSION", "priority": 280, "is_active": true
+		"pack_profile": "TOTAL_CONVERSION", "priority": 280, "is_active": true
 	})
 	_pack_json_entry(packer, "content/items/sample_items.json", {
 		"override_mode": "MERGE",

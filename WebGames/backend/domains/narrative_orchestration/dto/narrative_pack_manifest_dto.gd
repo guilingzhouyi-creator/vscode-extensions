@@ -103,8 +103,6 @@ static func from_dto(serialized_payload: Dictionary) -> NarrativePackManifestDTO
     manifest.engine_api_version = String(serialized_payload.get("engine_api_version", ""))
     manifest.tier = String(serialized_payload.get("tier", "TIER_1_LOGIC"))
     var raw_profile: String = String(serialized_payload.get("pack_profile", "")).strip_edges().to_upper()
-    if raw_profile.is_empty() and String(serialized_payload.get("mod_tier", "")).strip_edges().to_upper() == "TOTAL_CONVERSION":
-        raw_profile = "TOTAL_CONVERSION"
     manifest.pack_profile = raw_profile if not raw_profile.is_empty() else "CONTENT_ADDON"
     manifest.is_official = bool(serialized_payload.get("is_official", false))
     manifest.trust_tier = String(serialized_payload.get("trust_tier", "OFFICIAL" if manifest.is_official else "COMMUNITY"))

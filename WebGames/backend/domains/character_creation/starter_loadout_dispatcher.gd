@@ -204,7 +204,7 @@ static func _resolve_mod_kit_id_for_origin(origin_id: String, manifest: Dictiona
         if not mapped_id.is_empty():
             return mapped_id
 
-    var origins_catalog: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
+    var origins_catalog: Dictionary = manifest.get("origins_catalog", {})
     if origins_catalog.has(clean_origin):
         var origin_entry: Variant = origins_catalog.get(clean_origin)
         if origin_entry is Dictionary:

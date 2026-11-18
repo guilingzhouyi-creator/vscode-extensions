@@ -10,7 +10,7 @@ class_name ReincarnationOriginEngine extends RefCounted
 ## 读取身世常数表（MOD 清单优先，其次读取运行期覆盖后的 domains.character_creation）
 static func _origins(adapted_mod_manifest: Dictionary = {}) -> Dictionary:
 	var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
-	var mod_origins: Variant = manifest.get("origins_catalog", manifest.get("origins", {}))
+	var mod_origins: Variant = manifest.get("origins_catalog", {})
 	if mod_origins is Dictionary and not (mod_origins as Dictionary).is_empty():
 		return mod_origins as Dictionary
 	return GameConfig.get_dict("domains.character_creation", "origins", {})

@@ -30,7 +30,6 @@ static func write_synthetic_chrono_stack() -> void:
         "version": "1.0.0",
         "author": "SynthStudio",
         "pack_profile": "TOTAL_CONVERSION",
-        "mod_tier": "TOTAL_CONVERSION",
         "priority": 200,
         "is_active": true,
         "ui_capabilities": {
@@ -51,8 +50,8 @@ static func write_synthetic_chrono_stack() -> void:
                 "origin_id": "CLOCKWORK_SCRIBE",
                 "name": "时钟塔铭文士",
                 "desc": "来自发条尖塔的齿轮记录者",
-                "race_id": "AUTOMATON",
-                "birth_region_id": "CHRONO_SPIRE_DECK",
+                "race": "AUTOMATON",
+                "birth_region": "CHRONO_SPIRE_DECK",
                 "weight": 40,
                 "initial_gold": 220,
                 "attribute_bonus": {"INT": 2, "SPR": 1},
@@ -131,7 +130,6 @@ static func write_synthetic_chrono_stack() -> void:
         "version": "1.0.0",
         "author": "SynthStudio",
         "pack_profile": "CONTENT_ADDON",
-        "mod_tier": "EXPANSION",
         "priority": 250,
         "dependencies": ["mod_chrono_spire"],
         "is_active": true

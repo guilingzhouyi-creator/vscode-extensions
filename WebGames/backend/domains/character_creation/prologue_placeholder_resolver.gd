@@ -106,12 +106,12 @@ static func _populate_extended_placeholders(
 		origin_id = str((profile as Dictionary).get("origin_id", ""))
 	placeholders["ORIGIN_ID"] = origin_id
 
-	var origins_catalog: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
+	var origins_catalog: Dictionary = manifest.get("origins_catalog", {})
 	var origin_config: Dictionary = origins_catalog.get(origin_id, {})
 	placeholders["ORIGIN_NAME"] = str(origin_config.get("name", origin_id))
 
 	var birth_region_map: Dictionary = manifest.get("birth_region_map", {})
-	placeholders["BIRTH_REGION"] = str(birth_region_map.get(origin_id, str(origin_config.get("birth_region_id", prologue_context.assigned_start_location_id))))
+	placeholders["BIRTH_REGION"] = str(birth_region_map.get(origin_id, str(origin_config.get("birth_region", prologue_context.assigned_start_location_id))))
 
 	placeholders["TRAIT_SUMMARY"] = str(prologue_context.runtime_placeholders.get("TRAIT_SUMMARY", prologue_context.runtime_placeholders.get("trait_summary", "")))
 

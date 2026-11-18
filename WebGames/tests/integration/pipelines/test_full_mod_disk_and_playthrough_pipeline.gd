@@ -88,12 +88,11 @@ static func test_disk_mod_package_discovery_and_normalization() -> Dictionary:
 		and dto.custom_starter_kits.has("KIT_STARTER_WANDERER")
 
 	var kit_dict: Dictionary = dto.custom_starter_kits.get("KIT_STARTER_WANDERER", {})
-	var items_array: Array = kit_dict.get("items", [])
 	var initial_items_array: Array = kit_dict.get("initial_items", [])
-	var sync_ok: bool = not items_array.is_empty() and not initial_items_array.is_empty()
+	var sync_ok: bool = not initial_items_array.is_empty()
 
 	var passed: bool = load_ok and dto_ok and sync_ok
-	return TestCase.make_result("TC-FMP-01: 磁盘五件套模板聚合与双态Schema归一化", passed, {
+	return TestCase.make_result("TC-FMP-01: 磁盘五件套模板聚合与标准Schema装配", passed, {
 		"load_ok": load_ok,
 		"dto_ok": dto_ok,
 		"sync_ok": sync_ok
