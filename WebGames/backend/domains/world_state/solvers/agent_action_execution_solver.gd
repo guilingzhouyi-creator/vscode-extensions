@@ -93,9 +93,9 @@ static func _dispatch_domain_execution(
 	var action_parameters := _extract_params(action_packet)
 
 	match directive_id:
-		"ALLOCATE_POTENTIAL_STAT", "ALLOCATE_POTENTIAL":
-			var target_stat: String = str(action_parameters.get("stat_target", action_parameters.get("stat", action_parameters.get("attribute", "STR"))))
-			var points: int = int(action_parameters.get("points", action_parameters.get("amount", 1)))
+		"ALLOCATE_POTENTIAL_STAT":
+			var target_stat: String = str(action_parameters.get("stat_target", "STR"))
+			var points: int = int(action_parameters.get("points", 1))
 			if target_stat.is_empty() or points <= 0 or snapshot.unallocated_potential_points < points:
 				return {
 					"success": false,
@@ -111,7 +111,7 @@ static func _dispatch_domain_execution(
 				"cause": "AGENT_POTENTIAL_ALLOCATION"
 			}
 
-		"REST_AND_ADVANCE_TIME", "REST_INN":
+		"REST_AND_ADVANCE_TIME":
 			snapshot.ap_current = snapshot.ap_max
 			snapshot.hp_current = snapshot.hp_max
 			if snapshot.calendar_env != null:

@@ -159,27 +159,17 @@ static func _normalize_routing_rule_entry(raw_rule: Variant) -> Dictionary:
     if not (raw_rule is Dictionary):
         return {}
     var source_rule := raw_rule as Dictionary
-    var target_dag_id := String(source_rule.get("target_dag_id", source_rule.get("dag_id", ""))).strip_edges()
+    var target_dag_id := String(source_rule.get("target_dag_id", "")).strip_edges()
     if target_dag_id.is_empty():
         return {}
-    if source_rule.get("match_condition") is Dictionary:
-        var matched_rule := source_rule.duplicate(true)
-        matched_rule["target_dag_id"] = target_dag_id
-        return matched_rule
-    var match_condition: Dictionary = {}
-    var rule_race := String(source_rule.get("race_id", source_rule.get("race", ""))).strip_edges()
-    if not rule_race.is_empty():
-        match_condition["race_id"] = rule_race
-    var rule_origin := String(source_rule.get("origin_id", source_rule.get("origin", ""))).strip_edges()
-    if not rule_origin.is_empty():
-        match_condition["origin_id"] = rule_origin
-    if bool(source_rule.get("is_default", false)):
-        match_condition["is_default"] = true
-    if match_condition.is_empty():
+    var rule_race := String(source_rule.get("race_id", "")).strip_edges()
+    var rule_origin := String(source_rule.get("origin_id", "")).strip_edges()
+    var rule_region := String(source_rule.get("birth_region_id", "")).strip_edges()
+    var is_default := bool(source_rule.get("is_default", false))
+    if rule_race.is_empty() and rule_origin.is_empty() and rule_region.is_empty() and not is_default:
         return {}
     var normalized := source_rule.duplicate(true)
     normalized["target_dag_id"] = target_dag_id
-    normalized["match_condition"] = match_condition
     return normalized
 
 

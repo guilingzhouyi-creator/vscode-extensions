@@ -32,9 +32,9 @@ static func normalize_directory_path(raw_path: String) -> String:
 		cleaned += "/"
 	return cleaned
 
-## 从请求载荷中解析目标根目录（优先 target_root/install_root，其次 custom_roots[0]）
+## 从请求载荷中解析目标根目录（优先 target_root，其次 custom_roots[0]）
 static func resolve_target_root(request_payload: Dictionary) -> String:
-	var raw_root := str(request_payload.get("target_root", request_payload.get("install_root", "")))
+	var raw_root := str(request_payload.get("target_root", ""))
 	if raw_root.strip_edges().is_empty():
 		var roots_value: Variant = request_payload.get("custom_roots", [])
 		if roots_value is Array and not (roots_value as Array).is_empty():

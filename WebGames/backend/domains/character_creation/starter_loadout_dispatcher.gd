@@ -232,7 +232,7 @@ static func _lookup_kit_config_by_id(kit_id: String, manifest: Dictionary) -> Di
     if kit_id.is_empty():
         return {}
     if not manifest.is_empty():
-        var mod_kits: Dictionary = manifest.get("starter_kits", manifest.get("custom_starter_kits", {}))
+        var mod_kits: Dictionary = manifest.get("custom_starter_kits", {})
         if mod_kits.has(kit_id) and mod_kits[kit_id] is Dictionary:
             return mod_kits[kit_id] as Dictionary
     return GameConfig.get_dict("domains.starter_loadout", "starter_kits/" + kit_id, {})

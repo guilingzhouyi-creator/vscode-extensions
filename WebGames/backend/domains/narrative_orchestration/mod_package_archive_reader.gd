@@ -68,11 +68,6 @@ static func _merge_routing_payload(routing_data: Dictionary, package_payload: Di
         var existing_prologue: Array = package_payload.get("prologue_routing_rules", [])
         existing_prologue.append_array(routing_data["prologue_routing_rules"] as Array)
         package_payload["prologue_routing_rules"] = existing_prologue
-    var raw_rules: Variant = routing_data.get("custom_routing_rules", routing_data.get("routing_rules", []))
-    if raw_rules is Array:
-        var existing_custom: Array = package_payload.get("custom_routing_rules", [])
-        existing_custom.append_array(raw_rules as Array)
-        package_payload["custom_routing_rules"] = existing_custom
 
 
 ## 将源目录中的单个结构化配置条目归一化并合入 mod_data 目标载荷字典（供编译打包复用）
@@ -81,7 +76,7 @@ static func merge_source_entry(entry_path: String, entry_data: Dictionary, packa
     if normalized_path.begins_with("dag_graphs/") and normalized_path.ends_with(".json"):
         var dag_graphs: Dictionary = package_payload.get("dag_graphs", {}) as Dictionary
         var stem := normalized_path.get_file().get_basename()
-        var dag_id := str(entry_data.get("dag_id", entry_data.get("graph_id", stem)))
+        var dag_id := str(entry_data.get("dag_id", stem))
         dag_graphs[dag_id] = entry_data.duplicate(true)
         package_payload["dag_graphs"] = dag_graphs
     elif normalized_path.begins_with("i18n/") and normalized_path.ends_with(".json"):

@@ -151,15 +151,13 @@ static func _is_vanilla_pack(mod_entry: Variant) -> bool:
 
 	if mod_entry is Dictionary:
 		var mod_payload: Dictionary = mod_entry as Dictionary
-		is_official_flagged = bool(mod_payload.get("is_official", false)) or bool(mod_payload.get("is_vanilla", false))
+		is_official_flagged = bool(mod_payload.get("is_official", false))
 		trust_tier_value = str(mod_payload.get("trust_tier", "")).strip_edges().to_upper()
 		pack_profile_value = str(mod_payload.get("pack_profile", "")).strip_edges().to_upper()
 	elif mod_entry is Object:
 		var mod_object: Object = mod_entry as Object
 		if "is_official" in mod_object:
 			is_official_flagged = bool(mod_object.get("is_official"))
-		if not is_official_flagged and "is_vanilla" in mod_object:
-			is_official_flagged = bool(mod_object.get("is_vanilla"))
 		if "trust_tier" in mod_object:
 			trust_tier_value = str(mod_object.get("trust_tier")).strip_edges().to_upper()
 		if "pack_profile" in mod_object:
@@ -215,7 +213,7 @@ static func verify_realm_mod_manifest(local_packs: Array, server_realm_manifest:
 static func _index_local_pack_metadata(local_pack: Variant, target_index: Dictionary) -> void:
 	if local_pack is Dictionary:
 		var pack_map := local_pack as Dictionary
-		var pack_id := str(pack_map.get("pack_id", pack_map.get("id", ""))).strip_edges()
+		var pack_id := str(pack_map.get("pack_id", "")).strip_edges()
 		if not pack_id.is_empty():
 			target_index[pack_id] = {
 				"pack_id": pack_id,

@@ -190,7 +190,7 @@ static func _collect_base_reference_manifest(
             _merge_base_references_into(candidate_dto, traits_map, kits_map, dag_map)
     return {
         "traits": traits_map,
-        "starter_kits": kits_map,
+        "custom_starter_kits": kits_map,
         "dag_graphs": dag_map
     }
 

@@ -18,7 +18,7 @@ static func extract_pack_id(mod_entry: Variant) -> String:
         return str(mod_entry).strip_edges()
     if mod_entry is Dictionary:
         var entry_map := mod_entry as Dictionary
-        return str(entry_map.get("pack_id", entry_map.get("id", ""))).strip_edges()
+        return str(entry_map.get("pack_id", "")).strip_edges()
     if mod_entry is Object and mod_entry.get("pack_id") != null:
         return str(mod_entry.get("pack_id")).strip_edges()
     return ""
@@ -80,7 +80,7 @@ static func format_installed_mods_report(
     has_explicit_selection: bool,
     active_mods: Array
 ) -> Dictionary:
-    var packages: Variant = scan_result.get("packages", scan_result.get("packs", []))
+    var packages: Variant = scan_result.get("packs", [])
     var formatted_packages: Array[Dictionary] = []
     var default_selected_ids: Array[String] = []
     var has_base_content := false

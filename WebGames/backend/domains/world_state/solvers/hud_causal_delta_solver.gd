@@ -51,20 +51,6 @@ static func compute_deltas_into(
 
 	_trim_and_recycle(target_deltas, write_index)
 
-## 计算前后观测切片的结构化因果差分（兼容旧接口）
-static func compute_deltas(
-	previous_slice: AgentHudContextSliceDTO,
-	next_slice: AgentHudContextSliceDTO,
-	cause: String = "",
-	initiator: String = "SYSTEM_TICK_SIMULATION",
-	reason: String = ""
-) -> Array[HudCausalDeltaDTO]:
-	var deltas: Array[HudCausalDeltaDTO] = []
-	if previous_slice == null or next_slice == null:
-		return deltas
-	compute_deltas_into(previous_slice, next_slice, deltas, cause, initiator, reason)
-	return deltas
-
 static func _populate_delta(
 	deltas: Array[HudCausalDeltaDTO],
 	index: int,

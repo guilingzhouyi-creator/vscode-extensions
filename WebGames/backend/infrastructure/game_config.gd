@@ -296,10 +296,6 @@ static func reload_config() -> Dictionary:
 		"table_count": _tables.size()
 	}
 
-## 别名委托 reload_config()
-static func reload_all_configurations() -> Dictionary:
-	return reload_config()
-
 ## 查询是否存在激活状态的模组运行时配置覆盖层
 static func has_active_mod_overlay() -> bool:
 	return not _active_mod_overlays.is_empty()

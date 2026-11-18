@@ -106,7 +106,7 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 # ==============================================================================
 
 ## 存档读取：信封解析/版本方向闸门/签名校验（仅信任被签名的 data_json 同一字节序列）/
-## 反序列化；legacy 无签名存档降级读取并告警（verified=false）
+## 反序列化；版本不符或签名失效存档一律拒绝并尝试恢复有效备份
 static func load_game(save_name: String) -> Dictionary:
 	if not is_valid_save_name(save_name):
 		return _fail("load", "INVALID_SAVE_NAME", _msg("invalid_save_name", {"name": save_name}))

@@ -45,7 +45,7 @@ static func handle_select_or_create_world(
     request_payload: Dictionary,
     active_gateway: WorldGatewayFSM
 ) -> UnifiedResponseEnvelopeDTO:
-    var target_mode: int = int(request_payload.get("target_mode", request_payload.get("mode", WorldGatewayModel.GameMode.SINGLE_PLAYER)))
+    var target_mode: int = int(request_payload.get("target_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
     var target_world_id := str(request_payload.get("world_id", ""))
     var target_slot_id := str(request_payload.get("slot_id", ""))
     if not target_world_id.is_empty() and bool(request_payload.get("create_if_missing", true)):

@@ -54,7 +54,7 @@ static func _resolve_boss(battle_identifier: String) -> WorldBossAggregate:
 	return boss_entity
 
 static func _handle_combat(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
-	var boss_entity := _resolve_boss(str(payload_map.get("target_id", payload_map.get("battle_id", ""))))
+	var boss_entity := _resolve_boss(str(payload_map.get("target_id", "")))
 	var live_context := WorldSessionRuntimeService.build_live_hud_context() if WorldSessionRuntimeService.has_active_world() else {}
 	if action_type == "GET_COMBAT_SNAPSHOT":
 		var default_health := GameConfig.get_float("domains.combat", "player_defaults/hp_max", 1000.0)
@@ -80,7 +80,7 @@ static func _handle_combat(request_id: String, action_type: String, payload_map:
 		var mana_point_cost := maxf(0.0, float(payload_map.get("mp_cost", maxf(5.0, default_ap_cost * 2.5))))
 		var damage_multiplier := clampf(float(payload_map.get("skill_multiplier", 1.0)), 0.1, 10.0)
 		if WorldSessionRuntimeService.has_active_world():
-			WorldSessionRuntimeService.apply_mutation_and_sync({"ap_delta": -action_point_cost, "mp_delta": -mana_point_cost, "cause": skill_identifier}, -1, false)
+			WorldSessionRuntimeService.apply_mutation_and_sync({"ap_delta": - action_point_cost, "mp_delta": - mana_point_cost, "cause": skill_identifier}, -1, false)
 		var damage_outcome := ConfigurablePhaseTransitionFSM.apply_boss_damage(boss_entity, "PLAYER", base_damage * damage_multiplier)
 		return UnifiedProtocolFactory.create_response(request_id, true, {
 			"skill_id": skill_identifier,
@@ -97,16 +97,16 @@ static func _handle_economy(request_id: String, action_type: String, payload_map
 	var live_context := WorldSessionRuntimeService.build_live_hud_context() if WorldSessionRuntimeService.has_active_world() else {}
 	var current_gold := int(live_context.get("wallet_gold", int(payload_map.get("wallet_gold", 0))))
 	if action_type == "SHOP_BUY" or action_type == "AUCTION_BUYOUT" or action_type == "AUCTION_BID":
-		var unit_price := maxi(0, int(payload_map.get("unit_price", payload_map.get("price", 0))))
+		var unit_price := maxi(0, int(payload_map.get("unit_price", 0)))
 		var purchase_count := maxi(1, int(payload_map.get("quantity", 1)))
 		var total_cost := unit_price * purchase_count
 		if WorldSessionRuntimeService.has_active_world() and current_gold < total_cost:
 			return UnifiedProtocolFactory.create_response(request_id, false, {"wallet_gold": current_gold}, "ERR_INSUFFICIENT_GOLD", "Insufficient gold for purchase")
 		var updated_gold := current_gold - total_cost
 		if WorldSessionRuntimeService.has_active_world():
-			var snapshot_after := WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": -total_cost, "reason": action_type}, -1, false)
+			var snapshot_after := WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": - total_cost, "reason": action_type}, -1, false)
 			updated_gold = snapshot_after.wallet_gold
-		return UnifiedProtocolFactory.create_response(request_id, true, {"wallet_gold": updated_gold, "delta_gold": -total_cost}, "", "Economy debit completed")
+		return UnifiedProtocolFactory.create_response(request_id, true, {"wallet_gold": updated_gold, "delta_gold": - total_cost}, "", "Economy debit completed")
 	if action_type == "SHOP_SELL":
 		var unit_price := maxi(0, int(payload_map.get("unit_price", 0)))
 		var sell_count := maxi(1, int(payload_map.get("quantity", 1)))
@@ -136,12 +136,12 @@ static func _handle_gacha(request_id: String, action_type: String, payload_map: 
 		if WorldSessionRuntimeService.has_active_world() and current_gold < total_cost:
 			return UnifiedProtocolFactory.create_response(request_id, false, {"wallet_gold": current_gold}, "ERR_INSUFFICIENT_CURRENCY", "Insufficient currency for wish")
 		if WorldSessionRuntimeService.has_active_world():
-			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": -total_cost, "reason": "PULL_GACHA"}, -1, false)
+			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": - total_cost, "reason": "PULL_GACHA"}, -1, false)
 		return UnifiedProtocolFactory.create_response(request_id, true, {"pull_count": pull_count, "spent": total_cost, "rate_5star": GachaProbabilitySolver.calculate_current_5star_rate(pull_count)}, "", "Gacha pull settled")
 	return UnifiedProtocolFactory.create_unhandled_action_response(request_id, action_type)
 
 static func _handle_quest(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
-	var quest_identifier := str(payload_map.get("quest_id", payload_map.get("bounty_id", ""))).strip_edges()
+	var quest_identifier := str(payload_map.get("quest_id", "")).strip_edges()
 	if action_type == "ACCEPT_BOUNTY" or action_type == "TRANSITION_QUEST":
 		var target_status := str(payload_map.get("next_status", "ACTIVE"))
 		if not quest_identifier.is_empty():
@@ -157,7 +157,7 @@ static func _handle_crafting(request_id: String, action_type: String, payload_ma
 		var enhance_cost := EquipmentEnhancementSolver.calculate_enhance_cost(maxi(0, target_level - 1))
 		var gold_cost := int(enhance_cost.get("gold_cost", 0))
 		if WorldSessionRuntimeService.has_active_world() and gold_cost > 0:
-			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": -gold_cost, "reason": action_type}, -1, false)
+			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": - gold_cost, "reason": action_type}, -1, false)
 		return UnifiedProtocolFactory.create_response(request_id, true, {"action": action_type, "gold_cost": gold_cost, "crystal_cost": int(enhance_cost.get("crystal_cost", 0))}, "", "Workshop operation executed")
 	if action_type == "DISMANTLE_ITEM":
 		var refund_gold := maxi(10, int(payload_map.get("refund_gold", 25)))
@@ -168,7 +168,7 @@ static func _handle_crafting(request_id: String, action_type: String, payload_ma
 
 static func _handle_grimoire(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
 	if action_type == "PUBLISH_GRIMOIRE" or action_type == "LEARN_GRIMOIRE" or action_type == "COMPILE_AST":
-		var book_identifier := str(payload_map.get("book_id", payload_map.get("grimoire_id", "GRIM_CUSTOM")))
+		var book_identifier := str(payload_map.get("book_id", "GRIM_CUSTOM"))
 		_authored_books.append({"book_id": book_identifier, "action": action_type})
 		return UnifiedProtocolFactory.create_response(request_id, true, {"book_id": book_identifier, "authored_count": _authored_books.size()}, "", "Grimoire operation completed")
 	if action_type == "CLAIM_ROYALTIES":

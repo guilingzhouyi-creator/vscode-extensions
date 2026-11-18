@@ -48,9 +48,7 @@ static func _handle_mail(request_id: String, action_type: String, payload_map: D
 		_sent_mails.append(mail_record)
 		return UnifiedProtocolFactory.create_response(request_id, true, {"mail": mail_record, "sent_count": _sent_mails.size()}, "", "Mail sent")
 	if action_type == "CLAIM_MAIL" and WorldSessionRuntimeService.has_active_world():
-		var claim_bonus := maxi(0, int(payload_map.get("bonus_gold", 0)))
-		if claim_bonus > 0:
-			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": claim_bonus, "unread_mail_delta": -1}, -1, false)
+		WorldSessionRuntimeService.apply_mutation_and_sync({"unread_mail_delta": - 1}, -1, false)
 	return UnifiedProtocolFactory.create_response(request_id, true, {"action": action_type}, "", "Mail directive processed")
 
 static func _handle_guild(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
@@ -76,7 +74,7 @@ static func _handle_misc_edge(request_id: String, action_type: String, payload_m
 		_registered_names[candidate_name.to_lower()] = Time.get_datetime_string_from_system(false, true)
 		var fee_gold := maxi(0, int(payload_map.get("fee", 0)))
 		if WorldSessionRuntimeService.has_active_world() and fee_gold > 0:
-			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": -fee_gold, "character_name": candidate_name}, -1, false)
+			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": - fee_gold, "character_name": candidate_name}, -1, false)
 		return UnifiedProtocolFactory.create_response(request_id, true, {"candidate_name": candidate_name, "fee": fee_gold}, "", "Name registered")
 	return UnifiedProtocolFactory.create_response(request_id, true, {"action": action_type}, "", "Misc edge action processed")
 

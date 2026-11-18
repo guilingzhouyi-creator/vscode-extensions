@@ -181,17 +181,11 @@ static func authenticate_local(username: String, password_plain: String, account
 	if not device_fingerprint.is_empty() and not account.local_device_fingerprint.is_empty() and device_fingerprint != account.local_device_fingerprint:
 		var fingerprint_mismatch_code := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/device_mismatch", "ERR_DEVICE_MISMATCH")
 		return {"success": false, "code": fingerprint_mismatch_code, "token": ""}
-	# 口令校验：默认按配置盐哈希；若历史账号为无盐版本 (salt_version == 0) 则平滑迁移重铸
+	# 口令校验：强制单轨加盐哈希（严格拒收 salt_version < 1 的无盐旧凭据）
+	if not account.is_guest_mode and account.salt_version < 1:
+		var legacy_rejected_code := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
+		return {"success": false, "code": legacy_rejected_code, "token": ""}
 	var input_hash := hash_password(password_plain)
-	var is_rehashed := false
-	if account.username == username and not account.is_guest_mode and account.salt_version == 0:
-		if CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, password_plain.sha256_text()):
-			account.password_hash_sha256 = input_hash
-			account.salt_version = 1
-			is_rehashed = true
-			var repository := AccountRepository.get_instance()
-			if repository.has_account(account.account_id):
-				repository.save_account(account)
 
 	var is_matched := account.username == username and (account.is_guest_mode or CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, input_hash))
 	if is_matched:
@@ -238,7 +232,7 @@ static func authenticate_local(username: String, password_plain: String, account
 		})
 		_dispatch_auth_hooks("post_login", {"account_id": account.account_id, "username": account.username, "token": token, "auto_enter_gateway": should_auto_enter})
 
-		return {"success": true, "code": success_code, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + session_ttl_seconds, "rehashed": is_rehashed, "auto_enter_gateway": should_auto_enter}
+		return {"success": true, "code": success_code, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + session_ttl_seconds, "auto_enter_gateway": should_auto_enter}
 	var invalid_credentials_code := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": invalid_credentials_code, "token": ""}
 

@@ -50,8 +50,8 @@ static func extract_placeholders(
 			"narratives.prologue_i18n", location_key, prologue_context.assigned_start_location_id
 		)
 
-	# 初始装备展示名（优先查 MOD 清单 starter_kits 与 custom_i18n）
-	var mod_kits: Dictionary = adapted_mod_manifest.get("starter_kits", adapted_mod_manifest.get("custom_starter_kits", {}))
+	# 初始装备展示名（优先查 MOD 清单 custom_starter_kits 与 custom_i18n）
+	var mod_kits: Dictionary = adapted_mod_manifest.get("custom_starter_kits", {})
 	var kit_id := prologue_context.assigned_starter_kit_id
 	if kit_id.is_empty():
 		var mod_race_kits: Dictionary = adapted_mod_manifest.get("race_kit_map", {})
@@ -115,7 +115,7 @@ static func _populate_extended_placeholders(
 
 	placeholders["TRAIT_SUMMARY"] = str(prologue_context.runtime_placeholders.get("TRAIT_SUMMARY", prologue_context.runtime_placeholders.get("trait_summary", "")))
 
-	var mod_kits: Dictionary = manifest.get("starter_kits", manifest.get("custom_starter_kits", {}))
+	var mod_kits: Dictionary = manifest.get("custom_starter_kits", {})
 	var kit_name: String = str(mod_kits.get(kit_id, {}).get("name", kit_id))
 	placeholders["STARTER_KIT_NAME"] = kit_name
 

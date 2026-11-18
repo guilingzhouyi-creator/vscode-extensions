@@ -15,12 +15,12 @@ const MODE_MERGE: String = "MERGE"
 const MODE_REPLACE_ENTRY: String = "REPLACE_ENTRY"
 const MODE_TOTAL_PURGE: String = "TOTAL_PURGE"
 
-## 将模板与契约中的覆盖模式别名统一映射为规范三态策略
+## 将覆写模式字符串严格规约为规范三态策略
 static func normalize_override_mode(raw_mode: String) -> String:
 	var normalized := raw_mode.strip_edges().to_upper()
-	if normalized == "REPLACE_ENTRY":
+	if normalized == MODE_REPLACE_ENTRY:
 		return MODE_REPLACE_ENTRY
-	if normalized == "TOTAL_PURGE" or normalized == "REPLACE_EXISTING" or normalized == "FULL_OVERRIDE":
+	if normalized == MODE_TOTAL_PURGE:
 		return MODE_TOTAL_PURGE
 	return MODE_MERGE
 

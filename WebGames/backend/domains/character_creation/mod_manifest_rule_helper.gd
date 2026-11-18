@@ -144,7 +144,7 @@ static func validate_origin_references(
 	var combined_dags: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {}).duplicate()
 	if base_manifest is Dictionary:
 		var base_map: Dictionary = base_manifest as Dictionary
-		var extra_kits: Variant = base_map.get("starter_kits", base_map.get("custom_starter_kits", {}))
+		var extra_kits: Variant = base_map.get("custom_starter_kits", {})
 		if extra_kits is Dictionary:
 			combined_kits.merge(extra_kits as Dictionary, true)
 		var extra_dags: Variant = base_map.get("dag_graphs", {})

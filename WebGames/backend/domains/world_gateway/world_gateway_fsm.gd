@@ -128,7 +128,7 @@ func set_mod_selection(selected_pack_ids: Array, custom_roots: Array = []) -> Di
 ## 只读查询指定世界档案的 MOD 锁与漂移诊断报告
 func get_world_mod_diagnostics(world_id: String, custom_roots: Array = []) -> Dictionary:
     var scan_result := ModPackageDiscoverySolver.scan_installed_packs_with_diagnostics(custom_roots)
-    var packages: Array = scan_result.get("packages", []) if scan_result.get("packages") is Array else []
+    var packages: Array = scan_result.get("packs", []) if scan_result.get("packs") is Array else []
     var diagnostic := WorldModAffinityManager.new().diagnose_world_mods(world_id, packages)
     diagnostic["success"] = true
     return diagnostic
@@ -580,10 +580,6 @@ func _mark_selected_slot_prologue_completed() -> void:
     slot_summary.prologue_completed = true
     var account_repository: AccountRepository = slot_binding["account_repository"]
     account_repository.save_account(slot_binding["account"])
-
-## 退出世界回到世界栏主界面（门面方法，等价于 exit_to_gateway）
-func exit_world() -> Dictionary:
-    return exit_to_gateway()
 
 ## 5. 退回世界栏主界面并实施内存全量重置清理 (Full Memory Scrubbing + 探针与模式闸门复位)
 func exit_to_gateway() -> Dictionary:

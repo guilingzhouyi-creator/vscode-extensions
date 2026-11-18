@@ -38,7 +38,11 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			if should_auto_login:
 				var auth_result := AuthService.register_and_login(register_request, true)
 				if bool(auth_result.get("success", false)):
-					_activate_gateway_session(String(auth_result.get("account_id", "")), String(auth_result.get("session_token", "")))
+					var registered_account_id := String(auth_result.get("account_id", ""))
+					_activate_gateway_session(registered_account_id, String(auth_result.get("session_token", "")))
+					var registered_account := _load_account_or_null(registered_account_id)
+					auth_result["character_slots"] = AccountSlotBindingSolver.to_frontend_character_slots(registered_account) if registered_account != null else []
+					auth_result["world_state_ref"] = registered_account.world_state_ref if registered_account != null else ""
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, bool(auth_result.get("success", false)), auth_result,
 					"" if bool(auth_result.get("success", false)) else String(auth_result.get("error_code", "ERR_REGISTER_FAILED")),
@@ -62,6 +66,8 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			if auth_response.success:
 				_activate_gateway_session(auth_response.account_id, auth_response.session_token)
 			var response_payload := auth_response.to_dto()
+			var login_account := _load_account_or_null(auth_response.account_id) if auth_response.success else null
+			response_payload["character_slots"] = AccountSlotBindingSolver.to_frontend_character_slots(login_account) if login_account != null else []
 			var session_metadata := AuthService.get_session_masked_metadata(auth_response.session_token)
 			response_payload["masked_token_prefix"] = String(session_metadata.get("token_prefix", ""))
 			response_payload["has_masked_token"] = bool(session_metadata.get("has_masked_token", false))

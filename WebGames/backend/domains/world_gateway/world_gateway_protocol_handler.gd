@@ -116,7 +116,7 @@ static func _dispatch_mod_and_realm_action(
 				request.request_id, true, list_result, "", "Installed MOD catalog retrieved successfully"
 			)
 		"SET_MOD_SELECTION":
-			var selection_ids: Array = request_payload.get("selected_pack_ids", request_payload.get("enabled_pack_ids", [])) if request_payload.get("selected_pack_ids", request_payload.get("enabled_pack_ids", [])) is Array else []
+			var selection_ids: Array = request_payload.get("selected_pack_ids", []) if request_payload.get("selected_pack_ids") is Array else []
 			var selection_roots: Array = request_payload.get("custom_roots", []) if request_payload.get("custom_roots") is Array else []
 			var selection_update_result := active_gateway.set_mod_selection(selection_ids, selection_roots)
 			var is_selection_succeeded := bool(selection_update_result.get("success", false))

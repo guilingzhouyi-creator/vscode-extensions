@@ -114,12 +114,10 @@ static func _collect_sorted_routing_rules(raw_sources: Array) -> Array:
     return sorted_rules
 
 static func _normalize_routing_rule_fields(rule: Dictionary) -> Dictionary:
-    var raw_condition: Variant = rule.get("match_condition", {})
-    var condition: Dictionary = (raw_condition as Dictionary) if raw_condition is Dictionary else {}
-    var target: String = str(rule.get("target_dag_id", rule.get("dag_id", ""))).strip_edges()
-    var origin_text: String = str(condition.get("origin_id", condition.get("origin", rule.get("origin_id", rule.get("origin", ""))))).strip_edges()
-    var race_text: String = str(condition.get("race_id", condition.get("race", rule.get("race_id", rule.get("race", ""))))).strip_edges()
-    var is_default_rule: bool = bool(condition.get("is_default", rule.get("is_default", false)))
+    var target: String = str(rule.get("target_dag_id", "")).strip_edges()
+    var origin_text: String = str(rule.get("origin_id", "")).strip_edges()
+    var race_text: String = str(rule.get("race_id", "")).strip_edges()
+    var is_default_rule: bool = bool(rule.get("is_default", false))
     return {
         "target": target,
         "origin_id": origin_text,
@@ -219,7 +217,7 @@ static func _resolve_declared_dag_graph(
     catalog: Dictionary,
     manifest: Dictionary
 ) -> NarrativeDAGGraphDTO:
-    var mod_graphs: Dictionary = manifest.get("dag_graphs", manifest.get("custom_dag_graphs", {}))
+    var mod_graphs: Dictionary = manifest.get("dag_graphs", {})
     if mod_graphs.has(dag_id) and mod_graphs[dag_id] is Dictionary:
         return assemble_graph_from_raw(dag_id, mod_graphs[dag_id] as Dictionary)
 

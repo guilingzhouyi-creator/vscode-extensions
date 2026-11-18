@@ -67,11 +67,12 @@ static func build_adapted_manifest(
         "birth_region_map": accumulator["birth_region_map"],
         "traits": traits_map,
         "paired_presets": accumulator["paired_presets"],
-        "starter_kits": accumulator["starter_kits"],
+        "custom_starter_kits": accumulator["custom_starter_kits"],
         "race_kit_map": accumulator["race_kit_map"],
         "origin_kit_map": accumulator["origin_kit_map"],
         "origin_dag_map": accumulator["origin_dag_map"],
         "custom_routing_rules": accumulator["custom_routing_rules"],
+        "prologue_routing_rules": accumulator["prologue_routing_rules"],
         "dag_graphs": accumulator["dag_graphs"],
         "custom_i18n": accumulator["custom_i18n"]
     }
@@ -92,6 +93,7 @@ static func _create_base_merge_accumulator() -> Dictionary:
     paired_presets.assign(raw_base_pairs.duplicate(true))
 
     var custom_routing_rules: Array[Dictionary] = []
+    var prologue_routing_rules: Array[Dictionary] = []
     return {
         "races_catalog": ((base_cc.get("races_catalog", {}) as Dictionary) if (base_cc.get("races_catalog") is Dictionary) else {}).duplicate(true),
         "creation_rules": {},
@@ -101,11 +103,12 @@ static func _create_base_merge_accumulator() -> Dictionary:
         "birth_region_map": ((reincarnation_table.get("birth_region_map", {}) as Dictionary) if (reincarnation_table.get("birth_region_map") is Dictionary) else {}).duplicate(true),
         "traits": ((base_cc.get("traits", {}) as Dictionary) if (base_cc.get("traits") is Dictionary) else {}).duplicate(true),
         "paired_presets": paired_presets,
-        "starter_kits": ((base_loadout.get("starter_kits", {}) as Dictionary) if (base_loadout.get("starter_kits") is Dictionary) else {}).duplicate(true),
+        "custom_starter_kits": ((base_loadout.get("starter_kits", {}) as Dictionary) if (base_loadout.get("starter_kits") is Dictionary) else {}).duplicate(true),
         "race_kit_map": ((base_loadout.get("race_kit_map", {}) as Dictionary) if (base_loadout.get("race_kit_map") is Dictionary) else {}).duplicate(true),
         "origin_kit_map": {},
         "origin_dag_map": {},
         "custom_routing_rules": custom_routing_rules,
+        "prologue_routing_rules": prologue_routing_rules,
         "dag_graphs": {},
         "custom_i18n": {}
     }
@@ -116,8 +119,9 @@ static func _merge_single_pack_assets(manifest_dto: DestinyModManifestDTO, accum
     var creation_rules: Dictionary = accumulator["creation_rules"]
     var traits: Dictionary = accumulator["traits"]
     var paired_presets: Array[Dictionary] = accumulator["paired_presets"]
-    var starter_kits: Dictionary = accumulator["starter_kits"]
+    var starter_kits: Dictionary = accumulator["custom_starter_kits"]
     var custom_routing_rules: Array[Dictionary] = accumulator["custom_routing_rules"]
+    var prologue_routing_rules: Array[Dictionary] = accumulator["prologue_routing_rules"]
     var dag_graphs: Dictionary = accumulator["dag_graphs"]
     var custom_i18n: Dictionary = accumulator["custom_i18n"]
 
@@ -141,6 +145,9 @@ static func _merge_single_pack_assets(manifest_dto: DestinyModManifestDTO, accum
 
     if not manifest_dto.custom_routing_rules.is_empty():
         custom_routing_rules.append_array(manifest_dto.custom_routing_rules.duplicate(true))
+
+    if not manifest_dto.prologue_routing_rules.is_empty():
+        prologue_routing_rules.append_array(manifest_dto.prologue_routing_rules.duplicate(true))
 
     if not manifest_dto.dag_graphs.is_empty():
         dag_graphs.merge(manifest_dto.dag_graphs, true)

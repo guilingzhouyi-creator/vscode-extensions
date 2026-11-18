@@ -39,7 +39,7 @@ static func _build_normalized_mod_data(source_directory: String, pack_manifest: 
 	relative_files.sort()
 	for raw_rel in relative_files:
 		var rel_path := raw_rel.replace("\\", "/")
-		if rel_path == "manifest.json" or rel_path == "pack.json" or _is_skipped_source_file(rel_path):
+		if rel_path == "pack.json" or _is_skipped_source_file(rel_path):
 			continue
 		if not rel_path.to_lower().ends_with(".json"):
 			continue
@@ -51,8 +51,6 @@ static func _build_normalized_mod_data(source_directory: String, pack_manifest: 
 		file_handle.close()
 		if parsed is Dictionary:
 			ModPackageArchiveReader.merge_source_entry(rel_path, parsed as Dictionary, mod_data)
-		elif parsed is Array and rel_path == "routing_rules.json":
-			ModPackageArchiveReader.merge_source_entry(rel_path, {"routing_rules": parsed}, mod_data)
 	return mod_data
 
 

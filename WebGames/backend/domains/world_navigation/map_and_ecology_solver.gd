@@ -161,14 +161,14 @@ static func _ingest_topology_nodes(nodes_map: Dictionary, raw_nodes: Variant) ->
 		for raw_entry in raw_nodes as Array:
 			if raw_entry is Dictionary:
 				var entry := raw_entry as Dictionary
-				_upsert_graph_node(nodes_map, String(entry.get("node_id", entry.get("id", ""))), entry)
+				_upsert_graph_node(nodes_map, String(entry.get("node_id", "")), entry)
 
 static func _ingest_landmark_nodes(nodes_map: Dictionary, landmarks: Array) -> void:
 	for raw_landmark in landmarks:
 		if not (raw_landmark is Dictionary):
 			continue
 		var landmark_entry := raw_landmark as Dictionary
-		var landmark_id := String(landmark_entry.get("id", landmark_entry.get("node_id", ""))).strip_edges()
+		var landmark_id := String(landmark_entry.get("id", "")).strip_edges()
 		if not landmark_id.is_empty() and not nodes_map.has(landmark_id):
 			_upsert_graph_node(nodes_map, landmark_id, landmark_entry)
 
@@ -179,7 +179,7 @@ static func _upsert_graph_node(nodes_map: Dictionary, node_id: String, raw_entry
 	var entry := raw_entry as Dictionary
 	var graph_node := WorldMapGraphNode.new()
 	graph_node.node_id = clean_id
-	graph_node.node_name = String(entry.get("name", entry.get("node_name", clean_id)))
+	graph_node.node_name = String(entry.get("name", clean_id))
 	if entry.has("continent_id"):
 		graph_node.continent_id = String(entry.get("continent_id", ""))
 	if entry.has("terrain_type"):
@@ -199,8 +199,8 @@ static func _wire_topology_edges(nodes_map: Dictionary, raw_edges: Variant) -> v
 		if not (raw_edge is Dictionary):
 			continue
 		var edge := raw_edge as Dictionary
-		var from_id := String(edge.get("from", edge.get("from_node_id", ""))).strip_edges()
-		var to_id := String(edge.get("to", edge.get("target_node_id", ""))).strip_edges()
+		var from_id := String(edge.get("from", "")).strip_edges()
+		var to_id := String(edge.get("to", "")).strip_edges()
 		if from_id.is_empty() or to_id.is_empty():
 			continue
 		if not nodes_map.has(from_id) or not nodes_map.has(to_id):

@@ -50,7 +50,7 @@ static func serialize_pack_record(pack_entry: Variant) -> Dictionary:
     if pack_entry is Dictionary:
         var source_table := pack_entry as Dictionary
         return {
-            "pack_id": String(source_table.get("pack_id", source_table.get("id", ""))).strip_edges(),
+            "pack_id": String(source_table.get("pack_id", "")).strip_edges(),
             "version": String(source_table.get("version", "1.0.0")).strip_edges(),
             "content_sha256": String(source_table.get("content_sha256", "")).strip_edges().to_lower(),
             "priority": int(source_table.get("priority", 100)),

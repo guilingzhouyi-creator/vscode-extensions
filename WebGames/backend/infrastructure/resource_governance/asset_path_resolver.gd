@@ -246,7 +246,7 @@ static func _kmod_declares_pack_id(kmod_path: String, expected_pack_id: String) 
 		var decoded: Variant = BinaryConfigReader.load_kdat_buffer(reader.read_file("manifest.kdat"))
 		if decoded is Dictionary:
 			var manifest := decoded as Dictionary
-			declared_id = String(manifest.get("pack_id", manifest.get("bundle_id", ""))).strip_edges()
+			declared_id = String(manifest.get("pack_id", "")).strip_edges()
 	reader.close()
 	return declared_id == expected_pack_id
 

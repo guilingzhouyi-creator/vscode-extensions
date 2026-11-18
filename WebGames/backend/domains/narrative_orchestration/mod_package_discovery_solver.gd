@@ -17,7 +17,6 @@ const TIER1_MODS_ROOT_PATH: String = "mods/"
 const TIER2_USER_SANDBOX_PATH: String = "user://mods/narratives/"
 const TIER2_USER_ROOT_PATH: String = "user://mods/"
 const MANIFEST_FILENAME: String = "pack.json"
-const ALT_MANIFEST_FILENAME: String = "manifest.json"
 const LOG_CHANNEL: String = "mod_narrative"
 const SUPPORTED_ENGINE_API_MAJOR: int = 1
 const EMPTY_LIST: Array = []
@@ -435,17 +434,6 @@ static func _load_destinies_and_routing(mod_directory: String, package_payload: 
             for prologue_rule_entry in (routing_payload.get("prologue_routing_rules") as Array):
                 existing_prologue_rules.append(prologue_rule_entry)
             package_payload["prologue_routing_rules"] = existing_prologue_rules
-        var raw_rules: Variant = routing_payload.get("custom_routing_rules", routing_payload.get("routing_rules", []))
-        if raw_rules is Array:
-            var existing_rules: Array = package_payload.get("custom_routing_rules", [])
-            for rule_entry in (raw_rules as Array):
-                existing_rules.append(rule_entry)
-            package_payload["custom_routing_rules"] = existing_rules
-    elif raw_routing is Array:
-        var existing_rules: Array = package_payload.get("custom_routing_rules", [])
-        for rule_entry in (raw_routing as Array):
-            existing_rules.append(rule_entry)
-        package_payload["custom_routing_rules"] = existing_rules
 
 ## 从指定目录完整读取并组装单包数据字典
 static func load_full_mod_package_from_dir(mod_directory: String) -> Dictionary:
@@ -521,7 +509,7 @@ static func verify_package_content_integrity(package_entry: Variant) -> Dictiona
     var inline_declared := ""
     if package_entry is Dictionary:
         var entry_table := package_entry as Dictionary
-        package_id = String(entry_table.get("pack_id", entry_table.get("id", ""))).strip_edges()
+        package_id = String(entry_table.get("pack_id", "")).strip_edges()
         package_root = String(entry_table.get("root_path", "")).strip_edges()
         inline_declared = String(entry_table.get("declared_content_sha256", "")).strip_edges().to_lower()
     elif package_entry != null and "root_path" in package_entry:

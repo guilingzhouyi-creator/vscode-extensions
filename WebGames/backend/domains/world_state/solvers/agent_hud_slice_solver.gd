@@ -118,7 +118,7 @@ static func solve_slice(
 		var mode_features_value: Variant = snapshot.mode_features
 		var is_multiplayer: bool = (int(mode_features_value.get("game_mode", 0)) == 1 or int(mode_features_value.get("game_mode", 0)) == 2) if mode_features_value is Dictionary else (int(mode_features_value.game_mode) == 1 or int(mode_features_value.game_mode) == 2 or bool(mode_features_value.show_matchmaking))
 		slice.game_mode = "MULTIPLAYER" if is_multiplayer else "SINGLE_PLAYER"
-		var is_party_ready: bool = bool(mode_features_value.get("party_matchmaking_enabled", mode_features_value.get("show_matchmaking", false))) if mode_features_value is Dictionary else (bool(mode_features_value.party_matchmaking_enabled) if "party_matchmaking_enabled" in mode_features_value else bool(mode_features_value.show_matchmaking))
+		var is_party_ready: bool = bool(mode_features_value.get("show_matchmaking", false)) if mode_features_value is Dictionary else bool(mode_features_value.show_matchmaking)
 		slice.is_multiplayer_ready = is_multiplayer or is_party_ready
 	slice.unread_mail_count = snapshot.unread_mail_count
 
@@ -128,8 +128,8 @@ static func solve_slice(
 		notice.notice_id = str(snapshot.ops_bulletin_brief.get("notice_id", "bulletin_announcement"))
 		notice.category = "ANNOUNCEMENT"
 		notice.priority = 1
-		notice.message_text = str(snapshot.ops_bulletin_brief.get("title", ""))
-		notice.actions = ["DISMISS_UI_NOTICE"]
+		notice.body_text = str(snapshot.ops_bulletin_brief.get("title", ""))
+		notice.action_directive_ids = ["DISMISS_UI_NOTICE"]
 		slice.ui_notices.append(notice)
 
 	# 合并外部注入的结构化通知

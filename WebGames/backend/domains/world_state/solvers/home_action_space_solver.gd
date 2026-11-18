@@ -106,17 +106,6 @@ static func resolve_action_space_into(
 	var has_mail: bool = snapshot.unread_mail_count > 0
 	_populate_directive(target_actions[5], STATIC_DIR_SPECS[5], has_mail, "" if has_mail else "ERR_NO_UNREAD_MAIL", is_human_interacting)
 
-## 动态裁决当前权威快照下对 Agent 暴露的合法行动空间清单（兼容旧接口）
-static func resolve_action_space(
-	snapshot: AuthoritativeHudSnapshotDTO,
-	is_human_interacting: bool = false
-) -> Array[AgentActionDirectiveDTO]:
-	var actions: Array[AgentActionDirectiveDTO] = []
-	if snapshot == null:
-		return actions
-	resolve_action_space_into(snapshot, actions, is_human_interacting)
-	return actions
-
 static func _populate_directive(
 	target: AgentActionDirectiveDTO,
 	action_specification: Dictionary,
