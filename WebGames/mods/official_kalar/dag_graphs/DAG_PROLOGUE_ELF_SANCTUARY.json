@@ -23,8 +23,8 @@
   },
   "edges": [
     {
-      "from": "NODE_AWAKEN_GROVE",
-      "to": "NODE_DEPART_SANCTUARY"
+      "from_node_id": "NODE_AWAKEN_GROVE",
+      "to_node_id": "NODE_DEPART_SANCTUARY"
     }
   ],
   "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"

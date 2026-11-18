@@ -98,8 +98,8 @@ def build_dag_graph_structure(
     for edge in edges:
         if not isinstance(edge, dict):
             continue
-        u = edge.get("from") or edge.get("from_node_id")
-        v = edge.get("to") or edge.get("to_node_id")
+        u = edge.get("from_node_id")
+        v = edge.get("to_node_id")
         if u not in nodes or v not in nodes:
             diags.append(DiagnosticItem(
                 code="ERR_DAG_DANGLING_EDGE",
@@ -267,10 +267,9 @@ def check_dag_file(
     if not isinstance(data, dict):
         return
 
-    for id_field in ("dag_id", "graph_id"):
-        did = data.get(id_field)
-        if isinstance(did, str) and did.strip():
-            declared_dag_ids.add(did.strip())
+    did = data.get("dag_id")
+    if isinstance(did, str) and did.strip():
+        declared_dag_ids.add(did.strip())
 
     nodes = data.get("nodes")
     edges = data.get("edges")

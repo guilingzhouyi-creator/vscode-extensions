@@ -44,12 +44,12 @@
   },
   "edges": [
     {
-      "from": "NODE_AWAKEN_PLAZA",
-      "to": "NODE_BRANCH_EXPLORE"
+      "from_node_id": "NODE_AWAKEN_PLAZA",
+      "to_node_id": "NODE_BRANCH_EXPLORE"
     },
     {
-      "from": "NODE_BRANCH_EXPLORE",
-      "to": "NODE_INSPECT_OBELISK",
+      "from_node_id": "NODE_BRANCH_EXPLORE",
+      "to_node_id": "NODE_INSPECT_OBELISK",
       "label": "走近查探符文方尖碑",
       "branch_condition": {
         "kind": "CHOICE_MATCH",
@@ -58,18 +58,18 @@
       "priority_weight": 10
     },
     {
-      "from": "NODE_BRANCH_EXPLORE",
-      "to": "NODE_TALK_GUARD",
+      "from_node_id": "NODE_BRANCH_EXPLORE",
+      "to_node_id": "NODE_TALK_GUARD",
       "label": "径直走向要塞老兵",
       "priority_weight": 1
     },
     {
-      "from": "NODE_INSPECT_OBELISK",
-      "to": "NODE_TALK_GUARD"
+      "from_node_id": "NODE_INSPECT_OBELISK",
+      "to_node_id": "NODE_TALK_GUARD"
     },
     {
-      "from": "NODE_TALK_GUARD",
-      "to": "NODE_DEPART_WORLD"
+      "from_node_id": "NODE_TALK_GUARD",
+      "to_node_id": "NODE_DEPART_WORLD"
     }
   ],
   "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"

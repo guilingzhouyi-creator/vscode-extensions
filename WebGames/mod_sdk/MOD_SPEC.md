@@ -337,8 +337,8 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
     }
   },
   "edges": [
-    {"from": "NODE_ENTRY", "to": "NODE_STEP_EXPLORE"},
-    {"from": "NODE_STEP_EXPLORE", "to": "NODE_EXIT"}
+    {"from_node_id": "NODE_ENTRY", "to_node_id": "NODE_STEP_EXPLORE"},
+    {"from_node_id": "NODE_STEP_EXPLORE", "to_node_id": "NODE_EXIT"}
   ]
 }
 ```

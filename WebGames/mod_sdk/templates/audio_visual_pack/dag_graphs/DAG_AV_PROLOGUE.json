@@ -37,12 +37,12 @@
   },
   "edges": [
     {
-      "from": "NODE_AV_START",
-      "to": "NODE_AV_STEP_WAR_ROOM"
+      "from_node_id": "NODE_AV_START",
+      "to_node_id": "NODE_AV_STEP_WAR_ROOM"
     },
     {
-      "from": "NODE_AV_STEP_WAR_ROOM",
-      "to": "NODE_AV_EXIT"
+      "from_node_id": "NODE_AV_STEP_WAR_ROOM",
+      "to_node_id": "NODE_AV_EXIT"
     }
   ]
 }

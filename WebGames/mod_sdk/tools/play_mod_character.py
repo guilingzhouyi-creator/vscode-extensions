@@ -170,8 +170,8 @@ BUILTIN_DAG_TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
         "edges": [
-            {"from": "NODE_CAPITAL_WAKE", "to": "NODE_CAPITAL_GATE"},
-            {"from": "NODE_CAPITAL_GATE", "to": "NODE_CAPITAL_EXIT"},
+            {"from_node_id": "NODE_CAPITAL_WAKE", "to_node_id": "NODE_CAPITAL_GATE"},
+            {"from_node_id": "NODE_CAPITAL_GATE", "to_node_id": "NODE_CAPITAL_EXIT"},
         ],
     },
     "DAG_PROLOGUE_ELF_SANCTUARY": {
@@ -202,8 +202,8 @@ BUILTIN_DAG_TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
         "edges": [
-            {"from": "NODE_SANCTUARY_WAKE", "to": "NODE_SANCTUARY_STEP"},
-            {"from": "NODE_SANCTUARY_STEP", "to": "NODE_SANCTUARY_EXIT"},
+            {"from_node_id": "NODE_SANCTUARY_WAKE", "to_node_id": "NODE_SANCTUARY_STEP"},
+            {"from_node_id": "NODE_SANCTUARY_STEP", "to_node_id": "NODE_SANCTUARY_EXIT"},
         ],
     },
 }

@@ -174,8 +174,8 @@ def parse_dag_topology(
 
     for e in edges:
         if isinstance(e, dict):
-            u = e.get("from") or e.get("from_node_id")
-            v = e.get("to") or e.get("to_node_id")
+            u = e.get("from_node_id")
+            v = e.get("to_node_id")
             if u in adj and v in nodes:
                 adj[u].append(v)
 
@@ -243,8 +243,7 @@ def resolve_dag_routing(
         if target:
             return target, "routing_rules.json"
 
-    fallback = "DAG_PROLOGUE_ELF_SANCTUARY" if race_id.upper() == "ELF" else "DAG_PROLOGUE_HUMAN_CAPITAL"
-    return fallback, "builtin_default"
+    return "", "unresolved"
 
 
 def merge_destinies_from_mod(dest_data: dict[str, Any], state: dict[str, Any]) -> None:

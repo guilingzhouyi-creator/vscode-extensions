@@ -375,7 +375,7 @@ static func _build_custom_routing_mod_package() -> Dictionary:
 			"N_ALT_0": {"node_type": "START_ENTRY", "narrative_key": "narrative.sample_mod.alt0"},
 			"N_ALT_1": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.sample_mod.alt1", "required_prerequisites": ["N_ALT_0"]}
 		},
-		"edges": [{"from": "N_ALT_0", "to": "N_ALT_1"}]
+		"edges": [{"from_node_id": "N_ALT_0", "to_node_id": "N_ALT_1"}]
 	})
 	return ModPackageDiscoverySolver.load_full_mod_package_from_dir(route_dir)
 

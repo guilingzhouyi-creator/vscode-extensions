@@ -156,7 +156,7 @@ static func test_dangling_dag_and_kit_cross_table_rejection() -> Dictionary:
 	var bad_graph_pkg := base_pkg.duplicate(true)
 	bad_graph_pkg["dag_graphs"] = {
 		"DAG_CORRUPTED": {
-			"graph_id": "DAG_CORRUPTED",
+			"dag_id": "DAG_CORRUPTED",
 			"entry_node_id": "NODE_NON_EXISTENT",
 			"nodes": {}
 		}

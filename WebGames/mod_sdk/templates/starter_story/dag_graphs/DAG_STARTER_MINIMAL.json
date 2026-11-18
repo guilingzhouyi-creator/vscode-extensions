@@ -30,12 +30,12 @@
   },
   "edges": [
     {
-      "from": "NODE_STARTER_AWAKEN",
-      "to": "NODE_STARTER_EXPLORE"
+      "from_node_id": "NODE_STARTER_AWAKEN",
+      "to_node_id": "NODE_STARTER_EXPLORE"
     },
     {
-      "from": "NODE_STARTER_EXPLORE",
-      "to": "NODE_STARTER_DEPART"
+      "from_node_id": "NODE_STARTER_EXPLORE",
+      "to_node_id": "NODE_STARTER_DEPART"
     }
   ]
 }

@@ -25,8 +25,8 @@
   },
   "edges": [
     {
-      "from": "NODE_HUD_START",
-      "to": "NODE_HUD_EXIT"
+      "from_node_id": "NODE_HUD_START",
+      "to_node_id": "NODE_HUD_EXIT"
     }
   ]
 }

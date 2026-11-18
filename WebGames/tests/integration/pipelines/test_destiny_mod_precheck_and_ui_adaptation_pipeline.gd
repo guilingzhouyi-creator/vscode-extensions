@@ -157,7 +157,7 @@ static func _make_compliant_mod_a() -> Dictionary:
                     "NODE_ASTRO_START": {"node_type": "START_ENTRY", "narrative_key": "narrative.prologue.awakening"},
                     "NODE_ASTRO_END": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.prologue.completed", "required_prerequisites": ["NODE_ASTRO_START"]}
                 },
-                "edges": [{"from": "NODE_ASTRO_START", "to": "NODE_ASTRO_END"}]
+                "edges": [{"from_node_id": "NODE_ASTRO_START", "to_node_id": "NODE_ASTRO_END"}]
             }
         }
     }
@@ -228,7 +228,7 @@ static func _make_compliant_mod_b() -> Dictionary:
                     "NODE_RUNE_START": {"node_type": "START_ENTRY", "narrative_key": "narrative.prologue.awakening"},
                     "NODE_RUNE_END": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.prologue.completed", "required_prerequisites": ["NODE_RUNE_START"]}
                 },
-                "edges": [{"from": "NODE_RUNE_START", "to": "NODE_RUNE_END"}]
+                "edges": [{"from_node_id": "NODE_RUNE_START", "to_node_id": "NODE_RUNE_END"}]
             }
         }
     }

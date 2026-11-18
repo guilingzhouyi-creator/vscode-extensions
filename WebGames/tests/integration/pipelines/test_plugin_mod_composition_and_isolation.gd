@@ -112,7 +112,7 @@ static func test_cyclic_dependency_rejection() -> Dictionary:
 		"dag_graphs": {"DAG_C_A": {
 			"dag_id": "DAG_C_A", "entry_node_id": "N0", "terminal_node_id": "N1",
 			"nodes": {"N0": {"node_type": "START_ENTRY", "narrative_key": "k0"}, "N1": {"node_type": "TERMINAL_EXIT", "narrative_key": "k1", "required_prerequisites": ["N0"]}},
-			"edges": [{"from": "N0", "to": "N1"}]
+			"edges": [{"from_node_id": "N0", "to_node_id": "N1"}]
 		}}
 	}
 	var pack_b := {

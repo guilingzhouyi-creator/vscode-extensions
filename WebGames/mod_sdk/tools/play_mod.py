@@ -77,37 +77,6 @@ from play_mod_interactive import (
     resolve_choice_target,
 )
 
-# 兼容私有符号别名
-_ensure_utf8_stdout = ensure_utf8_stdout
-_safe_load_json = safe_load_json
-_flatten_i18n_dict = flatten_i18n_dict
-_normalize_items = normalize_items
-_extract_rules = extract_rules
-_generate_base_attributes = generate_base_attributes
-_pick_origin = pick_origin
-_pick_trait_pair = pick_trait_pair
-_pick_starter_kit = pick_starter_kit
-_resolve_character_sheet = resolve_character_sheet
-_build_context = build_character_context
-_hydrate = hydrate
-_resolve_node_text = resolve_node_text
-_parse_dag_topology = parse_dag_topology
-_score_rule = score_rule
-_match_rule = match_rule
-_resolve_dag_routing = resolve_dag_routing
-_merge_destinies_from_mod = merge_destinies_from_mod
-_merge_dag_and_i18n = merge_dag_and_i18n
-_load_and_merge_assets = load_and_merge_assets
-_prepare_session = prepare_session
-_build_observation_payload = build_observation_payload
-_emit_json_line = emit_json_line
-_apply_single_mutation = apply_single_mutation
-_apply_mutations_to_state = apply_mutations_to_state
-_parse_action_input = parse_action_input
-_resolve_choice_target = resolve_choice_target
-_handle_interactive_rollback = handle_interactive_rollback
-_handle_interactive_choose = handle_interactive_choose
-
 
 def _pick_batch_next_node(
     candidates: list[str],

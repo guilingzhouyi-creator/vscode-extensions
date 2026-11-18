@@ -24,8 +24,8 @@
   },
   "edges": [
     {
-      "from": "NODE_TC_START",
-      "to": "NODE_TC_EXIT"
+      "from_node_id": "NODE_TC_START",
+      "to_node_id": "NODE_TC_EXIT"
     }
   ]
 }

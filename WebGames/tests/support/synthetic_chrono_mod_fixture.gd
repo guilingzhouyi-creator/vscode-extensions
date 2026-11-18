@@ -93,7 +93,7 @@ static func write_synthetic_chrono_stack() -> void:
                 "mutations_on_complete": [{"type": "PrologueCompleted", "dag_id": "DAG_CHRONO_AWAKEN"}]
             }
         },
-        "edges": [{"from": "NODE_CHRONO_BOOT", "to": "NODE_CHRONO_DEPART"}]
+        "edges": [{"from_node_id": "NODE_CHRONO_BOOT", "to_node_id": "NODE_CHRONO_DEPART"}]
     })
     TestTier3ContentOverrideHelper.write_json_file(base_dir.path_join("content/items/chrono_items.json"), {
         "override_mode": "MERGE",

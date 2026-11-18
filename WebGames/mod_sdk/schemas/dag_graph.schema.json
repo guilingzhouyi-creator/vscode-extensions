@@ -10,11 +10,6 @@
       "pattern": "^DAG_[A-Z0-9_]+$",
       "description": "剧情有向图全局唯一标识符（如 DAG_FRONTIER_AWAKEN）"
     },
-    "graph_id": {
-      "type": "string",
-      "pattern": "^DAG_[A-Z0-9_]+$",
-      "description": "dag_id 的别名字段"
-    },
     "entry_node_id": {
       "type": "string",
       "description": "序章剧情起始入口节点标识符（对应 START_ENTRY 节点）"
@@ -98,21 +93,13 @@
       "items": {
         "type": "object",
         "properties": {
-          "from": {
+          "from_node_id": {
             "type": "string",
             "description": "起始源节点 ID"
           },
-          "from_node_id": {
-            "type": "string",
-            "description": "from 的别名字段"
-          },
-          "to": {
-            "type": "string",
-            "description": "指向目标节点 ID"
-          },
           "to_node_id": {
             "type": "string",
-            "description": "to 的别名字段"
+            "description": "指向目标节点 ID"
           },
           "label": {
             "type": "string",
@@ -123,10 +110,7 @@
             "description": "分支流转门槛判定表达式或逻辑断言"
           }
         },
-        "anyOf": [
-          { "required": ["from", "to"] },
-          { "required": ["from_node_id", "to_node_id"] }
-        ]
+        "required": ["from_node_id", "to_node_id"]
       }
     }
   },

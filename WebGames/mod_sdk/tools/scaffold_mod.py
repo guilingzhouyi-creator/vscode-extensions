@@ -162,8 +162,8 @@ def _build_dag_dict(
         "terminal_node_id": exit_nid,
         "nodes": nodes,
         "edges": [
-            {"from": entry_nid, "to": step_nid},
-            {"from": step_nid, "to": exit_nid},
+            {"from_node_id": entry_nid, "to_node_id": step_nid},
+            {"from_node_id": step_nid, "to_node_id": exit_nid},
         ],
     }
 

@@ -42,8 +42,8 @@ static func from_dto(serialized_payload: Dictionary) -> NarrativeDAGEdge:
 	var edge := NarrativeDAGEdge.new()
 	if serialized_payload.is_empty():
 		return edge
-	edge.from_node_id = str(serialized_payload.get("from_node_id", serialized_payload.get("from", "")))
-	edge.to_node_id = str(serialized_payload.get("to_node_id", serialized_payload.get("to", "")))
+	edge.from_node_id = str(serialized_payload.get("from_node_id", ""))
+	edge.to_node_id = str(serialized_payload.get("to_node_id", ""))
 	edge.branch_condition = (serialized_payload.get("branch_condition", {}) as Dictionary).duplicate(true)
 	edge.priority_weight = int(serialized_payload.get("priority_weight", 100))
 	return edge

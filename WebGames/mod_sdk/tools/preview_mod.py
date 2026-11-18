@@ -237,9 +237,7 @@ def _resolve_target_dag(
     if isinstance(origin_dag, str) and origin_dag.strip():
         return origin_dag.strip(), "origin_prologue_dag_id"
 
-    # Level 4: 内置默认
-    fallback = "DAG_PROLOGUE_ELF_SANCTUARY" if race_id.upper() == "ELF" else "DAG_PROLOGUE_HUMAN_CAPITAL"
-    return fallback, "builtin_default"
+    return "", "unresolved"
 
 
 def _build_simulation_graph(dag_data: dict[str, Any]) -> tuple[str | None, set[str], dict[str, list[str]]]:
@@ -269,8 +267,8 @@ def _build_simulation_graph(dag_data: dict[str, Any]) -> tuple[str | None, set[s
 
     for e in edges:
         if isinstance(e, dict):
-            u = e.get("from") or e.get("from_node_id")
-            v = e.get("to") or e.get("to_node_id")
+            u = e.get("from_node_id")
+            v = e.get("to_node_id")
             if u in adj and v in nodes:
                 adj[u].append(v)
 

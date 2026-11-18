@@ -415,7 +415,7 @@ static func _scan_mod_dag_graphs(mod_directory: String, target_graphs: Dictionar
         var raw_json: Variant = _read_json_file(file_path)
         if raw_json is Dictionary:
             var stem := file_path.get_file().get_basename()
-            var dag_id := str((raw_json as Dictionary).get("dag_id", (raw_json as Dictionary).get("graph_id", stem)))
+            var dag_id := str((raw_json as Dictionary).get("dag_id", stem))
             target_graphs[dag_id] = raw_json
 
 ## 扫描 mod_directory/i18n 目录下的多语言本地化配置（按语言分桶并兼容扁平回退）
