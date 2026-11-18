@@ -74,7 +74,7 @@ func _extract_packet_payload(event_packet: Variant, unwrap_nested: bool = true) 
 	if event_packet is Dictionary:
 		event_payload = (event_packet as Dictionary).duplicate(true)
 		return event_payload
-	var payload_object: Variant = event_packet.get("payload_obj")
+	var payload_object: Variant = event_packet.get("payload_dto")
 	if payload_object is Dictionary:
 		event_payload.merge(payload_object as Dictionary, true)
 	elif payload_object != null and payload_object.has_method("to_dto"):
@@ -228,8 +228,13 @@ func _on_wallet_mutated(event_packet: Variant) -> void:
 	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload, true, false)
 	if hud_view == null:
 		return
-	var gold: int = int(event_payload.get("current_gold", event_payload.get("gold", hud_view.wallet_gold)))
-	var crystals: int = int(event_payload.get("current_crystals", event_payload.get("crystals", hud_view.wallet_mana_crystals)))
+	var gold: int = int(event_payload.get("wallet_gold", hud_view.wallet_gold))
+	var crystals: int = int(event_payload.get("wallet_mana_monocrystals", hud_view.wallet_mana_crystals))
+	var currency_type := str(event_payload.get("currency_type", "")).strip_edges()
+	if currency_type == "gold" and event_payload.has("new_amount"):
+		gold = int(event_payload.get("new_amount", gold))
+	elif currency_type == "mana_monocrystals" and event_payload.has("new_amount"):
+		crystals = int(event_payload.get("new_amount", crystals))
 	_apply_partial_snapshot(hud_view, {
 		"gold": gold,
 		"mana_monocrystals": crystals

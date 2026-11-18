@@ -137,10 +137,10 @@ static func test_chain_02_event_packet_dual_payload_and_channel_isolation() -> D
 
 	var on_snap := func(pkt: EventPacket) -> void:
 		snap_hits.append(EventPacket.extract_payload_dict(pkt))
-		if pkt.payload_data is Dictionary and pkt.payload_dto != null:
-			snap_hits.append({"dual_ok": true})
+		if pkt.payload_dto != null and pkt.payload_data == null:
+			snap_hits.append({"dto_only_ok": true})
 	var on_wallet := func(pkt: EventPacket) -> void:
-		var wallet_data: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
+		var wallet_data: Dictionary = EventPacket.extract_payload_dict(pkt)
 		wallet_hits.append(wallet_data)
 	var on_prologue := func(_pkt: Variant) -> void:
 		prologue_hits[0] += 1
@@ -172,12 +172,15 @@ static func test_chain_02_event_packet_dual_payload_and_channel_isolation() -> D
 	# 注销后不再接收后续推送
 	AuthoritativeHudSyncService.publish_wallet_mutation("ACC_SIG", "gold", 350, 500, "AFTER_UNSUB")
 
-	var dual_ok: bool = snap_hits.size() == 2 and bool(snap_hits[1].get("dual_ok", false))
-	var wallet_ok: bool = wallet_hits.size() == 1 and int(wallet_hits[0].get("current_gold", 0)) == 350 and int(wallet_hits[0].get("new_amount", 0)) == 350
+	var dto_ok: bool = snap_hits.size() == 2 and bool(snap_hits[1].get("dto_only_ok", false))
+	var wallet_ok: bool = wallet_hits.size() == 1 \
+		and str(wallet_hits[0].get("currency_type", "")) == "gold" \
+		and int(wallet_hits[0].get("new_amount", 0)) == 350 \
+		and not wallet_hits[0].has("current_gold")
 	var split_ok: bool = stat_hits.size() == 1 and clock_hits.size() == 1 and prologue_hits[0] == 1 and world_hits[0] == 1
 
 	_teardown_env()
-	return TestCase.make_result("TC-CHAIN-02: EventPacket双载荷兼容与四信道精准分流隔离", dual_ok and wallet_ok and split_ok)
+	return TestCase.make_result("TC-CHAIN-02: EventPacket强类型单源DTO与四信道精准分流隔离", dto_ok and wallet_ok and split_ok)
 
 ## TC-CHAIN-03: 序章交接 L3 属性与出生点无损透传至探索态 HUD
 static func test_chain_03_prologue_handoff_l3_attrs_and_location_continuity() -> Dictionary:

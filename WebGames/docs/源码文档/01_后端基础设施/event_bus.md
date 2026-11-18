@@ -42,6 +42,6 @@ flowchart LR
 ## 三、配置契约与性能防线
 
 1. **配置驱动参数**：`initialize_from_config()` 读取 `infrastructure.event_bus_config` 下的 `spatial_routing/cell_size_meters`（默认 `16.0`）、`spatial_routing/max_dispatch_radius_meters`（默认 `256.0`）、`frame_batching/ring_buffer_capacity` 与 `channel_registry`。
-2. **版本感知信道缓存**：`_legacy_channel_to_id` 与 `_narrative_table_cache` 在检测到 `GameConfig.config_reload_version()` 变化时自动刷新。
+2. **版本感知信道缓存**：`_channel_name_to_id` 与 `_narrative_table_cache` 在检测到 `GameConfig.config_reload_version()` 变化时自动刷新。
 3. **重入熔断与零堆分配**：`_max_depth = 16` 防止循环订阅死锁；按递归深度索引的 `_target_scratch`、`_seen_scratch`、`_dead_tokens_scratch` 复用数组确保派发循环零瞬态堆分配；单测推荐使用独立 `EventBusCore.new()` 并调用 `clear_for_tests()` 清理环境。
 4. **关联测试**：[test_event_bus2_zero_gc_pipeline.gd](../../../tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd)。

@@ -80,8 +80,8 @@ def _extract_channel_candidates(data: dict, subkey: str | None) -> list[str]:
     candidates: list[str] = []
     if subkey is None:
         for entry in data.get("channel_registry", []):
-            if isinstance(entry, dict) and entry.get("legacy"):
-                candidates.append(str(entry["legacy"]))
+            if isinstance(entry, dict) and entry.get("channel_name"):
+                candidates.append(str(entry["channel_name"]))
         return candidates
 
     node: Any = data

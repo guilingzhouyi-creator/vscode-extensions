@@ -32,8 +32,16 @@ static func _capture_events(callback: Callable) -> Callable:
 
 static func _capture_channel_records(captured: Array) -> Callable:
 	return _capture_events(func(pkt: EventPacket) -> void:
-		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		captured.append({"channel": str(w.get("channel", "")), "payload": w.get("payload", {})})
+		var raw_data: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
+		var channel_name := str(raw_data.get("channel", ""))
+		if channel_name.is_empty():
+			channel_name = EventBusCore.get_instance().resolve_channel_name(pkt.channel_id)
+		var payload_dict := EventPacket.extract_payload_dict(pkt)
+		captured.append({
+			"channel": channel_name,
+			"payload": payload_dict,
+			"narrative_args": pkt.narrative_args.duplicate()
+		})
 	)
 
 static func _make_account_store() -> Dictionary:
@@ -153,13 +161,13 @@ static func test_hud_push_stream_and_payload_contract() -> Dictionary:
 	var wallet_hit := false
 	for ev in captured:
 		if ev["channel"] == HudEventContract.channel_hud_stat_mutated():
-			stat_hit = (ev["payload"].get("category_key") == "hud") \
+			stat_hit = (str(ev["payload"].get("stat_name", "")) == "STR") \
 				and (ev["payload"].get("delta") == 1.0) \
-				and (ev["payload"].get("args") is Array)
+				and (ev.get("narrative_args") is Array)
 		elif ev["channel"] == HudEventContract.channel_hud_wallet_mutated():
-			wallet_hit = (ev["payload"].get("category_key") == "hud") \
+			wallet_hit = (str(ev["payload"].get("currency_type", "")) == "gold") \
 				and (ev["payload"].get("delta") == 30) \
-				and (ev["payload"].get("args") is Array)
+				and (ev.get("narrative_args") is Array)
 	return {"test": "TC-HDS-05: 推轨事件流与载荷契约", "passed": stat_hit and wallet_hit}
 
 # ---- TC-HDS-06：全生命周期无头流程（注册→登录→进世界首帧→注销） ----

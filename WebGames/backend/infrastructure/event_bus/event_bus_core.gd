@@ -14,8 +14,8 @@ extends RefCounted
 static var _instance: EventBusCore = null
 
 var _channel_routes: Dictionary = {} # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
-var _legacy_channel_to_id: Dictionary = {} # "channel_string" -> channel_id(int)
-var _id_to_legacy_channel: Dictionary = {} # channel_id(int) -> "channel_string"
+var _channel_name_to_id: Dictionary = {} # "channel_string" -> channel_id(int)
+var _id_to_channel_name: Dictionary = {} # channel_id(int) -> "channel_string"
 var _channel_cache_version: int = -1
 var _spatial_grid: HeadlessSpatialHashGrid3D = null
 var _ring_buffer: PingPongRingBuffer = null
@@ -60,18 +60,15 @@ static func get_instance() -> EventBusCore:
 ## 确保频道配置与整型信道映射表加载对齐
 func _ensure_channel_registry_loaded() -> void:
 	var current_version: int = GameConfig.config_reload_version()
-	if _channel_cache_version == current_version and not _legacy_channel_to_id.is_empty():
+	if _channel_cache_version == current_version and not _channel_name_to_id.is_empty():
 		return
-	_legacy_channel_to_id.clear()
-	_id_to_legacy_channel.clear()
-	# 预装高频基础信道别名
-	_legacy_channel_to_id["world_state.hud_snapshot_published"] = EventChannelDefinition.HUD_STATUS_SNAPSHOT
-	_legacy_channel_to_id["world_state.snapshot_published"] = EventChannelDefinition.HUD_STATUS_SNAPSHOT
-	_legacy_channel_to_id["world_state.stat_mutated"] = EventChannelDefinition.HUD_STAT_MUTATED
-	_legacy_channel_to_id["world_state.wallet_mutated"] = EventChannelDefinition.HUD_WALLET_MUTATED
-	_legacy_channel_to_id["currency.wallet.mutated"] = EventChannelDefinition.HUD_WALLET_MUTATED
-	_legacy_channel_to_id["account.registered"] = EventChannelDefinition.AUTH_REGISTERED
-	_legacy_channel_to_id["account.login_succeeded"] = EventChannelDefinition.AUTH_LOGIN_SUCCEEDED
+	_channel_name_to_id.clear()
+	_id_to_channel_name.clear()
+	_channel_name_to_id["world_state.snapshot_published"] = EventChannelDefinition.HUD_STATUS_SNAPSHOT
+	_channel_name_to_id["world_state.stat_mutated"] = EventChannelDefinition.HUD_STAT_MUTATED
+	_channel_name_to_id["world_state.wallet_mutated"] = EventChannelDefinition.HUD_WALLET_MUTATED
+	_channel_name_to_id["account.registered"] = EventChannelDefinition.AUTH_REGISTERED
+	_channel_name_to_id["account.login_succeeded"] = EventChannelDefinition.AUTH_LOGIN_SUCCEEDED
 
 	var channel_registry: Array = GameConfig.get_array("infrastructure.event_bus_config", "channel_registry", [])
 	for raw_entry in channel_registry:
@@ -79,33 +76,38 @@ func _ensure_channel_registry_loaded() -> void:
 			continue
 		var entry: Dictionary = raw_entry as Dictionary
 		var channel_id: int = int(entry.get("id", 0))
-		var channel_name: String = str(entry.get("name", ""))
-		var legacy: String = str(entry.get("legacy", ""))
+		var registry_code: String = str(entry.get("name", ""))
+		var channel_name: String = str(entry.get("channel_name", ""))
 		if channel_id <= 0:
 			continue
+		if not registry_code.is_empty():
+			_channel_name_to_id[registry_code] = channel_id
+			_channel_name_to_id[registry_code.to_lower()] = channel_id
 		if not channel_name.is_empty():
-			_legacy_channel_to_id[channel_name] = channel_id
-			_legacy_channel_to_id[channel_name.to_lower()] = channel_id
-		if not legacy.is_empty():
-			_legacy_channel_to_id[legacy] = channel_id
-			_legacy_channel_to_id[legacy.to_lower()] = channel_id
-		_id_to_legacy_channel[channel_id] = legacy if not legacy.is_empty() else channel_name
+			_channel_name_to_id[channel_name] = channel_id
+			_channel_name_to_id[channel_name.to_lower()] = channel_id
+		_id_to_channel_name[channel_id] = channel_name if not channel_name.is_empty() else registry_code
 	_channel_cache_version = current_version
 
-## 将信道名称、别名或整型常量解析为标准整型信道常量
+## 将信道名称或整型常量解析为标准整型信道常量
 func resolve_channel_id(channel_descriptor: Variant) -> int:
 	if channel_descriptor is int:
 		return int(channel_descriptor)
 	if channel_descriptor is String:
 		var channel_name: String = channel_descriptor as String
 		_ensure_channel_registry_loaded()
-		if _legacy_channel_to_id.has(channel_name):
-			return int(_legacy_channel_to_id[channel_name])
+		if _channel_name_to_id.has(channel_name):
+			return int(_channel_name_to_id[channel_name])
 		var channel_name_lower: String = channel_name.to_lower()
-		if _legacy_channel_to_id.has(channel_name_lower):
-			return int(_legacy_channel_to_id[channel_name_lower])
+		if _channel_name_to_id.has(channel_name_lower):
+			return int(_channel_name_to_id[channel_name_lower])
 		return EventChannelDefinition.DOMAIN_EVENT_GENERIC
 	return EventChannelDefinition.DOMAIN_EVENT_GENERIC
+
+## 根据整型信道常量反查配置表规范信道名
+func resolve_channel_name(channel_id: int) -> String:
+	_ensure_channel_registry_loaded()
+	return str(_id_to_channel_name.get(channel_id, ""))
 
 ## 从 event_bus_config.json 驱动装配参数（单元尺寸/缓冲容量/池容量/熔断深度/遥测钩子）
 func initialize_from_config() -> void:
@@ -124,8 +126,8 @@ func initialize_from_config() -> void:
 ## 测试隔离：清空路由与状态
 func clear_for_tests() -> void:
 	_channel_routes.clear()
-	_legacy_channel_to_id.clear()
-	_id_to_legacy_channel.clear()
+	_channel_name_to_id.clear()
+	_id_to_channel_name.clear()
 	_channel_cache_version = -1
 	if _spatial_grid != null:
 		_spatial_grid.clear()

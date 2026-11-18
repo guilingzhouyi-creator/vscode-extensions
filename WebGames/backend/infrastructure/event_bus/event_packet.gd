@@ -23,7 +23,7 @@ var is_spatial: bool = false
 var world_position: Vector3 = Vector3.ZERO
 var effect_radius: float = 0.0
 
-# ---- 三、多态载荷（双通道：强类型 DTO 优先，轻量载荷回退，二选一） ----
+# ---- 三、多态载荷（强类型 DTO 与轻量字典二选一，单源直投） ----
 var payload_dto: RefCounted = null # 强类型业务 DTO（如 VisualCueDTO / 领域 DTO）
 var payload_data: Variant = null # 轻量载荷（Dictionary/Array），与 payload_dto 互斥使用
 
@@ -63,38 +63,6 @@ func set_spatial_header_2d(position_2d: Vector2, radius: float, is_isometric_xz:
 	effect_radius = maxf(0.0, radius)
 	world_position = Vector3(position_2d.x, 0.0, position_2d.y) if is_isometric_xz else Vector3(position_2d.x, position_2d.y, 0.0)
 	return self
-
-## 绑定强类型 DTO 与标准化字典双向载荷（兼容仅读取 payload_data 或仅读取 payload_dto 的消费端）
-static func bind_dual_payload(
-	packet: EventPacket,
-	payload_model: RefCounted,
-	channel_label: String = "",
-	compat_fields: Dictionary = {}
-) -> void:
-	if packet == null:
-		return
-	packet.payload_dto = payload_model
-	if payload_model == null:
-		return
-	var payload_map: Dictionary = {}
-	if payload_model.has_method("to_dto"):
-		var raw_payload: Variant = payload_model.call("to_dto")
-		if raw_payload is Dictionary:
-			payload_map = (raw_payload as Dictionary).duplicate()
-	if not compat_fields.is_empty():
-		for key in compat_fields.keys():
-			payload_map[key] = compat_fields[key]
-	if channel_label.is_empty():
-		packet.payload_data = payload_map
-		return
-	var envelope: Dictionary = {
-		"channel": channel_label,
-		"payload": payload_map
-	}
-	for key in payload_map.keys():
-		if key != "channel" and key != "payload":
-			envelope[key] = payload_map[key]
-	packet.payload_data = envelope
 
 ## 从事件包无差别提取字典载荷（优先强类型 DTO.to_dto()，其次展开 payload_data 信封）
 static func extract_payload_dict(packet: EventPacket) -> Dictionary:

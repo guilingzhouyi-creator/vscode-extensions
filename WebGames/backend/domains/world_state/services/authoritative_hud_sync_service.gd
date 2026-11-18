@@ -27,17 +27,13 @@ static func get_authoritative_snapshot(context: Dictionary) -> AuthoritativeHudS
 
 	return snapshot
 
-## 2. 推轨（Push）：广播主页 HUD 权威快照（池化借还守恒，双载荷兼容）
+## 2. 推轨（Push）：广播主页 HUD 权威快照（池化借还守恒，强类型单源载荷）
 static func publish_hud_snapshot(snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	if snapshot == null:
 		return
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.HUD_STATUS_SNAPSHOT, EventCategoryMask.CORE_STATE)
-	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/snapshot", "world_state.snapshot_published")
-	EventPacket.bind_dual_payload(packet, snapshot, channel_label, {
-		"category_key": "hud",
-		"args": [snapshot.character_name]
-	})
+	packet.payload_dto = snapshot
 	packet.source_entity_id = snapshot.character_id
 	packet.narrative_key = "snapshot_published"
 	packet.narrative_args = [snapshot.character_name]
@@ -50,7 +46,7 @@ static func trigger_initial_sync(context: Dictionary) -> AuthoritativeHudSnapsho
 	publish_hud_snapshot(snapshot)
 	return snapshot
 
-## 4. 增量推流：单项属性实值突变（池化借还守恒，双载荷兼容）
+## 4. 增量推流：单项属性实值突变（池化借还守恒，强类型单源载荷）
 static func publish_stat_mutation(
 	character_id: String,
 	stat_name: String,
@@ -68,17 +64,13 @@ static func publish_stat_mutation(
 	stat_mutation.new_value = updated_stat_value
 	stat_mutation.delta = updated_stat_value - previous_stat_value
 	stat_mutation.cause_event = cause
-	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/stat_mutated", "world_state.stat_mutated")
-	EventPacket.bind_dual_payload(packet, stat_mutation, channel_label, {
-		"category_key": "hud",
-		"args": [stat_name, previous_stat_value, updated_stat_value]
-	})
+	packet.payload_dto = stat_mutation
 	packet.narrative_key = "stat_mutated"
 	packet.narrative_args = [stat_name, previous_stat_value, updated_stat_value]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
-## 5. 增量推流：钱包资产变动（池化借还守恒，双载荷与前端桥接键兼容）
+## 5. 增量推流：钱包资产变动（池化借还守恒，强类型单源载荷）
 static func publish_wallet_mutation(
 	account_id: String,
 	currency_type: String,
@@ -96,29 +88,19 @@ static func publish_wallet_mutation(
 	wallet_mutation.new_amount = new_amount
 	wallet_mutation.delta = new_amount - old_amount
 	wallet_mutation.reason_key = reason
-	var compatibility_payload: Dictionary = {
-		"category_key": "hud",
-		"args": [currency_type, new_amount - old_amount]
-	}
-	if currency_type == "gold":
-		compatibility_payload["current_gold"] = new_amount
-	elif currency_type == "mana_monocrystals":
-		compatibility_payload["current_crystals"] = new_amount
-	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/wallet_mutated", "world_state.wallet_mutated")
-	EventPacket.bind_dual_payload(packet, wallet_mutation, channel_label, compatibility_payload)
+	packet.payload_dto = wallet_mutation
 	packet.narrative_key = "wallet_mutated"
 	packet.narrative_args = [currency_type, new_amount - old_amount]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
-## 6. 历法时钟推进事件广播（池化借还守恒，双载荷兼容）
+## 6. 历法时钟推进事件广播（池化借还守恒，强类型单源载荷）
 static func publish_clock_tick(calendar_environment: WorldCalendarEnvironmentDTO) -> void:
 	if calendar_environment == null:
 		return
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.WORLD_CLOCK_ADVANCED, EventCategoryMask.CORE_STATE)
-	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/clock_ticked", "world_state.clock_phase_ticked")
-	EventPacket.bind_dual_payload(packet, calendar_environment, channel_label)
+	packet.payload_dto = calendar_environment
 	packet.source_entity_id = "world_calendar"
 	packet.narrative_key = "clock_phase_ticked"
 	packet.narrative_args = [calendar_environment.calendar_years, calendar_environment.calendar_months, calendar_environment.calendar_days, calendar_environment.day_phase_key]

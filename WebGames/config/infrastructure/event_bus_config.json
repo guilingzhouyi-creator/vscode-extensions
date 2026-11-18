@@ -44,7 +44,7 @@
     {
       "id": 769,
       "name": "HUD_STATUS_SNAPSHOT",
-      "legacy": "world_state.snapshot_published",
+      "channel_name": "world_state.snapshot_published",
       "category": "CORE_STATE",
       "throttle_ms": 50,
       "priority": "HIGH"
@@ -52,7 +52,7 @@
     {
       "id": 770,
       "name": "HUD_STAT_MUTATED",
-      "legacy": "world_state.stat_mutated",
+      "channel_name": "world_state.stat_mutated",
       "category": "CORE_STATE",
       "throttle_ms": 16,
       "priority": "HIGH"
@@ -60,7 +60,7 @@
     {
       "id": 771,
       "name": "HUD_WALLET_MUTATED",
-      "legacy": "world_state.wallet_mutated",
+      "channel_name": "world_state.wallet_mutated",
       "category": "CORE_STATE",
       "throttle_ms": 0,
       "priority": "HIGH"
@@ -68,49 +68,49 @@
     {
       "id": 1025,
       "name": "AUTH_REGISTERED",
-      "legacy": "account.registered",
+      "channel_name": "account.registered",
       "category": "CORE_STATE"
     },
     {
       "id": 1026,
       "name": "AUTH_LOGIN_SUCCEEDED",
-      "legacy": "account.login_succeeded",
+      "channel_name": "account.login_succeeded",
       "category": "CORE_STATE"
     },
     {
       "id": 1281,
       "name": "SYSTEM_HEARTBEAT_TICK",
-      "legacy": "",
+      "channel_name": "",
       "category": "SYSTEM_TELEMETRY"
     },
     {
       "id": 516,
       "name": "SPATIAL_EXPLOSION_IMPACT",
-      "legacy": "",
+      "channel_name": "",
       "category": "SPATIAL_VFX"
     },
     {
       "id": 1283,
       "name": "LOG_RECORD_POSTED",
-      "legacy": "EventBus.log_record_emitted",
+      "channel_name": "EventBus.log_record_emitted",
       "category": "SYSTEM_TELEMETRY"
     },
     {
       "id": 1537,
       "name": "NARRATIVE_EVENT_TEXT",
-      "legacy": "EventBus.narrative_event_emitted",
+      "channel_name": "EventBus.narrative_event_emitted",
       "category": "NARRATIVE_TEXT"
     },
     {
       "id": 1538,
       "name": "DOMAIN_EVENT_GENERIC",
-      "legacy": "EventBus.domain_event",
+      "channel_name": "EventBus.domain_event",
       "category": "NARRATIVE_TEXT"
     },
     {
       "id": 1539,
       "name": "WORLD_CLOCK_ADVANCED",
-      "legacy": "EventBus.world_clock_advanced",
+      "channel_name": "EventBus.world_clock_advanced",
       "category": "NARRATIVE_TEXT",
       "throttle_ms": 50,
       "priority": "NORMAL"
@@ -118,19 +118,19 @@
     {
       "id": 1540,
       "name": "PROFESSION_PROMOTED",
-      "legacy": "EventBus.profession_promoted",
+      "channel_name": "EventBus.profession_promoted",
       "category": "CORE_STATE"
     },
     {
       "id": 1027,
       "name": "LIFECYCLE_SHUTDOWN_STARTED",
-      "legacy": "lifecycle.shutdown_started",
+      "channel_name": "lifecycle.shutdown_started",
       "category": "CORE_STATE"
     },
     {
       "id": 1028,
       "name": "LIFECYCLE_TEARDOWN_COMPLETED",
-      "legacy": "lifecycle.teardown_completed",
+      "channel_name": "lifecycle.teardown_completed",
       "category": "CORE_STATE",
       "narrative": false
     }

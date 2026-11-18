@@ -84,8 +84,8 @@ def _extract_channel_candidates(data: dict, subkey: str | None) -> list[str]:
     candidates: list[str] = []
     if subkey is None:
         for entry in data.get("channel_registry", []):
-            if isinstance(entry, dict) and entry.get("legacy"):
-                candidates.append(str(entry["legacy"]))
+            if isinstance(entry, dict) and entry.get("channel_name"):
+                candidates.append(str(entry["channel_name"]))
         return candidates
 
     node: Any = data
@@ -133,7 +133,7 @@ def collect_config_channels(domain_map: dict) -> list[dict]:
 
 
 def collect_channel_registry() -> dict[int, dict]:
-    """channel_registry: id -> {name, legacy, category, narrative_exempt}。"""
+    """channel_registry: id -> {name, channel_name, category, narrative_exempt}。"""
     out: dict[int, dict] = {}
     data = load_json("infrastructure/event_bus_config.json")
     for entry in data.get("channel_registry", []):
@@ -142,7 +142,7 @@ def collect_channel_registry() -> dict[int, dict]:
         cid = int(entry.get("id", 0))
         out[cid] = {
             "name": str(entry.get("name", "")),
-            "legacy": str(entry.get("legacy", "")),
+            "channel_name": str(entry.get("channel_name", "")),
             "category": str(entry.get("category", "")),
             "narrative": bool(entry.get("narrative", True)),
         }
@@ -300,7 +300,7 @@ def _check_r3_registry_constants(registry: dict[int, dict], consts: dict[str, in
 
 
 def _collect_all_candidate_channels(domain_map: dict[str, dict], registry: dict[int, dict]) -> list[dict]:
-    """合并配置驱动频道与代码字面量频道，并注入 legacy 豁免标志。"""
+    """合并配置驱动频道与代码字面量频道，并注入叙事豁免标志。"""
     channels: list[dict] = []
     seen: set[tuple] = set()
     for ch in collect_config_channels(domain_map) + collect_code_channels(domain_map):
@@ -312,10 +312,10 @@ def _collect_all_candidate_channels(domain_map: dict[str, dict], registry: dict[
         channels.append(ch)
 
     for entry in registry.values():
-        legacy = entry["legacy"]
-        if not legacy:
+        channel_name = entry["channel_name"]
+        if not channel_name:
             continue
-        cm = CHANNEL_RE.match(legacy)
+        cm = CHANNEL_RE.match(channel_name)
         if not cm:
             continue
         for ch in channels:

@@ -151,7 +151,7 @@ static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary
 
 	# 3. 通过 EventBus 广播快照事件
 	var bus := EventBusCore.get_instance()
-	bus.emit_domain_event("world_state.hud_snapshot_published", {
+	bus.emit_domain_event("world_state.snapshot_published", {
 		"account_id": "ACC_HUD_01",
 		"character_name": "星辰剑圣",
 		"hp_current": 88.0,
@@ -166,9 +166,9 @@ static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary
 		and hud_view.character_name == "星辰剑圣"
 
 	# 4. 广播钱包增量突变
-	bus.emit_domain_event("currency.wallet.mutated", {
-		"current_gold": 12000,
-		"current_crystals": 45
+	bus.emit_domain_event("world_state.wallet_mutated", {
+		"wallet_gold": 12000,
+		"wallet_mana_monocrystals": 45
 	})
 	var wallet_received: bool = hud_view.wallet_gold == 12000 and hud_view.wallet_mana_crystals == 45
 
@@ -177,9 +177,9 @@ static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary
 	var is_detached: bool = not bridge.is_attached()
 
 	# 解绑后再广播，视图不再更新
-	bus.emit_domain_event("currency.wallet.mutated", {
-		"current_gold": 99999,
-		"current_crystals": 99
+	bus.emit_domain_event("world_state.wallet_mutated", {
+		"wallet_gold": 99999,
+		"wallet_mana_monocrystals": 99
 	})
 	var no_leak_update: bool = hud_view.wallet_gold == 12000
 

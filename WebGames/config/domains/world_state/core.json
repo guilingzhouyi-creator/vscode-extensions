@@ -129,8 +129,7 @@
   },
   "hud_sync": {
     "min_interval_ms": 50,
-    "max_batch_size": 32,
-    "enable_dual_payload_envelope": true
+    "max_batch_size": 32
   },
   "esc_menu": {
     "require_bound_slot_for_auto_save": true,
