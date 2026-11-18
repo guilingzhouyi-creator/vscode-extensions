@@ -34,7 +34,7 @@
 - 统一请求信封真源：[`ClientRequestEnvelopeDTO`](../../../../../backend/domains/world_state/dto/client_request_envelope_dto.gd)
 - 统一响应信封真源：[`UnifiedResponseEnvelopeDTO`](../../../../../backend/domains/world_state/dto/unified_response_envelope_dto.gd)
 - 会话流转上下文真源：[`SessionFlowContextDTO`](../../../../../backend/domains/lifecycle/dto/session_flow_context_dto.gd)
-- 主页 HUD 快照契约：[`HudStatusSnapshotDTO`](../../../../../backend/domains/world_state/dto/hud_status_snapshot_dto.gd) · [`AuthoritativeHudSnapshotDTO`](../../../../../backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd) · [`HudMutationEventsDTO`](../../../../../backend/domains/world_state/dto/hud_mutation_events_dto.gd)
+- 主页 HUD 快照契约：`HudStatusSnapshotDTO` · [`AuthoritativeHudSnapshotDTO`](../../../../../backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd) · [`HudMutationEventsDTO`](../../../../../backend/domains/world_state/dto/hud_mutation_events_dto.gd)
 - 事件总线与信封定义：[`EventBusCore`](../../../../../backend/infrastructure/event_bus/event_bus_core.gd) · [`EventPacket`](../../../../../backend/infrastructure/event_bus/event_packet.gd) · [`EventChannelDefinition`](../../../../../backend/infrastructure/event_bus/event_channel_definition.gd)
 - 序章交接与开局流：[`OpeningEventStreamDTO`](../../../../../backend/domains/character_creation/opening_event_stream_dto.gd) · [`PrologueHandoffDTO`](../../../../../backend/domains/character_creation/dto/prologue_handoff_dto.gd)
 - 停机协议 DTO：[`GameShutdownDTO`](../../../../../backend/domains/lifecycle/dto/game_shutdown_dto.gd)
@@ -121,7 +121,7 @@ flowchart LR
 ### 1.4 序章到探索态字段对齐与会话载体契约
 
 1. **序章交接字段精准对齐（修复 `WorldGatewayFSM.handoff_prologue_to_world_exploration` 字段失配）**：
-   - 将传入 `AuthoritativeHudSyncService.trigger_initial_sync(hud_ctx)` 的键名强制修正为与 [`HudStatusSnapshotDTO`](../../../../../backend/domains/world_state/dto/hud_status_snapshot_dto.gd) 及 `AuthoritativeHudSyncService._resolve_physiology` 完全一致的标准键：
+   - 将传入 `AuthoritativeHudSyncService.trigger_initial_sync(hud_ctx)` 的键名强制修正为与 [`AuthoritativeHudSnapshotDTO`](../../../../../backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd) 及 `AuthoritativeHudSyncService._resolve_physiology` 完全一致的标准键：
      - `"attribute_values"` ← `handoff.allocated_attributes`（同时读取或派生 `"attribute_levels"`）；
      - `"current_location_id"` ← `handoff.assigned_start_location_id`（移除无效键 `"current_location"` / 孤立 `"attributes"`）；
      - `"race_id"` / `"character_id"` / `"character_name"` / `"account_id"` / `"wallet_gold"` / `"wallet_mana_monocrystals"` 全部从权威对象读取并写入。

@@ -3,7 +3,7 @@
 # 文件路径: res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd
 # 架构定位: HUD & Character Status Snapshot Contract
 # 依赖与触发: 上游: HudEventBridge, RealWorldService, MockWorldService | 下游: HUD 与角色养成视图
-# 职责说明: 承载主 HUD 与角色养成视图的权威快照字段（对齐 HudStatusSnapshotDTO），提供双向可逆序列化。
+# 职责说明: 承载主 HUD 与角色养成视图的权威快照字段（对齐 AuthoritativeHudSnapshotDTO），提供双向可逆序列化。
 # 退出语义与设计依据: 快照序列化对等契约与百分比只读派生契约
 # ==============================================================================
 

@@ -213,19 +213,19 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	load_result["adapted_mod_manifest"] = adapted_mod_manifest
 	return load_result
 
-## HUD 汇聚同步：无论是序章重放还是成熟直载，统一生成并广播主页快照
+## HUD 汇聚同步：无论是序章重放还是成熟直载，统一生成并广播主页权威快照
 static func synchronize_hud_entry(
 	account: AccountProfile,
 	slot: SaveSlotDTO,
 	physiology: CharacterPhysiologySheet = null,
 	wallet: CharacterWalletEntity = null
-) -> HudStatusSnapshotDTO:
+) -> AuthoritativeHudSnapshotDTO:
 	var character_id := slot.character_name.sha256_text().substr(0, 16)
 	var race_id := ""
 	if physiology != null and not physiology.race_id.is_empty():
 		race_id = physiology.race_id
 
-	var authoritative_snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync({
+	return AuthoritativeHudSyncService.trigger_initial_sync({
 		"account_id": account.account_id,
 		"character_id": character_id,
 		"character_name": slot.character_name,
@@ -235,7 +235,6 @@ static func synchronize_hud_entry(
 		"current_location_id": slot.current_location_name,
 		"allow_default_fallback": true
 	})
-	return authoritative_snapshot.to_legacy_snapshot()
 
 ## ESC 呼出菜单项配置获取
 static func get_esc_menu_options() -> Array[Dictionary]:

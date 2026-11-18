@@ -6,7 +6,7 @@
 > **【需求溯源】**：前后端契约审查结论（docs/audit/AUDIT_REPORT_前端可视化.md：前端 17 视图零后端接线、事件总线完全断开）+ 序章生命周期调查（EventBusCore 双通道可达前端进程，`main_dashboard.gd` 已验证消费；`main_hud_view.gd` 零订阅、`update_status_snapshot` 仅测试调用）。
 > **施工开始日期**: 2026-09-05（中午时段）
 > **状态**: 已验收 (演进_02 Completed)
-> **落地路径对齐说明**: `HudEventBridge` 已落地于 [hud_event_bridge.gd](../../../../frontend/systems/hud_event_bridge.gd)，`HudStatusSnapshotDTO` / `AuthoritativeHudSnapshotDTO` 已落地于 [hud_status_snapshot_dto.gd](../../../../backend/domains/world_state/dto/hud_status_snapshot_dto.gd) 与 [authoritative_hud_snapshot_dto.gd](../../../../backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd)，`HudEventContract` 已落地于 [hud_event_contract.gd](../../../../backend/domains/world_state/hud_event_contract.gd)，通道路由配置已归口至 [config/domains/world_state/core.json](../../../../config/domains/world_state/core.json) 与 [config/domains/account/core.json](../../../../config/domains/account/core.json)。
+> **落地路径对齐说明**: `HudEventBridge` 已落地于 [hud_event_bridge.gd](../../../../frontend/systems/hud_event_bridge.gd)，`AuthoritativeHudSnapshotDTO` 已落地于 [authoritative_hud_snapshot_dto.gd](../../../../backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd)，`HudEventContract` 已落地于 [hud_event_contract.gd](../../../../backend/domains/world_state/hud_event_contract.gd)，通道路由配置已归口至 [config/domains/world_state/core.json](../../../../config/domains/world_state/core.json) 与 [config/domains/account/core.json](../../../../config/domains/account/core.json)。
 
 ---
 

@@ -69,11 +69,7 @@ static func test_six_pillars_authoritative_snapshot_and_guards() -> Dictionary:
 	var has_social := snapshot.guild_faction_id == "ORDER_OF_THE_SUN" and snapshot.active_red_dot_paths.size() == 2
 	var has_mode := snapshot.mode_features != null and snapshot.mode_features.game_mode == GameModeFeatureSolver.MODE_SINGLE_PLAYER
 
-	# 验证向下兼容方法
-	var legacy := snapshot.to_legacy_snapshot()
-	var legacy_ok := legacy != null and legacy.account_id == "ACC_TEST_01" and legacy.character_name == "阿尔托莉雅"
-
-	var passed: bool = has_identity and has_guards and has_wallet and has_calendar and has_social and has_mode and legacy_ok
+	var passed: bool = has_identity and has_guards and has_wallet and has_calendar and has_social and has_mode
 	return TestCase.make_result("TC-HMA-01: 六大支柱权威快照聚合与防零下限守卫", passed)
 
 ## -----------------------------------------------------------------------------

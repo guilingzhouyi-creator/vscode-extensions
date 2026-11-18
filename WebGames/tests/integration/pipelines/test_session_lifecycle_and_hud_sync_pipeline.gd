@@ -114,8 +114,8 @@ static func test_hud_snapshot_dto_and_divider_guards() -> Dictionary:
 		"hp_current": - 5.0,
 		"wallet_gold": 7
 	}
-	var dto := HudStatusSnapshotDTO.from_dto(data)
-	var roundtrip := HudStatusSnapshotDTO.from_dto(dto.to_dto())
+	var dto := AuthoritativeHudSnapshotDTO.from_dto(data)
+	var roundtrip := AuthoritativeHudSnapshotDTO.from_dto(dto.to_dto())
 	var passed := dto.hp_max >= 1.0 and dto.ap_max >= 1.0 and dto.hp_current >= 0.0 \
 		and roundtrip.hp_max == dto.hp_max and roundtrip.wallet_gold == 7
 	return {"test": "TC-HDS-03: 快照序列化与除数下限守卫", "passed": passed}
@@ -138,14 +138,14 @@ static func test_hud_snapshot_real_source_derivation() -> Dictionary:
 		"wallet": wallet,
 		"current_location_id": "TOWN_VALAN",
 		"allow_default_fallback": true
-	}).to_legacy_snapshot()
+	})
 	var keys := snapshot.to_dto().keys()
-	var no_myth := not keys.has("mp_current") and not keys.has("level") and not keys.has("exp_next")
+	var no_myth := not keys.has("exp_next")
 	var passed := snapshot.attribute_values == sheet.get_actual_values() \
 		and snapshot.attribute_levels == sheet.get_all_levels() \
 		and snapshot.wallet_gold == 50 \
 		and snapshot.wallet_mana_monocrystals == 5 \
-		and snapshot.hp_max >= 1.0 and snapshot.ap_max >= 1.0 \
+		and snapshot.hp_max >= 1.0 and snapshot.mp_max >= 1.0 and snapshot.ap_max >= 1.0 \
 		and no_myth
 	return {"test": "TC-HDS-04: 快照真实溯源与防臆造白名单", "passed": passed}
 
@@ -193,7 +193,7 @@ static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 		"wallet": wallet,
 		"current_location_id": "TOWN_VALAN",
 		"allow_default_fallback": true
-	}).to_legacy_snapshot()
+	})
 	AuthService.revoke_token(String(auth.get("token", "")))
 	detach.call()
 
@@ -304,7 +304,7 @@ static func _simulate_prologue(opening: OpeningEventStreamDTO) -> bool:
 
 static func _simulate_world_and_hud(
 	account_id: String, char_id: String, char_name: String, create_res: Dictionary, gateway: WorldGatewayFSM
-) -> HudStatusSnapshotDTO:
+) -> AuthoritativeHudSnapshotDTO:
 	gateway.attach_ready_character(char_id)
 	gateway.enter_world()
 	var sheet: CharacterPhysiologySheet = create_res.get("physiology_sheet", null)
@@ -322,7 +322,7 @@ static func _simulate_world_and_hud(
 		"wallet": wallet,
 		"current_location_id": "CENTRAL_CITY_PLAZA",
 		"allow_default_fallback": true
-	}).to_legacy_snapshot()
+	})
 
 static func _simulate_shutdown(account_id: String, slot_id: String, token: String) -> GameShutdownDTO.Response:
 	GameBootstrap.assemble()

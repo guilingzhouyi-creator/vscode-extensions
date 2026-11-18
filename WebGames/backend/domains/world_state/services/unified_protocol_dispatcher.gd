@@ -150,11 +150,9 @@ static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gate
 		return EscMenuBackendService.handle_esc_action(request, gateway)
 	if request.action_type == "PULL_HUD_SNAPSHOT":
 		var authoritative_snapshot := WorldSessionRuntimeService.pull_authoritative_hud_snapshot()
-		var basic_snapshot := WorldSessionRuntimeService.pull_basic_hud_snapshot()
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, true, {
 				"hud_snapshot": authoritative_snapshot.to_dto(),
-				"basic_snapshot": basic_snapshot.to_dto(),
 				"world_active": WorldSessionRuntimeService.has_active_world()
 			}, "", "Home HUD authoritative snapshot retrieved successfully"
 		)

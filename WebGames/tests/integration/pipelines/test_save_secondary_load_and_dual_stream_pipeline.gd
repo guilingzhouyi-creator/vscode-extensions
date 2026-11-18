@@ -188,7 +188,7 @@ static func test_converged_hud_state_synchronization() -> Dictionary:
 	wallet.gold = 3500
 	wallet.mana_monocrystals = 50
 
-	var snapshot: HudStatusSnapshotDTO = SaveLoadRoutingSolver.synchronize_hud_entry(account, slot, physiology, wallet)
+	var snapshot: AuthoritativeHudSnapshotDTO = SaveLoadRoutingSolver.synchronize_hud_entry(account, slot, physiology, wallet)
 
 	ok = assert_not_null(snapshot, "TC-SLD-05A: HUD快照不应为空") and ok
 	if snapshot != null:

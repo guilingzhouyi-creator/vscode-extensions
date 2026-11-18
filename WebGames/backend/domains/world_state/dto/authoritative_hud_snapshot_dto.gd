@@ -147,22 +147,3 @@ static func _populate_social_and_features(serialized_payload: Dictionary, snapsh
 	var raw_mode_features: Variant = serialized_payload.get("mode_features", null)
 	if raw_mode_features is Dictionary and not raw_mode_features.is_empty():
 		snapshot.mode_features = ModeFeatureManifestDTO.from_dto(raw_mode_features)
-
-## 兼容层：降级转换为精简版老快照 HudStatusSnapshotDTO（零字段断裂）
-func to_legacy_snapshot() -> HudStatusSnapshotDTO:
-	var legacy := HudStatusSnapshotDTO.new()
-	legacy.account_id = account_id
-	legacy.character_id = character_id
-	legacy.character_name = character_name
-	legacy.race_id = race_id
-	legacy.current_location_id = current_location_id
-	legacy.attribute_values = attribute_values.duplicate()
-	legacy.attribute_levels = attribute_levels.duplicate()
-	legacy.hp_current = hp_current
-	legacy.hp_max = hp_max
-	legacy.ap_current = ap_current
-	legacy.ap_max = ap_max
-	legacy.wallet_gold = wallet_gold
-	legacy.wallet_mana_monocrystals = wallet_mana_monocrystals
-	legacy.timestamp_utc = int(Time.get_unix_time_from_system())
-	return legacy

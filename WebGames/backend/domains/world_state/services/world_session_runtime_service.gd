@@ -414,13 +414,6 @@ static func build_live_hud_context() -> Dictionary:
 static func pull_authoritative_hud_snapshot() -> AuthoritativeHudSnapshotDTO:
 	return AuthoritativeHudSyncService.get_authoritative_snapshot(build_live_hud_context())
 
-## 拉取精简标准 HudStatusSnapshotDTO
-static func pull_basic_hud_snapshot() -> HudStatusSnapshotDTO:
-	var authoritative_snapshot := pull_authoritative_hud_snapshot()
-	var basic_snapshot := authoritative_snapshot.to_legacy_snapshot()
-	basic_snapshot.current_location_id = _state.current_location_id
-	return basic_snapshot
-
 ## 构建 ESC 系统菜单后端权威状态视图
 static func get_esc_menu_state() -> Dictionary:
 	return {

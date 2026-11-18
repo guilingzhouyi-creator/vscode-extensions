@@ -91,7 +91,7 @@ static func inject_and_hydrate(snapshot: Variant, target_stage_key: String = "")
         "current_location_id": bundle.location_name,
         "allow_default_fallback": true
     })
-    var hud_snapshot: HudStatusSnapshotDTO = auth_hud_snapshot.to_legacy_snapshot()
+    var hud_snapshot := auth_hud_snapshot
     ctx.hud_snapshot = hud_snapshot.to_dto() if hud_snapshot != null else {}
     ctx.physiology_snapshot = bundle.physiology_data.duplicate(true)
     ctx.wallet_snapshot = bundle.wallet_data.duplicate(true)

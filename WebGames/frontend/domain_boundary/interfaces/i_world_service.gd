@@ -11,7 +11,7 @@
 class_name IWorldService
 extends RefCounted
 
-## 获取 HUD 权威状态快照 (对齐 HudStatusSnapshotDTO)
+## 获取 HUD 权威状态快照 (对齐 AuthoritativeHudSnapshotDTO)
 func get_hud_snapshot_async(_character_id: String, _result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.get_hud_snapshot_async: pure virtual method must be implemented by subclass")
 
