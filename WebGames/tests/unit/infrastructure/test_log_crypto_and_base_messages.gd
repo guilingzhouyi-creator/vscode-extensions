@@ -1,7 +1,7 @@
 # ==============================================================================
-# 单元测试：日志加密信封、内联脱敏、纯计算库与标准英文底座文本库
+# 单元测试：日志加密信封、内联脱敏、纯计算库与标准英文基础文本库
 # 文件路径: res://tests/unit/infrastructure/test_log_crypto_and_base_messages.gd
-# 职责: 验证 Encrypt-then-MAC 密封解封、篡改检测、加盐摘要、消息内联洗净与底座文本解耦（TC-RM-40 ~ TC-RM-43）
+# 职责: 验证 Encrypt-then-MAC 密封解封、篡改检测、加盐摘要、消息内联洗净与基础文本库解耦（TC-RM-40 ~ TC-RM-43）
 # ==============================================================================
 class_name TestLogCryptoAndBaseMessages extends RefCounted
 
@@ -19,7 +19,7 @@ static func run_all_tests() -> Dictionary:
 			all_passed = false
 			break
 	return {
-		"domain": "日志安全加密、脱敏清洗与底座英文文本库",
+		"domain": "日志安全加密、脱敏清洗与基础英文文本库",
 		"all_passed": all_passed,
 		"results": results
 	}
@@ -125,7 +125,7 @@ static func test_redaction_inline_scrub_and_salted_hash() -> Dictionary:
 		"detail": "msg_scrubbed=%s, ctx_scrubbed=%s, salted_ok=%s" % [str(msg_scrubbed), str(ctx_scrubbed), str(salted_ok)]
 	}
 
-## TC-RM-43: SystemBaseMessages 英文底座库化区分与 StatisticsMathLib 纯计算校验
+## TC-RM-43: SystemBaseMessages 英文基础库区分与 StatisticsMathLib 纯计算校验
 static func test_base_messages_and_statistics_lib_separation() -> Dictionary:
 	var base_msg := SystemBaseMessages.format(SystemBaseMessages.MSG_POOL_HARD_LIMIT_ERR, {"pool_name": "EventPacketPool"})
 	var base_ok := base_msg == "ObjectPool[EventPacketPool] reached hard limit with overflow allocation forbidden."
@@ -141,7 +141,7 @@ static func test_base_messages_and_statistics_lib_separation() -> Dictionary:
 	var stats_ok := int(stats.get("p50_ms", 0)) >= 30 and int(stats.get("p95_ms", 0)) == 50
 
 	return {
-		"test": "TC-RM-43: SystemBaseMessages 英文底座与配置文案分离及纯统计库断言",
+		"test": "TC-RM-43: SystemBaseMessages 英文基础库与配置文案分离及纯统计库断言",
 		"passed": base_ok and cfg_ok and stats_ok,
 		"detail": "base_ok=%s, cfg_ok=%s, stats_ok=%s" % [str(base_ok), str(cfg_ok), str(stats_ok)]
 	}

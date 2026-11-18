@@ -47,7 +47,7 @@ static func _test_volume_feedback() -> Dictionary:
 	var p_low := MarketElasticityAndTradingSolver.calculate_market_price(low_vol, 10)
 	var p_high := MarketElasticityAndTradingSolver.calculate_market_price(high_vol, 10)
 	var passed = p_high != p_low
-	return { "test": "TC-ECON-S4-02: 成交量反馈影响报价（市场闭环）", "passed": passed, "p_low": p_low, "p_high": p_high }
+	return { "test": "TC-ECON-S4-02: 成交量反馈影响报价（市场供需反馈）", "passed": passed, "p_low": p_low, "p_high": p_high }
 
 ## TC-ECON-S4-03: 单轮变化率上限（极端波动抑制——报价有界）
 static func _test_change_rate_cap() -> Dictionary:

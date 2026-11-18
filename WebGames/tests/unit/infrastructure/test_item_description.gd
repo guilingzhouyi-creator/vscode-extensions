@@ -81,7 +81,7 @@ static func _test_no_reverse_attribute_definition() -> Dictionary:
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	# 模板引用 state 未提供的白名单参数（quality_tier）→ MISSING_PARAMS（不静默输出）
 	var res := ItemDescriptionResolver.resolve(catalog, SWORD_ID, {})
-	# base 模板参数全部由 proto 注入（无缺参）；此处验证未知参数兜底不抛 Fatal
+	# base 模板参数全部由 proto 注入（无缺参）；此处验证未知参数安全回退不抛 Fatal
 	var ok_resolve: bool = res.get("success", false)
 	# 白名单核验：模板占位符集合 ⊆ 白名单（name/tier_rank/mass_kg/market_value/quantity/durability/enchant）
 	var templates: Dictionary = GameConfig.get_table("copywriting.item", {})

@@ -3,7 +3,7 @@
 # 文件路径: res://tests/unit/infrastructure/test_magic_tier.gd
 # 覆盖: 阶段1~4 验收矩阵（TC-MD-01~06）
 #       —— 阶位纯梯度 / 能力分级独立 / 弱映射非 1:1 / 越级容忍 / 参考标签 /
-#          消费方零回归（语义保持：mana_gate/强度兜底/四维解析）
+#          消费方零回归（语义保持：mana_gate/强度默认值/四维解析）
 # ==============================================================================
 class_name TestMagicTierDomain
 extends RefCounted

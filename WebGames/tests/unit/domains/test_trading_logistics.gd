@@ -43,4 +43,4 @@ static func test_caravan_logistics_and_arrival() -> Dictionary:
 	var step1 = CaravanLogisticsFSM.advance_caravan_progress(caravan, 0.5, 0.2)
 	var step2 = CaravanLogisticsFSM.advance_caravan_progress(caravan, 0.6, 0.2)
 	var passed = (step1.progress == 0.5) and step2.arrived
-	return { "test": "TC-TRD-03: 跨大陆商队物流安全运抵闭环", "passed": passed, "arrived": step2.arrived }
+	return { "test": "TC-TRD-03: 跨大陆商队物流安全运抵结算", "passed": passed, "arrived": step2.arrived }

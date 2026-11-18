@@ -101,7 +101,7 @@ static func test_bootstrap_assembly() -> Dictionary:
 		and CommandRegistryEngine.has_command("god") \
 		and CommandRegistryEngine.has_command("time")
 
-	# 经装配 catalog 走通 /give 分发闭环
+	# 经装配 catalog 完成 /give 分发链路验证
 	var context := _make_gm_inventory_context(catalog)
 	var inv: WearableInventoryAggregate = context["inventory"]
 	var gm_admin: AdminPermissionAggregate = context["admin"]
@@ -111,7 +111,7 @@ static func test_bootstrap_assembly() -> Dictionary:
 
 	var passed = item_ok and cmd_ok and dispatch_ok
 	return {
-		"test": "TC-ADMIN-06: 全域启动装配（注册表+内置命令+分发闭环）",
+		"test": "TC-ADMIN-06: 全域启动装配（注册表+内置命令+命令分发流转）",
 		"passed": passed
 	}
 

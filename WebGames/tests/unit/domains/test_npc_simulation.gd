@@ -22,7 +22,7 @@ static func test_npc_isomorphic_structure() -> Dictionary:
 	npc.npc_id = "NPC_ELDER_01"
 	npc.personal_name = "老法师甘道夫"
 	var passed = (npc.physiology != null) and (npc.wallet != null) and npc.personality.has("courage")
-	return { "test": "TC-NPC-01: NPC全域100%同构底座与五维性格矩阵", "passed": passed }
+	return { "test": "TC-NPC-01: NPC全域100%同构属性框架与五维性格矩阵", "passed": passed }
 
 static func test_npc_goap_planner() -> Dictionary:
 	var npc := AutonomousNPCEntity.new()

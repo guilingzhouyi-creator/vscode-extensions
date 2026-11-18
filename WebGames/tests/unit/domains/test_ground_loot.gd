@@ -83,7 +83,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_drop_declaration_registry_closed_loop())
 	results.append(_test_pickup_add_item_and_statistics())
 	results.append(_test_ground_loot_event_listener())
-	# 战斗击杀→监听器→按 id 拾取出队闭环
+	# 战斗击杀→监听器→按 id 拾取出队流程
 	results.append(_test_monster_kill_to_pickup_closed_loop())
 	# cleanup_decayed 常态零分配
 	results.append(_test_cleanup_no_decay_zero_alloc())
@@ -173,7 +173,7 @@ static func _test_drop_declaration_registry_closed_loop() -> Dictionary:
 		and (not bad_res.success) and bad_res.error_code == "ITEM_NOT_REGISTERED"
 	return {"test": "TC-LOOT-DECL-01: 掉落声明统一事实源（已登记成功 + UID，未登记拒绝）", "passed": passed}
 
-## 战斗击杀→监听器登记闭环与拾取出队：
+## 战斗击杀→监听器登记流程与拾取出队：
 ## 发射 monster.killed（monster.json loot/default_drop_canonical_ids 均在册 → +2 活跃掉落）
 ## → attempt_pickup_from_ground 按 drop_id 拾取成功并出队（活跃掉落减一、GRANTED +1）。
 ## 全程经 GameBootstrap 装配的全局监听器，delta 断言规避跨套件累积影响。
@@ -197,9 +197,9 @@ static func _test_monster_kill_to_pickup_closed_loop() -> Dictionary:
 	var after_kill := listener.get_active_drops().size()
 	var kill_ok: bool = after_kill == baseline + 2 # 两件在册默认掉落均登记为活跃
 	if not kill_ok:
-		return {"test": "TC-LOOT-KILL-01: 击杀发射→监听器登记闭环（kill +2）", "passed": false, "baseline": baseline, "after_kill": after_kill}
+		return {"test": "TC-LOOT-KILL-01: 击杀发射→监听器登记验证（kill +2）", "passed": false, "baseline": baseline, "after_kill": after_kill}
 
-	# 拾取闭环：按首个 drop_id 拾取（击杀归属人即玩家 → 无保护期拦截）
+	# 拾取流程：按首个 drop_id 拾取（击杀归属人即玩家 → 无保护期拦截）
 	var inv := WearableInventoryAggregate.new()
 	var chest := ItemEntity.new()
 	chest.category = "ARMOR_EQUIPMENT"
@@ -218,7 +218,7 @@ static func _test_monster_kill_to_pickup_closed_loop() -> Dictionary:
 			var stats = ItemStatisticsSolver.query_account_item_stats(lib, picked_item.template_id)
 			stats_ok = stats.found and int(stats.stats["total_gained"]) >= 1
 	var passed = kill_ok and picked_ok and stats_ok
-	return {"test": "TC-LOOT-KILL-01: 击杀→掉落→按 id 拾取出队闭环（活跃减一 + GRANTED +1）", "passed": passed}
+	return {"test": "TC-LOOT-KILL-01: 击杀→掉落→按 id 拾取出队流程（活跃减一 + GRANTED +1）", "passed": passed}
 
 ## cleanup_decayed 常态零分配——无衰变项时直接返回
 ## （活跃列表不变、drop 身份稳定）；有衰变项时单遍过滤清理

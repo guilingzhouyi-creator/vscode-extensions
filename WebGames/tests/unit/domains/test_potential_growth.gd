@@ -20,7 +20,7 @@ static func run_all_tests() -> Dictionary:
 		if not r.get("passed", false):
 			all_passed = false
 			break
-	return { "domain": "Domain 16: 潜能成长与双轨加点（定向/动态）与破阶递减", "all_passed": all_passed, "results": results }
+	return { "domain": "Domain 16: 潜能成长与双路径加点（定向/动态）与破阶递减", "all_passed": all_passed, "results": results }
 
 static func test_diminishing_cost_calculation() -> Dictionary:
 	# 统一等级破阶成本：C(L) = 1 + floor((L-1)/2) → 1~2 级 1 点 / 3~4 级 2 点 / 5~6 级 3 点

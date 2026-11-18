@@ -83,7 +83,7 @@ static func _test_furnace_disposal_and_residue_generation() -> Dictionary:
 	}
 
 static func _test_locked_container_state_rejection() -> Dictionary:
-	# 安全闭环：container_state == LOCKED 的锁定物品严禁销毁（与分解/追缴同语义）
+	# 安全约束：container_state == LOCKED 的锁定物品严禁销毁（与分解/追缴同语义）
 	var locked_item := ItemEntity.new()
 	locked_item.item_id = "LOCKED_RELIC"
 	locked_item.custom_name = "已锁定圣遗物"
@@ -101,7 +101,7 @@ static func _test_locked_container_state_rejection() -> Dictionary:
 		and (inv.storage_items.size() == 1) \
 		and (inv.storage_items[0].item_id == "LOCKED_RELIC")
 	return {
-		"test": "TC-DISPOSAL-04: LOCKED 容器状态物品销毁拦截（清单4 锁定校验闭环）",
+		"test": "TC-DISPOSAL-04: LOCKED 容器状态物品销毁拦截（清单4 锁定拦截校验）",
 		"passed": passed
 	}
 

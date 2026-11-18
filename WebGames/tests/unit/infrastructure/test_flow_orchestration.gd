@@ -1,7 +1,7 @@
 # ==============================================================================
 # 单元测试：兑换流程审计与测试体系
 # 文件路径: res://tests/unit/infrastructure/test_flow_orchestration.gd
-# 覆盖: TC-FLOW-S4-01/05/06/07 —— 流程闭环 / 重复事务键去重 /
+# 覆盖: TC-FLOW-S4-01/05/06/07 —— 完整流转 / 重复事务键去重 /
 #       投递失败恢复（DISPATCH_PENDING + 重发）/ 审计记录可回溯
 # ==============================================================================
 class_name TestFlowOrchestrationDomain
@@ -29,7 +29,7 @@ static func run_all_tests() -> Dictionary:
 		"results": results
 	}
 
-## TC-FLOW-S4-01: 完整流程闭环（判定→核销→记录→投递 DISPATCHED）
+## TC-FLOW-S4-01: 完整流转验证（判定→核销→记录→投递 DISPATCHED）
 static func _test_flow_full_cycle() -> Dictionary:
 	RedemptionFlowOrchestrator.reset_records()
 	var req := _build_request("TX_FLOW_1", null)
@@ -37,7 +37,7 @@ static func _test_flow_full_cycle() -> Dictionary:
 	var res := RedemptionFlowOrchestrator.process_redemption(req)
 	var passed = res.get("success", false) and res.get("code", "") == "OK" \
 		and res.get("record_status", "") == "DISPATCHED"
-	return { "test": "TC-FLOW-S4-01: 完整兑换流程闭环（五阶段 DISPATCHED）", "passed": passed }
+	return { "test": "TC-FLOW-S4-01: 完整兑换流程流转（五阶段 DISPATCHED）", "passed": passed }
 
 ## TC-FLOW-S4-05: 同一事务键重复提交去重
 static func _test_duplicate_transaction() -> Dictionary:

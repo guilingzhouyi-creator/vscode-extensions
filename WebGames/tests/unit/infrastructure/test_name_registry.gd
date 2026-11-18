@@ -73,7 +73,7 @@ static func _test_en_us_fallback_required() -> Dictionary:
 	var resolved := LocalizationSolver.resolve_name_key(catalog, "npc.merchant.quest.title", "zh_CN")
 	var passed = resolved == "The Merchant's Quest"
 	return {
-		"test": "TC-NAM-03: 英文 fallback 必达（en_US 唯一底座，缺失中文时回退英文无 [key]）",
+		"test": "TC-NAM-03: 英文 fallback 必达（en_US 唯一基准，缺失中文时回退英文无 [key]）",
 		"passed": passed
 	}
 

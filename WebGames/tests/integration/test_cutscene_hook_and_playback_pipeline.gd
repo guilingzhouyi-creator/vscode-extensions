@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 依赖与触发: 上游: TestRegistry | 下游: CutsceneRequestDTO, CutsceneAsyncLoader, CutsceneHookRegistry, CutsceneOrchestrator, CutscenePlayerView, NarrativeDagExecutionEngine
-# 职责说明: 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎全链路验收集成测试套件；
+# 职责说明: 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎端到端验收集成测试套件；
 #           全面断言参数化 DTO、非阻塞流式装载、LRU 缓存、Hook 路由拦截、长按跳过互锁、
 #           无艺术资产时的文字替补演播（Text Fallback）与主线程纯通用调用流程。
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
@@ -175,7 +175,7 @@ static func test_tc_cs_03_hook_registry_and_narrative_interception() -> Dictiona
 		"unmatched_ok": unmatched_ok
 	})
 
-## TC-CS-04: 主线程通用调用 (play_by_id / parse_and_play) 与生命周期闭环
+## TC-CS-04: 主线程通用调用 (play_by_id / parse_and_play) 与生命周期流转
 static func test_tc_cs_04_orchestrator_lifecycle_and_skip_interlock() -> Dictionary:
 	var orch := CutsceneOrchestrator.new()
 	var loader := CutsceneAsyncLoader.get_instance()
@@ -266,7 +266,7 @@ static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 	presenter.unbind_view()
 	view.free()
 
-	# 4. 验证 CutsceneEventBridge 经 EventBusCore 全域解耦消费闭环（待命零接线契约）
+	# 4. 验证 CutsceneEventBridge 经 EventBusCore 全域解耦消费流程（待命零接线契约）
 	var bridge := CutsceneEventBridge.new()
 	var host := Control.new()
 	bridge.attach_host(host)

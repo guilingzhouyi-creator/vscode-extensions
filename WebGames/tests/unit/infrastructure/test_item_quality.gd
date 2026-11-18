@@ -3,7 +3,7 @@
 # 文件路径: res://tests/unit/infrastructure/test_item_quality.gd
 # 覆盖: 阶段1~4 验收矩阵（TC-ITEM-QT-01~06）
 #       —— 六档单调序列 / 神话区间端点语义 / 唯一映射 / 禁跨级倒置 /
-#          配置完整与安全兜底 / 扩展受限（未登记与跨级区间拒绝）
+#          配置完整与安全默认值 / 扩展受限（未登记与跨级区间拒绝）
 # ==============================================================================
 class_name TestItemQualityDomain
 extends RefCounted
@@ -112,7 +112,7 @@ static func _test_no_tier_inversion() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-ITEM-QT-05: 配置完整与安全兜底（必需表可加载；未登记品质不产生基线消费，强度兜底 1.0）
+## TC-ITEM-QT-05: 配置完整与安全默认值（必需表可加载；未登记品质不产生基线消费，强度默认 1.0）
 static func _test_config_completeness_and_fallback() -> Dictionary:
 	var registry := QualityTierRegistry.new()
 	registry.reload_configuration()
@@ -125,7 +125,7 @@ static func _test_config_completeness_and_fallback() -> Dictionary:
 	var fallback_ok: bool = is_equal_approx(fallback, 1.0)
 	var passed = registry.is_ready() and rejected_ok and fallback_ok
 	return {
-		"test": "TC-ITEM-QT-05: 配置完整与安全兜底（未登记品质拒绝 + 强度基线兜底 1.0 不抛 Fatal）",
+		"test": "TC-ITEM-QT-05: 配置完整与安全默认值（未登记品质拒绝 + 强度基线默认 1.0 不抛 Fatal）",
 		"passed": passed
 	}
 
@@ -148,13 +148,13 @@ static func _test_extension_constraint() -> Dictionary:
 
 ## QualityTierRegistry 装配期单例复用——
 ## GameBootstrap.quality_tier_registry() 多次调用返回同一就绪实例；ItemInstanceFactory
-## build_instance 不传 registry（兜底单例）时品质快照与显式注入单例产出一致。
+## build_instance 不传 registry（默认单例）时品质快照与显式注入单例产出一致。
 static func _test_singleton_registry_reuse() -> Dictionary:
 	var reg_a: QualityTierRegistry = GameBootstrap.quality_tier_registry()
 	var reg_b: QualityTierRegistry = GameBootstrap.quality_tier_registry()
 	var reuse_ok: bool = reg_a != null and reg_a == reg_b and reg_a.is_ready()
 
-	# 工厂发放：同一 proto 经「显式单例注入」与「缺省单例兜底」产出等价品质快照
+	# 工厂发放：同一 proto 经「显式单例注入」与「缺省默认单例」产出等价品质快照
 	var catalog := GameBootstrap.catalog()
 	var proto: ItemRegistryCatalog.ItemPrototypeTemplate = catalog.get_prototype("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD")
 	var snapshot_ok := true
@@ -168,6 +168,6 @@ static func _test_singleton_registry_reuse() -> Dictionary:
 
 	var passed = reuse_ok and snapshot_ok
 	return {
-		"test": "TC-ITEM-QT-07: 品质注册表单例复用 + 工厂发放快照等价（显式/兜底一致）",
+		"test": "TC-ITEM-QT-07: 品质注册表单例复用 + 工厂发放快照等价（显式/默认一致）",
 		"passed": passed
 	}

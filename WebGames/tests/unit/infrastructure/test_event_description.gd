@@ -50,7 +50,7 @@ static func _test_normal_generation() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-EVTDESC-02: 结果分支选择（outcome success/failure → 对应分支模板，base 兜底）
+## TC-EVTDESC-02: 结果分支选择（outcome success/failure → 对应分支模板，base 回退）
 static func _test_outcome_branch() -> Dictionary:
 	var res_s := EventDescriptionResolver.resolve(
 		"EVT_BEAST_TIDE", {"town": "瓦兰城"}, {"outcome": "success", "reward_gold": 500, "loss_soldiers": 3})
@@ -59,7 +59,7 @@ static func _test_outcome_branch() -> Dictionary:
 	var passed = res_s.get("success", false) and str(res_s.get("text", "")).contains("击退了兽潮") \
 		and res_f.get("success", false) and str(res_f.get("text", "")).contains("冲破城门")
 	return {
-		"test": "TC-EVTDESC-02: 结果分支选择（success/failure 分支模板 + base 兜底）",
+		"test": "TC-EVTDESC-02: 结果分支选择（success/failure 分支模板 + base 回退）",
 		"passed": passed
 	}
 
@@ -106,8 +106,8 @@ static func _test_missing_and_unknown() -> Dictionary:
 	var unknown_outcome := EventDescriptionResolver.resolve(
 		"EVT_MARKET_CRASH", {"town": "中洲圣城"}, {"outcome": "legendary", "loss_gold": 10})
 	var passed = not missing.get("success", true) and str(missing.get("code", "")) == "EVENT_DESC_MISSING" \
-		and unknown_outcome.get("success", false)  # 未知 outcome 回退 base 兜底
+		and unknown_outcome.get("success", false)  # 未知 outcome 回退至 base
 	return {
-		"test": "TC-EVTDESC-06: 未配置事件拦截（EVENT_DESC_MISSING）+ 未知分支回退 base 兜底",
+		"test": "TC-EVTDESC-06: 未配置事件拦截（EVENT_DESC_MISSING）+ 未知分支回退至 base",
 		"passed": passed
 	}

@@ -241,7 +241,7 @@ static func test_state_pollution_prevention() -> Dictionary:
 		"error_code": err
 	}
 
-## TC-SV-27: 四层隔离体系全面闭环判定（Inv-SV-8）
+## TC-SV-27: 四层隔离体系完备性判定（Inv-SV-8）
 static func test_four_layer_isolation_comprehensive() -> Dictionary:
 	# 验证四层门禁：
 	# 1. 模式枚举正交
@@ -259,7 +259,7 @@ static func test_four_layer_isolation_comprehensive() -> Dictionary:
 
 	var passed: bool = is_sp and ds_ok and lc_ok and gate_ok
 	return {
-		"test": "TC-SV-27: 单机/联机（模式/数据源/生命周期/服务入口）四层隔离全链路断言",
+		"test": "TC-SV-27: 单机/联机（模式/数据源/生命周期/服务入口）四层隔离端到端断言",
 		"passed": passed
 	}
 

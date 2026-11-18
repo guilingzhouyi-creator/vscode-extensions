@@ -69,7 +69,7 @@ static func test_character_creation_output() -> Dictionary:
 	var coef_ok = is_equal_approx(float(sheet.base_coefficients.get("INT", 0.0)), 1.2) # 始源共鸣 INT 系数修正
 	var actual_ok = sheet.get_actual_value("INT") > 0.0 and sheet.get_actual_value("STR") > 0.0
 	var passed = level_ok and coef_ok and actual_ok and (sheet.somatic_function > 0.0) and (res.wallet.gold == 500)
-	return { "test": "TC-CREATE-03: 创角聚合生成统一六维底座与种族/天赋系数修正", "passed": passed }
+	return { "test": "TC-CREATE-03: 创角聚合生成统一六维基础属性与种族/天赋系数修正", "passed": passed }
 
 static func test_attribute_conversion_engine() -> Dictionary:
 	# 人类基准十进制与满级原值（6 级 × 每级基准 = 600/60/6000/600/60/6000）
@@ -117,4 +117,4 @@ static func test_attribute_conversion_engine() -> Dictionary:
 	var linked_ok = (linked.get_level("STR") == 6) and is_equal_approx(linked.get_actual_value("STR"), before * 2.0)
 
 	var passed = base_ok and full_ok and dead_ok and race_ok and cap_ok and linked_ok
-	return { "test": "TC-CREATE-04: 统一换算底座（人类基准/满级原值/死区/种族系数/6级上限/配置联动）", "passed": passed }
+	return { "test": "TC-CREATE-04: 统一换算基准（人类基准/满级原值/死区/种族系数/6级上限/配置联动）", "passed": passed }

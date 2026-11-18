@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - Vol 31 双轨空间坐标系统单元测试
+# 卡拉尔世界引擎 (Kalar World Engine) - Vol 31 复合空间坐标系统单元测试
 # 文件路径: res://tests/unit/domains/test_spatial_movement.gd
 # ==============================================================================
 class_name TestSpatialMovementDomain
@@ -7,7 +7,7 @@ extends RefCounted
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name = "Domain 31: 双轨空间坐标系与2D位移平滑演化引擎"
+	var domain_name = "Domain 31: 复合空间坐标系与2D位移平滑演化引擎"
 
 	results.append(_test_text_to_vector_translation())
 	results.append(_test_speed_load_and_impedance_damping())

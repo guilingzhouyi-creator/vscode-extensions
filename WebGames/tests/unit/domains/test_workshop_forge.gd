@@ -58,7 +58,7 @@ static func test_salvage_equipment() -> Dictionary:
 	return {"test": "TC-FORGE-03: 装备分解材料与熔铸货币返还", "passed": passed}
 
 static func test_reforge_lock_cost_closure() -> Dictionary:
-	# 事务闭环：lock_count > 0 时保护符/魔单晶消耗在同一事务内扣除；
+	# 事务一致性：lock_count > 0 时保护符/魔单晶消耗在同一事务内扣除；
 	# 余额不足拒绝且不改动物品（词缀保持原样、钱包不扣）
 	var item := ItemEntity.new()
 	item.custom_name = "实验法杖"
@@ -87,6 +87,6 @@ static func test_reforge_lock_cost_closure() -> Dictionary:
 		and (poor.mana_monocrystals == 0) \
 		and (item.serialize() == before)
 	return {
-		"test": "TC-FORGE-04: 重铸锁定消耗闭环（同事务扣魔单晶/余额不足拒绝不改物）",
+		"test": "TC-FORGE-04: 重铸锁定消耗事务（同事务扣魔单晶/余额不足拒绝不改物）",
 		"passed": ok_passed and deny_passed
 	}

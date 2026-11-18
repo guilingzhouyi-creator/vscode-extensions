@@ -203,7 +203,7 @@ static func test_item_entity_static_defaults_cache_and_reset_state() -> Dictiona
 		item.combat_metrics.get("edge_sharpness", 0.0) == 1.0
 	)
 
-	# 5. 反序列化缺省字段兜底验证（从静态缓存提取 deserialize_name）
+	# 5. 反序列化缺省字段默认回退验证（从静态缓存提取 deserialize_name）
 	var sparse_dto := {
 		"item_id": "SPARSE_TEST_ITEM"
 	}

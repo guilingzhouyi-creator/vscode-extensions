@@ -103,17 +103,17 @@ const SuiteUnifiedLoggerService = preload("res://tests/unit/infrastructure/test_
 const SuiteLogCryptoAndBaseMessages = preload("res://tests/unit/infrastructure/test_log_crypto_and_base_messages.gd")
 # EventBus 2.0 空间分发与零GC流水线
 const SuiteEventBus2ZeroGCPipeline = preload("res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd")
-# 用户会话生命周期与主页HUD双轨同步流水线
+# 用户会话生命周期与主页HUD双通道同步流水线
 const SuiteSessionLifecycleAndHudSyncPipeline = preload("res://tests/integration/pipelines/test_session_lifecycle_and_hud_sync_pipeline.gd")
 # 灰度发布版本编排与底层动态更新流水线
 const SuiteVersionGovernancePipeline = preload("res://tests/integration/pipelines/test_version_governance_pipeline.gd")
-# 存档二次载入与复合鉴权双轨分流全链路流水线
+# 存档二次载入与复合鉴权双模式分流端到端流水线
 const SuiteSaveSecondaryLoadAndDualStreamPipeline = preload("res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd")
-# 快照测试工程模式与全域数据流插桩全链路流水线
+# 快照测试工程模式与全域数据流插桩端到端流水线
 const SuiteSnapshotEngineeringHarnessPipeline = preload("res://tests/integration/pipelines/test_snapshot_engineering_harness_pipeline.gd")
-# 双域储存架构与异步流式加载全链路流水线
+# 双域储存架构与异步流式加载端到端流水线
 const SuiteDualDomainStoragePipeline = preload("res://tests/integration/pipelines/test_dual_domain_storage_pipeline.gd")
-# 统一资源索引中心与配置系统异步流式加载全链路流水线
+# 统一资源索引中心与配置系统异步流式加载端到端流水线
 const SuiteResourceCatalogAndAsyncConfigPipeline = preload("res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd")
 # 高承压对象池与数据导向无头处理器架构
 const SuiteObjectPoolAndBatchPipeline = preload("res://tests/unit/infrastructure/test_object_pool_and_batch_pipeline.gd")
@@ -139,25 +139,25 @@ const SuiteDestinyModPrecheckAndUiAdaptationPipeline = preload("res://tests/inte
 const SuiteFullModDiskAndPlaythroughPipeline = preload("res://tests/integration/pipelines/test_full_mod_disk_and_playthrough_pipeline.gd")
 # Agent交互试玩与伴侣观察总线流水线
 const SuiteAgentInteractiveSessionAndCompanionPipeline = preload("res://tests/integration/pipelines/test_agent_interactive_session_and_companion_pipeline.gd")
-# 主页HUD六大支柱与网关模式自适应全链路流水线
+# 主页HUD六大支柱与网关模式自适应端到端流水线
 const SuiteAuthoritativeHudAndModeAdaptationPipeline = preload("res://tests/integration/pipelines/test_authoritative_hud_and_mode_adaptation_pipeline.gd")
 # 主页HUD面向Agent标准数据包与动态行动空间流水线
 const SuiteAgentHudSliceAndActionSpacePipeline = preload("res://tests/integration/pipelines/test_agent_hud_slice_and_action_space_pipeline.gd")
 # Agent遥测高频推演基准与深度对象池流水线
 const SuiteAgentTelemetryHighThroughputPipeline = preload("res://tests/integration/pipelines/test_agent_telemetry_high_throughput_pipeline.gd")
-# 统一协议工厂与双轨信封及ESC系统菜单后端联动流水线
+# 统一协议工厂与双格式信封及ESC系统菜单后端联动流水线
 const SuiteUnifiedProtocolAndEscPipeline = preload("res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd")
 # MOD开发者SDK便利协议同步与推演流水线
 const SuiteModSdkDeveloperErgonomicsPipeline = preload("res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd")
 # Agent全流程推演与开发者工作台流水线
 const SuiteAgentFullPlaythroughAndWorkbenchPipeline = preload("res://tests/integration/pipelines/test_agent_full_playthrough_and_workbench_pipeline.gd")
-# 高纯度二进制数据流与GameConfig双轨流水线
+# 高纯度二进制数据流与GameConfig同步流水线
 const SuiteBinaryConfigAndKdatPipeline = preload("res://tests/integration/test_binary_config_and_kdat_pipeline.gd")
 # 全域非阻塞CG视频播放与剧情通用Hook流水线
 const SuiteCutsceneHookAndPlaybackPipeline = preload("res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd")
 # 艺术资源寻址与环境裁决治理套件
 const SuiteAssetPathResolver = preload("res://tests/unit/infrastructure/test_asset_path_resolver.gd")
-# 全链路生命周期与ESC菜单后端双分流无头流水线
+# 端到端生命周期与ESC菜单后端双分流无头流水线
 const SuiteFullLifecycleChainAndEscFlowPipeline = preload("res://tests/integration/pipelines/test_full_lifecycle_chain_and_esc_flow_pipeline.gd")
 # 全链路前后端交互数据流契约与后端闭环改造无头验收流水线
 const SuiteFullChainBackendProtocolAndLifecyclePipeline = preload("res://tests/integration/pipelines/test_full_chain_backend_protocol_and_lifecycle_pipeline.gd")

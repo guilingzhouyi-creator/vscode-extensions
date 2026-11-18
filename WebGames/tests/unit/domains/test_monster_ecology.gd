@@ -29,7 +29,7 @@ static func test_monster_isomorphic_structure() -> Dictionary:
 	m.body_parts["WING"] = p_wing
 
 	var passed = (m.physiology.get_level("STR") == 3) and m.body_parts.has("WING")
-	return { "test": "TC-MON-01: 怪物微观生理同构（统一等级底座）与部位结构挂载", "passed": passed }
+	return { "test": "TC-MON-01: 怪物微观生理同构（统一等级基准）与部位结构挂载", "passed": passed }
 
 static func test_part_destruction_and_ap_penalty() -> Dictionary:
 	var m := MonsterAggregateEntity.new()

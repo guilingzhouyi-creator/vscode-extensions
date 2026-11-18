@@ -208,7 +208,7 @@ static func test_canary_rollout_integration() -> Dictionary:
 		"passed": passed
 	}
 
-## 6. 状态机非法跳转阻断与全流程流转闭环
+## 6. 状态机非法跳转阻断与全流程流转校验
 static func test_fsm_invalid_transition_blocking() -> Dictionary:
 	var fsm := WorldGatewayFSM.new("ACC_FULL_FLOW_01")
 
@@ -234,11 +234,11 @@ static func test_fsm_invalid_transition_blocking() -> Dictionary:
 
 	var passed = invalid_attach_ok and s1_ok and s2_ok and s3_ok and s4_ok
 	return {
-		"test": "TC-GW-06: 状态机非法跳转阻断与网关全生命周期闭环流转",
+		"test": "TC-GW-06: 状态机非法跳转阻断与网关全生命周期完整流转",
 		"passed": passed
 	}
 
-## 7. 代码质量审查修复闭环（B1 官方事件入口 / S1 联机放行显式边界 / S2 context from_dto / S3 灰度默认装配）
+## 7. 代码质量审查修复验证（B1 官方事件入口 / S1 联机放行显式边界 / S2 context from_dto / S3 灰度默认装配）
 static func test_review_fix_closure() -> Dictionary:
 	# S3: 默认灰度装配（world_gateway.json canary_features 段被消费；未注入时不再空旗标）
 	var default_flags := GameModeRoutingSolver.load_default_canary_flags()
@@ -294,6 +294,6 @@ static func test_review_fix_closure() -> Dictionary:
 
 	var passed = s3_load_ok and s3_reject_ok and s1_pending_ok and s2_ok and b1_ok
 	return {
-		"test": "TC-GW-07: 审查修复闭环（灰度默认装配/联机放行显式边界/context 往返/官方事件入口）",
+		"test": "TC-GW-07: 审查修复验证（灰度默认装配/联机放行显式边界/context 往返/官方事件入口）",
 		"passed": passed
 	}

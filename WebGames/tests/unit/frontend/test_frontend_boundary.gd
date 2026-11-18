@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端可视化边界与快照契约验收套件
 # 文件路径: res://tests/unit/frontend/test_frontend_boundary.gd
-# 职责: 验证统一快照 DTO 序列化对等与防御兜底、BaseScreen 唯一注入入口、五态容器与视图基类继承
+# 职责: 验证统一快照 DTO 序列化对等与防御性默认值、BaseScreen 唯一注入入口、五态容器与视图基类继承
 # ==============================================================================
 class_name TestFrontendBoundary
 extends TestCase
@@ -31,7 +31,7 @@ static func _test_snapshot_round_trip() -> Dictionary:
 	var ok := TestCase.assert_eq(restored.to_dictionary(), dto.to_dictionary(), "快照序列化往返深度对等")
 	return TestCase.make_result("snapshot_round_trip", ok)
 
-## 2. 空数据防御兜底（零除/越界安全）
+## 2. 空数据防御默认值（零除/越界安全）
 static func _test_snapshot_defensive_defaults() -> Dictionary:
 	var empty := FrontendHudSnapshot.from_dictionary({})
 	var ok := TestCase.assert_gte(empty.hp_max, 1.0, "空数据 hp_max 安全下限")

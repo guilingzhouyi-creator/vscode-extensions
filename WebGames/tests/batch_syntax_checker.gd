@@ -2,7 +2,7 @@
 # 卡拉尔世界引擎 - GDScript 全量语法与装载批处理校验器 (单进程极速版)
 # 文件路径: res://tests/batch_syntax_checker.gd
 # 职责: 在单次 Godot 进程中批量校验全部 .gd 文件的语法与装载正确性，消除 340+ 次冷启动
-#       （全量 backend/frontend/tests/benchmarks 四目录，随新施工卷持续增长）
+#       （全量 backend/frontend/tests/benchmarks 四目录，随新增测试套件持续增长）
 # ==============================================================================
 extends SceneTree
 

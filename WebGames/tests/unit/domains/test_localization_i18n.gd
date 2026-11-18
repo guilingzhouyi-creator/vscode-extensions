@@ -61,12 +61,12 @@ static func _test_multi_tier_fallback_hierarchy() -> Dictionary:
     catalog.register_translation("en_US", "item.potion.name", "Health Potion")
     var res_fallback: String = LocalizationSolver.translate(catalog, "item.potion.name")
 
-    # 两个语言都缺失 -> 最终兜底返回原始 key
+    # 两个语言都缺失 -> 最终默认回退返回原始 key
     var res_missing: String = LocalizationSolver.translate(catalog, "item.unknown_key.name")
 
     var passed: bool = (res_fallback == "Health Potion") and (res_missing == "[item.unknown_key.name]")
     return {
-        "test": "TC-I18N-02: 多层级语言包回退与缺失词条安全兜底",
+        "test": "TC-I18N-02: 多层级语言包回退与缺失词条默认回退",
         "passed": passed
     }
 
@@ -187,7 +187,7 @@ static func _test_hot_switch_and_event_bus_broadcast() -> Dictionary:
 
     var passed: bool = switch_ok and cur_loc_ok and fail_ok and null_cat_ok
     return {
-        "test": "TC-I18N-07: 语言热切换与 EventBus 领域事件广播闭环",
+        "test": "TC-I18N-07: 语言热切换与 EventBus 领域事件广播联动",
         "passed": passed
     }
 

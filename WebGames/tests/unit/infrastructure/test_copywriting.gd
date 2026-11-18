@@ -3,7 +3,7 @@
 # 文件路径: res://tests/unit/infrastructure/test_copywriting.gd
 # 覆盖: 阶段1~4 验收矩阵（TC-COPY-01~06）
 #       —— 统一键解析 / 条件段拼接 / 结果分支 / 未填充拦截 / 域解析器零回归 /
-#          热重载与键登记（适配层兜底）
+#          热重载与键登记（适配层兼容回退）
 # ==============================================================================
 class_name TestCopywritingDomain
 extends RefCounted
@@ -66,7 +66,7 @@ static func _test_condition_segment() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-COPY-03: 结果分支（narrative 域 outcome success/failure + base 兜底）
+## TC-COPY-03: 结果分支（narrative 域 outcome success/failure + base 回退）
 static func _test_outcome_branch() -> Dictionary:
 	var res_s := CopywritingResolver.resolve(
 		"narrative.EVT_BEAST_TIDE.desc", {"town": "瓦兰城", "reward_gold": 500, "loss_soldiers": 3}, "success")
@@ -78,7 +78,7 @@ static func _test_outcome_branch() -> Dictionary:
 		and res_f.get("success", false) and str(res_f.get("text", "")).contains("冲破城门") \
 		and res_unknown.get("success", false) and str(res_unknown.get("text", "")).contains("兽潮")
 	return {
-		"test": "TC-COPY-03: 结果分支（outcome 分支 + 未知 outcome 回退 base 兜底）",
+		"test": "TC-COPY-03: 结果分支（outcome 分支 + 未知 outcome 回退至 base 默认值）",
 		"passed": passed
 	}
 
@@ -108,10 +108,10 @@ static func _test_domain_resolver_regression() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-COPY-06: 适配层兜底 + 键登记（旧表未迁移条目可解析；四域文案键登记可查）
+## TC-COPY-06: 适配层兼容回退 + 键登记（旧表未迁移条目可解析；四域文案键登记可查）
 static func _test_hot_reload_and_key_registration() -> Dictionary:
 	var shared := LocalizationRegistryCatalog.get_shared()
-	# 适配层兜底：narrative 旧表条目（未迁移）仍可解析——用已迁移条目验证键登记
+	# 适配层兼容回退：narrative 旧表条目（未迁移）仍可解析——用已迁移条目验证键登记
 	var res := CopywritingResolver.resolve(
 		"item.mithril_longsword.desc",
 		{"name": "mithril_longsword", "tier_rank": 3, "mass_kg": 1.5, "volume_slots": 1, "market_value": 350,

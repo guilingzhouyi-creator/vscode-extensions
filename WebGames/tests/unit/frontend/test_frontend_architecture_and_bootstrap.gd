@@ -150,7 +150,7 @@ static func _test_toast_and_loading_dispatch() -> Dictionary:
 	loading.free()
 	return {"test": test_name, "passed": passed}
 
-## 5. 验证 ModWorkbenchScreen 在 real 模式下的创建 / .kmod 打包 / 安装 / 自定义目录与手排序保持闭环
+## 5. 验证 ModWorkbenchScreen 在 real 模式下的创建 / .kmod 打包 / 安装 / 自定义目录与手排序保持流程
 static func _test_mounted_real_mod_workbench_lifecycle() -> Dictionary:
 	var backend_helper := load("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
 	backend_helper.setup_env()
@@ -219,7 +219,7 @@ static func _test_mounted_real_mod_workbench_lifecycle() -> Dictionary:
 	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	return {"test": "test_mounted_real_mod_workbench_lifecycle", "passed": passed and (orphan_after <= orphan_before)}
 
-## 6. 验证 CutscenePlayerView 真场景挂载、NavManager 路由注册与 CutsceneEventBridge 预演驱动闭环
+## 6. 验证 CutscenePlayerView 真场景挂载、NavManager 路由注册与 CutsceneEventBridge 预演驱动流程
 static func _test_mounted_real_cutscene_player_and_bridge() -> Dictionary:
 	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var nav := NavManager.get_instance()
