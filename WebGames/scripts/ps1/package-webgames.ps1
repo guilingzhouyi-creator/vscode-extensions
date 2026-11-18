@@ -157,7 +157,7 @@ if ($code -eq 0 -and (Test-Path $artifactPath)) {
     }
     if (Test-Path $sdkOutDir) { Remove-Item -Recurse -Force $sdkOutDir }
     Copy-Item -Path $sdkSrcDir -Destination $sdkOutDir -Recurse -Force
-    Get-ChildItem -Path $sdkOutDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+    Get-ChildItem -Path $sdkOutDir -Recurse -Directory -Filter "__pycache__" | ForEach-Object { Remove-Item -Recurse -Force $_.FullName }
     $sdkBundled = $true
   }
 

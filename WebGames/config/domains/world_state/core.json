@@ -149,14 +149,10 @@
   },
   "dispatcher": {
     "require_session_auth": true,
-    "allow_stateless_compat_for_unregistered_tokens": true,
-    "stateless_compat_defaults": {
-      "unallocated_potential_points": 5,
-      "unread_mail_count": 1
-    },
     "anonymous_allowed_actions": [
       "REGISTER_ACCOUNT",
       "LOGIN_LOCAL",
+      "LOGIN_GUEST",
       "LOGIN_COMPOSITE",
       "GET_ACCOUNT_HOME_VIEW_MODEL",
       "ESC_QUERY_READINESS",

@@ -58,7 +58,13 @@ static func _test_ground_loot_proximity_prompt() -> Dictionary:
 		"passed": passed
 	}
 
+static func _ensure_fe17_guest_session() -> void:
+	if not WorldSessionRuntimeService.get_active_session_token().is_empty():
+		return
+	RealAuthService.new().login_guest_async("fe17_test_device", func(_res: Dictionary) -> void: pass)
+
 static func _test_item_namespace_search() -> Dictionary:
+	_ensure_fe17_guest_session()
 	var view = MiscEdgeView.new()
 	var res: Dictionary = view.search_item_namespace("   potion   ")
 	var passed = res.get("success", false) and (view.search_query_keyword == "potion")
@@ -70,6 +76,7 @@ static func _test_item_namespace_search() -> Dictionary:
 	}
 
 static func _test_mounted_real_misc_edge() -> Dictionary:
+	_ensure_fe17_guest_session()
 	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/misc_edge/misc_edge_view.tscn", "real")
 	var passed := bool(mount_handle.get("ok", false))

@@ -57,18 +57,14 @@ static func emit_error(
 # 二、消息本地化解析
 # ==============================================================================
 
-## message 本地化解析：优先按 ErrorCodeRegistry.message_key（"errors/<key>" → 表 narratives.errors 路径 <key>）
-## 取表，未命中回退调用方文案，最终回退 code 本体（逻辑判断严禁依赖返回值）
+## message 本地化解析：按 ErrorCodeRegistry.message_key（"errors/<key>" → 表 narratives.errors 路径 <key>）
+## 取表，未命中回退调用方文案或错误码本体（逻辑判断严禁依赖返回值）
 static func _resolve_message(error_code: String, fallback: String) -> String:
 	var entry := ErrorCodeRegistry.lookup(error_code)
 	if entry != null and not entry.message_key.is_empty():
 		var hit := _resolve_message_key(entry.message_key)
 		if not hit.is_empty():
 			return hit
-	# 兼容直查：按 error_code 本体查 narratives.errors 表
-	var direct := GameConfig.get_string(LogConstants.CFG_NARRATIVES_ERRORS, error_code, "")
-	if not direct.is_empty():
-		return direct
 	if not fallback.is_empty():
 		return fallback
 	return error_code
@@ -82,10 +78,6 @@ static func _resolve_message_key(message_key: String) -> String:
 		var path := "/".join(parts.slice(1))
 		return GameConfig.get_string(table, path, "")
 	return GameConfig.get_string(LogConstants.CFG_NARRATIVES_ERRORS, message_key, "")
-
-## 存量 push_error / push_warning 零阻断收敛包装：保持原调用点失败关闭语义，仅收敛通道
-static func migrate_push_error(channel: String, message: String) -> void:
-	emit_error(channel, LogConstants.ERR_CODE_UNKNOWN, message, {})
 
 ## 便捷错误/告警广播入口（默认通道 infrastructure）
 static func emit(error_code: String, context: Dictionary = {}, message: String = "") -> void:

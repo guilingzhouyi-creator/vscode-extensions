@@ -65,6 +65,7 @@ static func test_tc_neut_01_real_service_container_coverage() -> Dictionary:
 
 ## 验证新增真实适配器核心方法可直接响应且不依赖 Mock 目录
 static func _exercise_real_domain_services(service_container: ServiceContainer) -> bool:
+	service_container.auth().login_guest_async("neut_01_device", func(_res: Dictionary) -> void: pass)
 	var version_holder: Dictionary = {}
 	service_container.version().check_version_async(func(reply_payload: Dictionary) -> void:
 		version_holder.merge(reply_payload, true)

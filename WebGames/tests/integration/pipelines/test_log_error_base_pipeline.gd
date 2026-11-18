@@ -469,14 +469,14 @@ static func _scan_push_scatter(dir_path: String, allowed: Dictionary, offenders:
 
 static func _check_push_file(fpath: String, allowed: Dictionary, offenders: Array[String]) -> void:
 	if fpath.ends_with("error_reporter.gd"):
-		return # 自身 API 名 migrate_push_error 含子串，非调用点
+		return
 	var text := FileAccess.get_file_as_string(fpath)
 	if text.is_empty():
 		return
 	var hit := false
 	for ln in text.split("\n"):
 		var s: String = (ln as String).strip_edges()
-		if s.begins_with("#") or s.begins_with("func push_warning") or s.begins_with("static func migrate_push_error"):
+		if s.begins_with("#") or s.begins_with("func push_warning"):
 			continue
 		if s.contains("push_error(") or s.contains("push_warning("):
 			hit = true

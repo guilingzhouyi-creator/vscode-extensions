@@ -120,10 +120,6 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 	if is_anonymous_action or not GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true):
 		return null
 
-	var should_allow_compatibility := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true)
-	if not _is_protected_request(request) and should_allow_compatibility:
-		return null
-
 	var validation_result := AuthService.validate_token(request.session_token, request.account_id)
 	if not bool(validation_result.get("success", false)):
 		return UnifiedProtocolFactory.create_response(
@@ -144,22 +140,6 @@ static func _is_agent_blocked_request(request: ClientRequestEnvelopeDTO) -> bool
 	if PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
 		return true
 	return request.domain in ["account", "lifecycle", "character_creation", "prologue", "game_settings"]
-
-static func _is_protected_request(request: ClientRequestEnvelopeDTO) -> bool:
-	if request.domain in ["character_creation", "prologue"]:
-		return true
-	if PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
-		return true
-	if request.domain == "account" and request.action_type in ["LOGOUT_ACCOUNT", "CLEAR_SLOT", "LIST_CHARACTERS"]:
-		return true
-	if request.action_type in ["PULL_HUD_SNAPSHOT", "TICK_WORLD_CLOCK", "ESC_GET_MENU_STATE"]:
-		return true
-	return _is_authenticated_esc_or_lifecycle_request(request)
-
-static func _is_authenticated_esc_or_lifecycle_request(request: ClientRequestEnvelopeDTO) -> bool:
-	if not WorldSessionRuntimeService.has_authenticated_session() or not WorldSessionRuntimeService.has_session_token():
-		return false
-	return request.action_type.begins_with("ESC_") or request.domain in ["lifecycle", "game_settings"]
 
 # ==============================================================================
 # 各领域路由分派实现 (Link 1 ~ Link 11)
@@ -184,9 +164,9 @@ static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gate
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, true, {"hud_snapshot": updated_snapshot.to_dto()}, "", "World clock and resident HUD synchronized successfully"
 		)
-	return _dispatch_agent_action_compat(request)
+	return _dispatch_agent_action(request)
 
-static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
+static func _dispatch_agent_action(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
 	var agent_packet := AgentActionPacketDTO.new()
 	agent_packet.session_id = request.character_id
 	agent_packet.directive_id = request.action_type
@@ -202,12 +182,6 @@ static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> 
 	if request.payload is Dictionary:
 		for payload_key in request.payload.keys():
 			hud_context[payload_key] = request.payload[payload_key]
-
-	if not is_active_world and GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true):
-		var compatibility_defaults: Dictionary = GameConfig.get_dict(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/stateless_compat_defaults", {})
-		for default_key in compatibility_defaults.keys():
-			if not hud_context.has(default_key):
-				hud_context[default_key] = compatibility_defaults[default_key]
 
 	var hud_snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(hud_context)
 	var is_human_active: bool = false if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()

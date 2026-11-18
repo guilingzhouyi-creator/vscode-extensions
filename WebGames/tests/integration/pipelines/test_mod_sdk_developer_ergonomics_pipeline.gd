@@ -24,7 +24,11 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_mde_09_mod_topological_sort_and_dependencies())
 	return TestCase.pack_results("MOD开发者便利套件协议同步与端到端调试推演流水线", results)
 
+static var _mde_account_store: Dictionary = {}
+
 static func _setup_env() -> void:
+	_mde_account_store.clear()
+	AuthService.clear_sessions()
 	WorldSessionRuntimeService.reset_for_tests()
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
@@ -32,11 +36,19 @@ static func _setup_env() -> void:
 	UnifiedProtocolFactory.reset_for_tests()
 
 static func _teardown_env() -> void:
+	_mde_account_store.clear()
+	AuthService.clear_sessions()
 	WorldSessionRuntimeService.reset_for_tests()
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()
 	UnifiedProtocolFactory.reset_for_tests()
+
+static func _issue_mde_auth(tag: String) -> Dictionary:
+	var reg := AccountRegistrationDTO.Request.new()
+	reg.username = "mde_" + tag
+	reg.password_plain = "StrongPass#01"
+	return AuthService.register_and_login(reg, true, _mde_account_store)
 
 ## -----------------------------------------------------------------------------
 ## TC-MDE-01: 权威能力清单与双份 Schema 零漂移静态一致性断言
@@ -134,22 +146,34 @@ static func test_tc_mde_02_client_request_envelope_validation() -> Dictionary:
 ## -----------------------------------------------------------------------------
 static func test_tc_mde_03_human_control_lease_preemption_and_renewal() -> Dictionary:
 	_setup_env()
+	var auth := _issue_mde_auth("lease")
+	var acc_id := String(auth.get("account_id", ""))
+	var tok := String(auth.get("session_token", ""))
+	WorldSessionRuntimeService.activate_world_session({
+		"account_id": acc_id,
+		"character_id": "CHAR_01",
+		"character_name": "LeaseHero",
+		"world_id": "WORLD_MDE",
+		"slot_id": "SLOT_01",
+		"unallocated_potential_points": 5
+	}, false)
 
 	# 1. 人类续订 3000ms 租约
-	HumanControlLeaseManager.renew_human_lease("ACC_TEST_HUMAN", 1, 3000)
-	var human_active: bool = HumanControlLeaseManager.is_lease_active("ACC_TEST_HUMAN")
+	HumanControlLeaseManager.renew_human_lease(acc_id, 1, 3000)
+	var human_active: bool = HumanControlLeaseManager.is_lease_active(acc_id)
 
 	# 2. Agent 动作尝试抢占 -> 遭到拦截
 	var agent_req := UnifiedProtocolFactory.create_agent_request(
-		"world_state", "ALLOCATE_POTENTIAL_STAT", {"stat": "STR"}, "ACC_AGENT", "CHAR_01"
+		"world_state", "ALLOCATE_POTENTIAL_STAT", {"stat": "STR"}, acc_id, "CHAR_01"
 	)
+	agent_req.session_token = tok
 	var resp_blocked := UnifiedProtocolDispatcher.dispatch(agent_req)
 	var blocked_ok: bool = not resp_blocked.is_success \
 		and resp_blocked.error_code == "ERR_PREEMPTED_BY_HUMAN"
 
 	# 3. 模拟时间推进 3500ms（租约过期）
 	HumanControlLeaseManager.simulate_time_advance_ms(3500)
-	var expired_ok: bool = not HumanControlLeaseManager.is_lease_active("ACC_TEST_HUMAN")
+	var expired_ok: bool = not HumanControlLeaseManager.is_lease_active(acc_id)
 
 	# 4. Agent 动作重试 -> 成功放行
 	var resp_allowed := UnifiedProtocolDispatcher.dispatch(agent_req)
@@ -168,10 +192,13 @@ static func test_tc_mde_03_human_control_lease_preemption_and_renewal() -> Dicti
 ## -----------------------------------------------------------------------------
 static func test_tc_mde_04_esc_menu_action_payload_and_state_transition() -> Dictionary:
 	_setup_env()
+	var auth := _issue_mde_auth("esc")
+	var acc_id := String(auth.get("account_id", ""))
+	var tok := String(auth.get("session_token", ""))
 
 	# 发射 ESC_QUERY_READINESS
 	var req_query := UnifiedProtocolFactory.create_human_request(
-		"world_state", "ESC_QUERY_READINESS", {}, "", "ACC_01", "CHAR_01"
+		"world_state", "ESC_QUERY_READINESS", {}, tok, acc_id, "CHAR_01"
 	)
 	var resp_query := UnifiedProtocolDispatcher.dispatch(req_query)
 	var query_ok: bool = resp_query.is_success \
@@ -180,7 +207,7 @@ static func test_tc_mde_04_esc_menu_action_payload_and_state_transition() -> Dic
 
 	# 发射未知 ESC 指令 -> 拦截
 	var req_invalid := UnifiedProtocolFactory.create_human_request(
-		"world_state", "ESC_EXPLODE_UNIVERSE", {}, "", "ACC_01", "CHAR_01"
+		"world_state", "ESC_EXPLODE_UNIVERSE", {}, tok, acc_id, "CHAR_01"
 	)
 	var resp_invalid := UnifiedProtocolDispatcher.dispatch(req_invalid)
 	var invalid_ok: bool = not resp_invalid.is_success \
@@ -197,12 +224,15 @@ static func test_tc_mde_04_esc_menu_action_payload_and_state_transition() -> Dic
 ## -----------------------------------------------------------------------------
 static func test_tc_mde_05_save_guard_interception_semantics() -> Dictionary:
 	_setup_env()
+	var auth := _issue_mde_auth("save_guard")
+	var acc_id := String(auth.get("account_id", ""))
+	var tok := String(auth.get("session_token", ""))
 
 	# 模拟强制阻断存档环境
 	SaveDataAccessLayer.set_mock_busy_for_test(true)
 
 	var req_save := UnifiedProtocolFactory.create_human_request(
-		"world_state", "ESC_SAVE_GAME", {"slot_id": "SLOT_TEST"}, "", "ACC_01", "CHAR_01"
+		"world_state", "ESC_SAVE_GAME", {"slot_id": "SLOT_TEST"}, tok, acc_id, "CHAR_01"
 	)
 	var resp_save := UnifiedProtocolDispatcher.dispatch(req_save)
 
@@ -226,17 +256,29 @@ static func test_tc_mde_05_save_guard_interception_semantics() -> Dictionary:
 ## -----------------------------------------------------------------------------
 static func test_tc_mde_06_home_hud_directives_and_snapshot_sync() -> Dictionary:
 	_setup_env()
+	var auth := _issue_mde_auth("hud_dir")
+	var acc_id := String(auth.get("account_id", ""))
+	var tok := String(auth.get("session_token", ""))
+	WorldSessionRuntimeService.activate_world_session({
+		"account_id": acc_id,
+		"character_id": "CHAR_01",
+		"character_name": "HudDirHero",
+		"world_id": "WORLD_MDE",
+		"slot_id": "SLOT_01",
+		"unallocated_potential_points": 5,
+		"unread_mail_count": 1
+	}, false)
 
 	# 派发 REST_AND_ADVANCE_TIME
 	var req_rest := UnifiedProtocolFactory.create_human_request(
-		"world_state", "REST_AND_ADVANCE_TIME", {}, "", "ACC_01", "CHAR_01"
+		"world_state", "REST_AND_ADVANCE_TIME", {}, tok, acc_id, "CHAR_01"
 	)
 	var resp_rest := UnifiedProtocolDispatcher.dispatch(req_rest)
 	var rest_ok: bool = resp_rest.is_success
 
 	# 派发 MARK_MAIL_READ
 	var req_mail := UnifiedProtocolFactory.create_human_request(
-		"world_state", "MARK_MAIL_READ", {"mail_id": "MAIL_01"}, "", "ACC_01", "CHAR_01"
+		"world_state", "MARK_MAIL_READ", {"mail_id": "MAIL_01"}, tok, acc_id, "CHAR_01"
 	)
 	var resp_mail := UnifiedProtocolDispatcher.dispatch(req_mail)
 	var mail_ok: bool = resp_mail.is_success

@@ -23,7 +23,11 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_upe_09_custom_domain_handler_scalability())
 	return TestCase.pack_results("统一协议工厂与ESC系统菜单后端联动端到端流水线", results)
 
+static var _test_account_store: Dictionary = {}
+
 static func _reset_env() -> void:
+	_test_account_store.clear()
+	AuthService.clear_sessions()
 	WorldSessionRuntimeService.reset_for_tests()
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
@@ -31,6 +35,12 @@ static func _reset_env() -> void:
 	UnifiedProtocolFactory.reset_for_tests()
 	HudEventBridge.reset_for_tests()
 	UnifiedProtocolDispatcher.reset_custom_handlers_for_tests()
+
+static func _create_auth_session(username_suffix: String) -> Dictionary:
+	var reg := AccountRegistrationDTO.Request.new()
+	reg.username = "upe_" + username_suffix
+	reg.password_plain = "StrongPass#01"
+	return AuthService.register_and_login(reg, true, _test_account_store)
 
 ## -----------------------------------------------------------------------------
 ## TC-UPE-01: 统一协议工厂双模式请求装箱与反装箱一致性断言
@@ -89,14 +99,16 @@ static func test_tc_upe_01_protocol_factory_packing_roundtrip() -> Dictionary:
 static func test_tc_upe_02_human_lease_preemption_and_agent_blocking() -> Dictionary:
 	_reset_env()
 
-	var account_id := "ACC_LEASE_01"
+	var auth := _create_auth_session("lease")
+	var account_id := String(auth.get("account_id", ""))
+	var token := String(auth.get("session_token", ""))
 
 	# 1. 前置状态：无人类操作时，租约非活跃
 	var pre_active: bool = HumanControlLeaseManager.is_lease_active(account_id)
 
 	# 2. 人类前台触发请求，自动激活租约
 	var req_h := UnifiedProtocolFactory.create_human_request(
-		"world_state", "ESC_QUERY_READINESS", {}, "TOKEN_LEASE", account_id, "CHAR_01"
+		"world_state", "ESC_QUERY_READINESS", {}, token, account_id, "CHAR_01"
 	)
 	var _resp_h := UnifiedProtocolDispatcher.dispatch_request(req_h)
 	var lease_active_after_human: bool = HumanControlLeaseManager.is_lease_active(account_id)
@@ -106,7 +118,7 @@ static func test_tc_upe_02_human_lease_preemption_and_agent_blocking() -> Dictio
 	agent_pkt.session_id = "CHAR_01"
 	agent_pkt.directive_id = "ALLOCATE_POTENTIAL_STAT"
 	agent_pkt.params = {"stat_target": "AGI", "points": 1}
-	var req_a := UnifiedProtocolFactory.wrap_agent_action(agent_pkt, "TOKEN_LEASE", account_id)
+	var req_a := UnifiedProtocolFactory.wrap_agent_action(agent_pkt, token, account_id)
 
 	var resp_a_blocked := UnifiedProtocolDispatcher.dispatch_request(req_a)
 	var agent_blocked_ok: bool = not resp_a_blocked.success \
@@ -214,6 +226,9 @@ static func test_tc_upe_04_esc_query_save_readiness_guards() -> Dictionary:
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 	_reset_env()
+	var auth := _create_auth_session("save")
+	var account_id := String(auth.get("account_id", ""))
+	var token := String(auth.get("session_token", ""))
 
 	# 1. 尝试使用非法存储路径或异常模式
 	var req_unsafe := UnifiedProtocolFactory.create_human_request(
@@ -221,7 +236,7 @@ static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 			"slot_id": "../evil_path",
 			"game_mode": WorldGatewayModel.GameMode.SINGLE_PLAYER,
 			"in_combat": false
-		}
+		}, token, account_id
 	)
 	var resp_unsafe := UnifiedProtocolDispatcher.dispatch_request(req_unsafe)
 	var ok_unsafe_blocked: bool = (not resp_unsafe.success)
@@ -233,7 +248,7 @@ static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 			"game_mode": WorldGatewayModel.GameMode.SINGLE_PLAYER,
 			"game_data": {"player_name": "瓦尔兰守望者", "level": 10},
 			"in_combat": false
-		}
+		}, token, account_id
 	)
 	var resp_valid := UnifiedProtocolDispatcher.dispatch_request(req_valid)
 	var ok_save: bool = resp_valid.success and bool(resp_valid.data.get("success", false))
@@ -254,7 +269,9 @@ static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 	_reset_env()
 
-	var account_id := "ACC_SCRUB_01"
+	var auth := _create_auth_session("scrub")
+	var account_id := String(auth.get("account_id", ""))
+	var token := String(auth.get("session_token", ""))
 	var gateway := WorldGatewayFSM.new(account_id)
 	gateway.enter_gateway()
 	gateway.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
@@ -265,7 +282,7 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 
 	# 发射 ESC 退出到网关请求
 	var req_exit := UnifiedProtocolFactory.create_human_request(
-		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}, "TOKEN_SCRUB", account_id, "CHAR_SCRUB_01"
+		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}, token, account_id, "CHAR_SCRUB_01"
 	)
 	var resp_exit := UnifiedProtocolDispatcher.dispatch_request(req_exit, gateway)
 	var exit_ok: bool = resp_exit.success
@@ -298,8 +315,9 @@ static func test_tc_upe_07_esc_quit_game_graceful_shutdown() -> Dictionary:
 	_reset_env()
 	GameBootstrap.assemble()
 
-	var account_id := "ACC_QUIT_01"
-	var token := "TOKEN_QUIT_01"
+	var auth := _create_auth_session("quit")
+	var account_id := String(auth.get("account_id", ""))
+	var token := String(auth.get("session_token", ""))
 
 	var req_quit := UnifiedProtocolFactory.create_human_request(
 		"lifecycle", "ESC_QUIT_GAME", {"slot_id": "SLOT_01"}, token, account_id
@@ -359,6 +377,9 @@ static func test_tc_upe_08_protocol_objects_zero_heap_recycling() -> Dictionary:
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
 	_reset_env()
+	var auth := _create_auth_session("custom")
+	var account_id := String(auth.get("account_id", ""))
+	var token := String(auth.get("session_token", ""))
 
 	var custom_domain := "inventory_market"
 	var custom_called_box := [false]
@@ -383,6 +404,8 @@ static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
 	req.action_type = custom_action
 	req.payload = {"qty": 5}
 	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI
+	req.account_id = account_id
+	req.session_token = token
 
 	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
 	var dispatch_ok: bool = resp.success and custom_called_box[0] and int(resp.data.get("qty", 0)) == 5
