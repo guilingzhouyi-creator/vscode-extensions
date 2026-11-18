@@ -51,7 +51,7 @@ static func _test_ui_state_container_retry_callback() -> Dictionary:
 static func _test_hud_view_model_invariants() -> Dictionary:
 	# 故意注入非法的 0/负上限
 	var dto := CharacterHudViewModel.CharacterTransportDTO.new()
-	dto.nickname = "阿尔托莉雅"
+	dto.character_name = "阿尔托莉雅"
 	dto.hp_current = 50.0
 	dto.hp_maximum = 0.0
 	dto.ap_current = 5.0

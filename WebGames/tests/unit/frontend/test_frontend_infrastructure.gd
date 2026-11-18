@@ -231,7 +231,7 @@ static func _test_three_layer_model_decoupling() -> Dictionary:
 
 	var dto := CharacterHudViewModel.CharacterTransportDTO.new()
 	dto.character_id = "char_99"
-	dto.nickname = "测试勇士"
+	dto.character_name = "测试勇士"
 	dto.level_raw = 15
 	dto.hp_current = 20.0
 	dto.hp_maximum = 100.0

@@ -37,7 +37,6 @@ func check_version_async(result_callback: Callable) -> void:
 		"success": is_compatible,
 		"compatible": is_compatible,
 		"version": installed_version,
-		"client_version": installed_version,
 		"latest_version": latest_version,
 		"update_required": latest_version != installed_version and max_code > version_code,
 		"version_code": version_code,

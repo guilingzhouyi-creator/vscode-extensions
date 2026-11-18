@@ -93,7 +93,7 @@ static func test_cold_02_version_compatible_and_null_protocol_bridge() -> Dictio
 
 	var version_ok: bool = bool(version_reply.get("success", false)) \
 		and bool(version_reply.get("compatible", false)) \
-		and version_reply.has("client_version") \
+		and version_reply.has("version") \
 		and version_reply.has("latest_version")
 	var null_snapshot: Dictionary = null_reply.get("snapshot", {}) as Dictionary
 	var null_bridge_ok: bool = (not bool(null_reply.get("success", true))) \

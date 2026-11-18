@@ -170,7 +170,7 @@ func init_about_tab() -> void:
 		ServiceLocator.get_instance().version().check_version_async(func(version_reply: Dictionary) -> void:
 			if _view == null or not is_instance_valid(_view) or _view.label_version == null:
 				return
-			var version_text := str(version_reply.get("version", version_reply.get("client_version", "")))
+			var version_text := str(version_reply.get("version", ""))
 			if not version_text.is_empty():
 				_view.label_version.text = "%s (%s)" % [UIIntermediary.text("ui.fe15.about.version"), version_text]
 		)

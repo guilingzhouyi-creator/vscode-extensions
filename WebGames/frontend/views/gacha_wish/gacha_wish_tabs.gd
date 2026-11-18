@@ -174,7 +174,7 @@ func _configure_up_item_cell(panel: PanelContainer, item_entry: Dictionary) -> v
 	star_label.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_text})
 	star_label.add_theme_color_override("font_color", rarity_color)
 	var new_tag_label := card_box.get_child(2) as Label
-	new_tag_label.visible = bool(item_entry.get("is_recently_added", item_entry.get("is_new", false)))
+	new_tag_label.visible = bool(item_entry.get("is_recently_added", false))
 
 ## 初始化抽卡历史记录侧面板并刷新统计与列表
 func init_history_panel() -> void:
@@ -307,7 +307,7 @@ func _configure_result_cell(panel: PanelContainer, drop_entry: Dictionary) -> vo
 	var name_label := card_box.get_child(1) as Label
 	name_label.text = UIIntermediary.text(str(drop_entry.get("name", "ui.fe06.unknown")))
 	var new_tag_label := card_box.get_child(2) as Label
-	new_tag_label.visible = bool(drop_entry.get("is_recently_added", drop_entry.get("is_new", false)))
+	new_tag_label.visible = bool(drop_entry.get("is_recently_added", false))
 
 ## 跳过结果展示并关闭结果弹窗
 func on_result_skip_pressed() -> void:
@@ -323,7 +323,7 @@ func on_result_detail_pressed() -> void:
 	for drop in view.latest_pull_results:
 		detail_parameters["rarity"] = str(drop.get("rarity", "3"))
 		detail_parameters["name"] = UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown")))
-		detail_parameters["is_new"] = str(drop.get("is_recently_added", drop.get("is_new", false)))
+		detail_parameters["is_new"] = str(drop.get("is_recently_added", false))
 		entries.append(UIIntermediary.text("ui.fe06.result.detail_item", detail_parameters))
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe06.result.detail_toast", {"summary": " | ".join(entries)}),
@@ -348,9 +348,9 @@ func load_mock_data() -> void:
 				"subtitle": "ui.fe06.mock.banner.limited_warrior.subtitle",
 				"remaining_time": "ui.fe06.mock.banner.limited_warrior.remaining",
 				"up_items": [
-					{"name": "ui.fe06.mock.item.flame_knight", "rarity": "5", "is_recently_added": true, "is_new": true},
-					{"name": "ui.fe06.mock.item.dragon_spine_greatsword", "rarity": "5", "is_recently_added": false, "is_new": false},
-					{"name": "ui.fe06.mock.item.wind_shortbow", "rarity": "4", "is_recently_added": false, "is_new": false},
+					{"name": "ui.fe06.mock.item.flame_knight", "rarity": "5", "is_recently_added": true},
+					{"name": "ui.fe06.mock.item.dragon_spine_greatsword", "rarity": "5", "is_recently_added": false},
+					{"name": "ui.fe06.mock.item.wind_shortbow", "rarity": "4", "is_recently_added": false},
 				],
 			},
 			{
@@ -359,9 +359,9 @@ func load_mock_data() -> void:
 				"subtitle": "ui.fe06.mock.banner.permanent.subtitle",
 				"remaining_time": "ui.fe06.mock.banner.permanent.remaining",
 				"up_items": [
-					{"name": "ui.fe06.mock.item.mithril_guardian", "rarity": "5", "is_recently_added": false, "is_new": false},
-					{"name": "ui.fe06.mock.item.arcane_staff", "rarity": "4", "is_recently_added": true, "is_new": true},
-					{"name": "ui.fe06.mock.item.healing_potion_l", "rarity": "3", "is_recently_added": false, "is_new": false},
+					{"name": "ui.fe06.mock.item.mithril_guardian", "rarity": "5", "is_recently_added": false},
+					{"name": "ui.fe06.mock.item.arcane_staff", "rarity": "4", "is_recently_added": true},
+					{"name": "ui.fe06.mock.item.healing_potion_l", "rarity": "3", "is_recently_added": false},
 				],
 			},
 		]

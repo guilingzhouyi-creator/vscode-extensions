@@ -179,7 +179,7 @@ func _ready() -> void:
 		pity_4star = 0
 		var economy_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("economy")
 		var wallet_table: Dictionary = economy_snapshot.get("wallet", {}) as Dictionary
-		currency_primogems = int(wallet_table.get("mana_monocrystals", wallet_table.get("gold", 0)))
+		currency_primogems = int(wallet_table.get("mana_monocrystals", 0))
 	_apply_theme()
 	_load_mock_data()
 	_init_static_text()

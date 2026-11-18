@@ -69,7 +69,6 @@ func generate_drops(pull_count: int, pity_5star: int, pity_4star: int) -> Array:
 			"name": item_name,
 			"rarity": rarity,
 			"is_recently_added": is_recent,
-			"is_new": is_recent,
 		})
 	return drop_entries
 

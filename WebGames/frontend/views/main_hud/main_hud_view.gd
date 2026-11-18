@@ -246,7 +246,7 @@ func _render_from_snapshot() -> void:
 	stat_ap_max = hud_snapshot.ap_max
 	wallet_gold = hud_snapshot.gold
 	wallet_mana_crystals = hud_snapshot.mana_monocrystals
-	if snapshot.has("character_name") or snapshot.has("nickname"):
+	if snapshot.has("character_name"):
 		character_name = hud_snapshot.character_name
 	if snapshot.has("clock_display"):
 		hud_clock_display = str(snapshot.get("clock_display", ""))

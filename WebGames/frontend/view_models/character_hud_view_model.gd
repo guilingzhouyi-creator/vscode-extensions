@@ -13,7 +13,7 @@ extends RefCounted
 ## 1. 传输层载荷模型 (严格与传输契约对齐)
 class CharacterTransportDTO extends RefCounted:
 	var character_id: String = ""
-	var nickname: String = ""
+	var character_name: String = ""
 	var level_raw: int = 1
 	var hp_current: float = 0.0
 	var hp_maximum: float = 1.0
@@ -50,7 +50,7 @@ class CharacterDomainModel extends RefCounted:
 	static func from_dto(transport_payload: CharacterTransportDTO) -> CharacterDomainModel:
 		var domain_model := CharacterDomainModel.new()
 		domain_model.id = transport_payload.character_id
-		domain_model.name = transport_payload.nickname
+		domain_model.name = transport_payload.character_name
 		domain_model.level = maxi(1, transport_payload.level_raw)
 		domain_model.current_hp = transport_payload.hp_current
 		domain_model.max_hp = maxf(1.0, transport_payload.hp_maximum)

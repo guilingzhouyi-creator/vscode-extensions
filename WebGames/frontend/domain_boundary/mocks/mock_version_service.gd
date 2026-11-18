@@ -20,7 +20,7 @@ func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) 
 func check_version_async(result_callback: Callable) -> void:
 	MockBaseService.delayed_call(result_callback, {
 		"success": true,
-		"client_version": "0.4.9",
+		"version": "0.4.9",
 		"latest_version": "0.4.9",
 		"compatible": true,
 		"update_required": false

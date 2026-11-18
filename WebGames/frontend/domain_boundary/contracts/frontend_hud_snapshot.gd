@@ -15,9 +15,7 @@ const SCHEMA_VERSION: int = 2
 
 var character_id: String = ""
 var character_name: String = ""
-var nickname: String:
-	get: return character_name
-	set(value): character_name = value
+
 var race_name: String = ""
 var location_name: String = ""
 var level: int = 1
@@ -33,9 +31,6 @@ var gold: int = 0
 var silver: int = 0
 var copper: int = 0
 var mana_monocrystals: int = 0
-var monocrystals: int:
-	get: return mana_monocrystals
-	set(value): mana_monocrystals = value
 
 ## 将当前 HUD 快照实体序列化为与 from_dictionary 对等的字典结构
 func to_dictionary() -> Dictionary:
@@ -63,8 +58,7 @@ static func from_dictionary(snapshot_payload: Dictionary) -> FrontendHudSnapshot
 	var snapshot := FrontendHudSnapshot.new()
 	snapshot.character_id = read_string(snapshot_payload, "character_id")
 	var resolved_name := read_string(snapshot_payload, "character_name", "")
-	if resolved_name.is_empty():
-		resolved_name = read_string(snapshot_payload, "nickname", "")
+
 	snapshot.character_name = resolved_name
 	snapshot.race_name = read_string(snapshot_payload, "race_name")
 	snapshot.location_name = read_string(snapshot_payload, "location_name")
@@ -78,10 +72,7 @@ static func from_dictionary(snapshot_payload: Dictionary) -> FrontendHudSnapshot
 	snapshot.gold = maxi(0, read_int(snapshot_payload, "gold", 0))
 	snapshot.silver = maxi(0, read_int(snapshot_payload, "silver", 0))
 	snapshot.copper = maxi(0, read_int(snapshot_payload, "copper", 0))
-	var crystals := maxi(0, read_int(snapshot_payload, "mana_monocrystals", -1))
-	if crystals < 0:
-		crystals = maxi(0, read_int(snapshot_payload, "monocrystals", 0))
-	snapshot.mana_monocrystals = crystals
+	snapshot.mana_monocrystals = maxi(0, read_int(snapshot_payload, "mana_monocrystals", 0))
 	return snapshot
 
 ## 展示派生：生命值百分比（只读格式化，不参与任何业务规则）

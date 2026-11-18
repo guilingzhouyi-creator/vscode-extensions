@@ -23,7 +23,7 @@ static func run_all_tests() -> Dictionary:
 static func _test_snapshot_round_trip() -> Dictionary:
 	var dto := FrontendHudSnapshot.new()
 	dto.character_id = "char_81"
-	dto.nickname = "边界勇士"
+	dto.character_name = "边界勇士"
 	dto.hp_current = 88.0
 	dto.hp_max = 100.0
 	dto.gold = 7
@@ -73,11 +73,11 @@ static func _test_view_boundary_inheritance() -> Dictionary:
 static func _test_hud_snapshot_render_mapping() -> Dictionary:
 	var hud := MainHUDView.new()
 	hud.apply_snapshot({
-		"nickname": "快照勇士",
+		"character_name": "快照勇士",
 		"hp_current": 66.0,
 		"hp_max": 100.0,
 		"gold": 321,
-		"monocrystals": 9,
+		"mana_monocrystals": 9,
 	})
 	var ok := TestCase.assert_eq(hud.stat_hp_current, 66.0, "快照字段映射到状态字段")
 	ok = ok and TestCase.assert_eq(hud.wallet_gold, 321, "快照钱包映射")
