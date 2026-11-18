@@ -244,7 +244,7 @@ static func reload_config() -> Dictionary:
 
 	var built: Dictionary = {}
 	var warnings: Array = []
-	GameConfigLoader.scan_dir_into(CONFIG_DIR, "", built, _scan_failures, warnings)
+	GameConfigLoader.load_all_tables_into(built, _scan_failures, warnings)
 	_flush_loader_warnings(warnings)
 
 	if not _scan_failures.is_empty():

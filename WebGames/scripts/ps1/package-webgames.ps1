@@ -82,7 +82,7 @@ if ($code -eq 0 -and (Test-Path $artifactPath)) {
   Write-Host "  • 文件大小: $($item.Length) 字节"
   Write-Host "  • SHA-256: $hash"
 
-  # 验证 dev_harness 与 tests 绝对排除 (零测试/调试脚手架污染)
+  # 验证 dev_harness / tests / 明文 mods / 明文 config 绝对排除 (零调试与明文数据泄漏)
   $scanTargets = @($artifactPath)
   $sidecarPck = [System.IO.Path]::ChangeExtension($artifactPath, ".pck")
   if ((Test-Path $sidecarPck) -and ($scanTargets -notcontains $sidecarPck)) {
@@ -95,8 +95,12 @@ if ($code -eq 0 -and (Test-Path $artifactPath)) {
       Write-Host "【package-webgames】安全门禁拦截：导出产物包含 res://dev_harness/ 调试脚手架代码 ($scanFile)！"
       exit 1
     }
+    if ($rawText -match "res://mods/official_kalar/pack\.json" -or $rawText -match "res://config/domains/combat/mechanics\.json") {
+      Write-Host "【package-webgames】安全门禁拦截：导出产物包含明文 mods/ 或 config/ JSON 资产 ($scanFile)！"
+      exit 1
+    }
   }
-  Write-Host "  • 安全门禁: dev_harness 零调试脚手架排除验证通过"
+  Write-Host "  • 安全门禁: dev_harness 与明文 mods/config 零泄漏排除验证通过"
 
   # 外部加载 assets 捆绑：config.kdat 与 mods/ (.kmod 归档)
   $modsOutDir = Join-Path $OutDir "mods"

@@ -126,7 +126,7 @@ if [[ $code -eq 0 ]] && [[ -f "$ARTIFACT_PATH" ]]; then
   echo "  • 文件大小: $FILE_SIZE 字节"
   echo "  • SHA-256: $SHA"
 
-  # 验证 dev_harness 与 tests 绝对排除 (零测试/调试脚手架污染)
+  # 验证 dev_harness / tests / 明文 mods / 明文 config 绝对排除 (零调试与明文数据泄漏)
   SCAN_TARGETS=("$ARTIFACT_PATH")
   SIDECAR_PCK="${ARTIFACT_PATH%.*}.pck"
   if [[ -f "$SIDECAR_PCK" ]] && [[ "$SIDECAR_PCK" != "$ARTIFACT_PATH" ]]; then
@@ -137,8 +137,12 @@ if [[ $code -eq 0 ]] && [[ -f "$ARTIFACT_PATH" ]]; then
       echo "【package-webgames】安全门禁拦截：导出产物包含 res://dev_harness/ 调试脚手架代码 ($SCAN_FILE)！"
       exit 1
     fi
+    if grep -aqE "res://mods/official_kalar/pack\.json|res://config/domains/combat/mechanics\.json" "$SCAN_FILE" 2>/dev/null; then
+      echo "【package-webgames】安全门禁拦截：导出产物包含明文 mods/ 或 config/ JSON 资产 ($SCAN_FILE)！"
+      exit 1
+    fi
   done
-  echo "  • 安全门禁: dev_harness 零调试脚手架排除验证通过"
+  echo "  • 安全门禁: dev_harness 与明文 mods/config 零泄漏排除验证通过"
 
   # 外部加载 assets 捆绑：config.kdat 与 mods/ (.kmod 归档)
   MODS_OUT_DIR="$OUT_DIR/mods"

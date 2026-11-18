@@ -29,13 +29,8 @@ const INT32_MAX: int = 2147483647
 const MAX_STRING_POOL_SIZE: int = 65535
 const LOG_CHANNEL: String = "config_kdat"
 
-## 将任意 Variant（核心用于 Dictionary/Array）编译为完整 .kdat 字节流
-static func encode_kdat_buffer(
-	source_payload: Variant,
-	compress: bool = true,
-	payload_type: int = KDataHeaderDTO.PAYLOAD_MOD_PACKAGE,
-	encrypt: bool = false
-) -> PackedByteArray:
+## 将单个 Variant 编译为未加 32B 头的原始池化 TLV 负载切片（供单表与 Monolithic Bundle 复用）
+static func encode_raw_payload(source_payload: Variant) -> PackedByteArray:
 	var pool_strings := _build_string_pool(source_payload)
 	var pool_index: Dictionary = {}
 	for pool_position in range(pool_strings.size()):
@@ -52,8 +47,19 @@ static func encode_kdat_buffer(
 
 	if not _encode_tlv_value(raw_stream, source_payload, pool_index):
 		return PackedByteArray()
+	return raw_stream.data_array
 
-	var raw_payload := raw_stream.data_array
+## 将任意 Variant（核心用于 Dictionary/Array）编译为完整 .kdat 字节流
+static func encode_kdat_buffer(
+	source_payload: Variant,
+	compress: bool = true,
+	payload_type: int = KDataHeaderDTO.PAYLOAD_MOD_PACKAGE,
+	encrypt: bool = false
+) -> PackedByteArray:
+	var raw_payload := encode_raw_payload(source_payload)
+	if raw_payload.is_empty():
+		return PackedByteArray()
+	var pool_strings := _build_string_pool(source_payload)
 	var uncompressed_size := raw_payload.size()
 	var flags := KDataHeaderDTO.FLAG_LITTLE_ENDIAN | (KDataHeaderDTO.FLAG_STRING_POOL if not pool_strings.is_empty() else 0)
 	var compress_type := KDataHeaderDTO.COMPRESS_RAW
@@ -78,6 +84,36 @@ static func encode_kdat_buffer(
 	var out_bytes := header.serialize()
 	out_bytes.append_array(final_payload)
 	return out_bytes
+
+## 将多张配置表编译为 Monolithic config.kdat 字节流（TOC + Payload Slices，与 Python kalar_config_compiler 互通）
+static func encode_monolithic_bundle(tables_by_name: Dictionary, compress: bool = true) -> PackedByteArray:
+	var sorted_names: Array[String] = []
+	for raw_name in tables_by_name.keys():
+		sorted_names.append(String(raw_name))
+	sorted_names.sort()
+
+	var toc_entries: Array[Dictionary] = []
+	var payload_blobs := PackedByteArray()
+	for table_name in sorted_names:
+		var raw_bytes := encode_raw_payload(tables_by_name[table_name])
+		if raw_bytes.is_empty():
+			return PackedByteArray()
+		var offset := payload_blobs.size()
+		payload_blobs.append_array(raw_bytes)
+		toc_entries.append({
+			"table_name": table_name,
+			"offset": offset,
+			"length": raw_bytes.size(),
+			"uncompressed_length": raw_bytes.size(),
+			"crc32": BinaryConfigReader.compute_crc32(raw_bytes),
+		})
+
+	return encode_kdat_buffer(
+		{"toc": toc_entries, "payload": payload_blobs},
+		compress,
+		KDataHeaderDTO.PAYLOAD_MONOLITHIC,
+		false
+	)
 
 static func _build_string_pool(root_value: Variant) -> Array[String]:
 	var freq_map: Dictionary = {}

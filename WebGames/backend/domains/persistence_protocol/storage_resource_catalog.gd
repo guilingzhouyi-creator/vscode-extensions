@@ -14,6 +14,8 @@ class_name StorageResourceCatalog extends RefCounted
 
 const PATH_RESOURCE_CATALOG: String = "res://config/infrastructure/resource_catalog.json"
 const PATH_DOMAINS_JSON: String = "res://config/infrastructure/domains.json"
+const TABLE_RESOURCE_CATALOG: String = "infrastructure.resource_catalog"
+const TABLE_DOMAINS: String = "infrastructure.domains"
 const PREFIX_CONFIG_KEY: String = "config."
 const PREFIX_CONFIG_DIR: String = "res://config/"
 const CAT_CONFIG: String = "config"
@@ -59,13 +61,21 @@ static func _read_json_dict(path: String) -> Dictionary:
 		return {}
 	return json.get_data()
 
-## 确保存档资源索引已加载
+## 确保存档资源索引已加载（开发期读盘，发行包 res://config/ 剔除后回退 config.kdat）
 func ensure_catalog_loaded() -> void:
 	if _loaded:
 		return
 	_loaded = true
 
 	var catalog_root := _read_json_dict(PATH_RESOURCE_CATALOG)
+	var domains_root := _read_json_dict(PATH_DOMAINS_JSON)
+	if catalog_root.is_empty() or domains_root.is_empty():
+		var bundle_tables: Dictionary = GameConfigLoader.load_bundle_tables_snapshot()
+		if catalog_root.is_empty() and bundle_tables.get(TABLE_RESOURCE_CATALOG, null) is Dictionary:
+			catalog_root = (bundle_tables[TABLE_RESOURCE_CATALOG] as Dictionary).duplicate(true)
+		if domains_root.is_empty() and bundle_tables.get(TABLE_DOMAINS, null) is Dictionary:
+			domains_root = (bundle_tables[TABLE_DOMAINS] as Dictionary).duplicate(true)
+
 	for table_name in catalog_root.get("critical_boot_tables", []):
 		_critical_tables[String(table_name)] = true
 	var empty_entry: Dictionary = {}
@@ -74,7 +84,6 @@ func ensure_catalog_loaded() -> void:
 		var resource_entry := ResourceIndexEntryDTO.from_dict(custom_payload) as ResourceIndexEntryDTO
 		register_entry(resource_entry)
 
-	var domains_root := _read_json_dict(PATH_DOMAINS_JSON)
 	for entry in domains_root.get("domains", []):
 		_register_domain_entry(entry)
 

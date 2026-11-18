@@ -53,6 +53,34 @@
                 "panel": "shared",
                 "close": true
             }
+        },
+        {
+            "label": "WebGames: Check GDScript",
+            "type": "shell",
+            "command": "pwsh -NoProfile -File WebGames/scripts/ps1/check-gdscript.ps1",
+            "problemMatcher": [],
+            "group": "test"
+        },
+        {
+            "label": "WebGames: Run Tests",
+            "type": "shell",
+            "command": "pwsh -NoProfile -File WebGames/scripts/ps1/test-run.ps1",
+            "problemMatcher": [],
+            "group": "test"
+        },
+        {
+            "label": "WebGames: Full Audit",
+            "type": "shell",
+            "command": "pwsh -NoProfile -File WebGames/scripts/ps1/audit-all.ps1",
+            "problemMatcher": [],
+            "group": "test"
+        },
+        {
+            "label": "WebGames: Package PCK",
+            "type": "shell",
+            "command": "pwsh -NoProfile -File WebGames/scripts/ps1/package-webgames.ps1",
+            "problemMatcher": [],
+            "group": "build"
         }
     ]
 }

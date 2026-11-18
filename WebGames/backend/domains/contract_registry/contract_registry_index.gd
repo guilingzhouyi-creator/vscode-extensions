@@ -17,6 +17,7 @@ const DOMAIN_NAME: String = "contract_registry_index"
 
 const SUPPORTED_SCHEMA_VERSION: int = 1
 const CONTRACT_CONFIG_PATH_PRIMARY: String = "res://config/infrastructure/contracts.json"
+const CONTRACT_TABLE_NAME: String = "infrastructure.contracts"
 
 static var _instance: ContractRegistryIndex = null
 static var _entries: Array = []
@@ -125,12 +126,17 @@ func _load_from_config() -> void:
 	_by_domain_view.clear()
 	_by_endpoint.clear()
 
-	var text := _read_config_file_text()
-	if text.is_empty():
-		_loaded = true
-		return
-
-	var registry_dictionary := _parse_json_dict(text)
+	var registry_dictionary: Dictionary = {}
+	if not FileAccess.file_exists(CONTRACT_CONFIG_PATH_PRIMARY) and GameConfig.has_table(CONTRACT_TABLE_NAME):
+		var bundle_table: Variant = GameConfig.get_table(CONTRACT_TABLE_NAME, {})
+		if bundle_table is Dictionary:
+			registry_dictionary = bundle_table as Dictionary
+	if registry_dictionary.is_empty():
+		var text := _read_config_file_text()
+		if text.is_empty():
+			_loaded = true
+			return
+		registry_dictionary = _parse_json_dict(text)
 	if registry_dictionary.is_empty():
 		_loaded = true
 		return

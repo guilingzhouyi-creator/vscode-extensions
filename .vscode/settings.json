@@ -48,6 +48,11 @@
     "[shellscript]": {
         "files.eol": "\n"
     },
+    "[gdscript]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": false,
+        "files.eol": "\n"
+    },
     // 多项目 ESLint 解析隔离（防跨目录配置漂移）
     "eslint.workingDirectories": [
         { "pattern": "./workspace-timing" },

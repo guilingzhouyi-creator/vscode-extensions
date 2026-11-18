@@ -14,6 +14,7 @@ extends RefCounted
 const CONFIG_DIR: String = "res://config/"
 const EXT_JSON: String = ".json"
 const EXT_KDAT: String = ".kdat"
+const FILE_CONFIG_BUNDLE: String = "config.kdat"
 const PATH_CONFIG_BUNDLE: String = "res://config/config.kdat"
 const PATH_STORAGE_CATALOG_SCRIPT: String = "res://backend/domains/persistence_protocol/storage_resource_catalog.gd"
 const PATH_AUX_WORKER_POOL_SCRIPT: String = "res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd"
@@ -23,6 +24,36 @@ const METHOD_GET_INSTANCE: String = "get_instance"
 const METHOD_RESOLVE_CONFIG_TABLE_ENTRY: String = "resolve_config_table_entry"
 const METHOD_GET_CRITICAL_BOOT_ENTRIES: String = "get_critical_boot_entries"
 const BATCH_ID_CONFIG_BULK: String = "config_bulk_async"
+
+static var _override_config_bundle_path_for_test: String = ""
+
+
+## 测试注入专用：覆写或清空 Monolithic config.kdat 路径探针（供无头测试验证发行包回退）
+static func set_config_bundle_path_override_for_test(bundle_path: String) -> void:
+	_override_config_bundle_path_for_test = bundle_path.strip_edges()
+
+
+## 解析实际可用的 Monolithic config.kdat 路径（测试覆写 -> res://config/config.kdat -> 发行版可执行同级 config.kdat）
+static func resolve_config_bundle_path() -> String:
+	if not _override_config_bundle_path_for_test.is_empty():
+		return _override_config_bundle_path_for_test if FileAccess.file_exists(_override_config_bundle_path_for_test) else ""
+	if FileAccess.file_exists(PATH_CONFIG_BUNDLE):
+		return PATH_CONFIG_BUNDLE
+	if not AssetPathResolver.is_engineering_build():
+		var exe_path := OS.get_executable_path().strip_edges()
+		if not exe_path.is_empty():
+			var adjacent_bundle := exe_path.get_base_dir().path_join(FILE_CONFIG_BUNDLE)
+			if FileAccess.file_exists(adjacent_bundle):
+				return adjacent_bundle
+	return ""
+
+
+## 从当前解析到的 Monolithic config.kdat 解码全量配置表快照（不存在或损坏时返回空字典）
+static func load_bundle_tables_snapshot() -> Dictionary:
+	var bundle_path := resolve_config_bundle_path()
+	if bundle_path.is_empty():
+		return {}
+	return BinaryConfigReader.load_monolithic_bundle(bundle_path)
 
 
 ## 获取统一资源目录实例（动态解耦，杜绝跨层静态强引用）
@@ -36,16 +67,15 @@ static func get_catalog() -> Variant:
 
 ## 按优先级装载全量配置表（Monolithic Bundle 优先，回退递归目录扫描）
 static func load_all_tables_into(target_tables: Dictionary, scan_failures: Array, scan_warnings: Array = []) -> void:
-	if FileAccess.file_exists(PATH_CONFIG_BUNDLE):
-		var bundle_tables: Dictionary = BinaryConfigReader.load_monolithic_bundle(PATH_CONFIG_BUNDLE)
-		if not bundle_tables.is_empty():
-			for table_name in bundle_tables:
-				target_tables[table_name] = bundle_tables[table_name]
-			return
+	var bundle_tables: Dictionary = load_bundle_tables_snapshot()
+	if not bundle_tables.is_empty():
+		for table_name in bundle_tables:
+			target_tables[table_name] = bundle_tables[table_name]
+		return
 	scan_dir_into(CONFIG_DIR, "", target_tables, scan_failures, scan_warnings)
 
 
-## JIT 靶向按需加载单个配置表（消除冷启动全局阻塞）
+## JIT 靶向按需加载单个配置表（消除冷启动全局阻塞，发行态自动回退至 config.kdat）
 static func ensure_table_loaded_jit(
 	table_name: String,
 	tables: Dictionary,
@@ -71,29 +101,62 @@ static func ensure_table_loaded_jit(
 	var base_path: String = CONFIG_DIR + "/".join(parts)
 	if FileAccess.file_exists(base_path + EXT_KDAT):
 		load_single_table_into(base_path + EXT_KDAT, target_name, tables, scan_failures, scan_warnings)
-	elif FileAccess.file_exists(base_path + EXT_JSON):
+		return
+	if FileAccess.file_exists(base_path + EXT_JSON):
 		load_single_table_into(base_path + EXT_JSON, target_name, tables, scan_failures, scan_warnings)
+		return
+
+	var bundle_tables: Dictionary = load_bundle_tables_snapshot()
+	var resolved_bundle_key: String = _resolve_bundle_table_key(bundle_tables, target_name)
+	if not resolved_bundle_key.is_empty():
+		tables[resolved_bundle_key] = bundle_tables[resolved_bundle_key]
 
 
-## 同步极速加载 L0 核心基础配置表
+static func _resolve_bundle_table_key(bundle_tables: Dictionary, table_name: String) -> String:
+	if bundle_tables.has(table_name) and bundle_tables[table_name] is Dictionary:
+		return table_name
+	var core_key: String = table_name + ".core"
+	if bundle_tables.has(core_key) and bundle_tables[core_key] is Dictionary:
+		return core_key
+	var resolved_alias: String = ConfigRouterEngine.resolve_table_name(table_name)
+	if bundle_tables.has(resolved_alias) and bundle_tables[resolved_alias] is Dictionary:
+		return resolved_alias
+	return ""
+
+
+## 同步极速加载 L0 核心基础配置表（发行态当 res://config/ 被剔除时整包从 config.kdat 装入）
 static func load_l0_entries_into(tables: Dictionary, scan_failures: Array, scan_warnings: Array = []) -> int:
 	var catalog: Variant = get_catalog()
 	var loaded_count: int = 0
+	var bundle_cache: Dictionary = {}
+	var bundle_probed: bool = false
 	if catalog != null and catalog.has_method(METHOD_GET_CRITICAL_BOOT_ENTRIES):
 		for entry in catalog.get_critical_boot_entries():
 			var table_name: String = str(entry.metadata.get("table_name", ""))
-			if not table_name.is_empty() and not tables.has(table_name):
+			if table_name.is_empty() or tables.has(table_name):
+				continue
+			if FileAccess.file_exists(entry.physical_path):
 				load_single_table_into(entry.physical_path, table_name, tables, scan_failures, scan_warnings)
+				loaded_count += 1
+				continue
+			if not bundle_probed:
+				bundle_cache = load_bundle_tables_snapshot()
+				bundle_probed = true
+			var bundle_key: String = _resolve_bundle_table_key(bundle_cache, table_name)
+			if not bundle_key.is_empty():
+				tables[bundle_key] = bundle_cache[bundle_key]
 				loaded_count += 1
 	return loaded_count
 
 
-## 尝试向异步储存工作池提交配置表批量装载任务（条件不满足返回 false 供同步回退）
+## 尝试向异步储存工作池提交配置表批量装载任务（条件不满足或存在单体 config.kdat 时返回 false 供同步整包回退）
 static func try_enqueue_async_config_batch(
 	tables: Dictionary,
 	on_item_loaded: Callable,
 	on_batch_completed: Callable
 ) -> bool:
+	if not resolve_config_bundle_path().is_empty():
+		return false
 	var catalog: Variant = get_catalog()
 	if catalog == null or not ResourceLoader.exists(PATH_AUX_WORKER_POOL_SCRIPT):
 		return false

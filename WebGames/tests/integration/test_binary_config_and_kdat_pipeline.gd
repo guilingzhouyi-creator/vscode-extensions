@@ -26,6 +26,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_kdat_08_encrypted_stream_and_client_secret_vault())
 	results.append(test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolation())
 	results.append(test_tc_kdat_10_binary_writer_roundtrip_and_kmod_binary_envelope())
+	results.append(test_tc_kdat_11_release_config_bundle_and_direct_reader_fallbacks())
 
 	return pack_results("Binary Config & KData Pipeline", results)
 
@@ -440,4 +441,65 @@ static func test_tc_kdat_10_binary_writer_roundtrip_and_kmod_binary_envelope() -
 		"parity_ok": parity_ok,
 		"integrity_ok": integrity_ok,
 		"leak_rejected": leak_rejected,
+	})
+
+
+## TC-KDAT-11: Monolithic config.kdat 打包、发行模式解析及 JSON 缺失时直读回退验证
+static func test_tc_kdat_11_release_config_bundle_and_direct_reader_fallbacks() -> Dictionary:
+	var sandbox := "user://test_kdat11_release_bundle"
+	WorldModPackageOpsHelper.ensure_directory_recursive(sandbox)
+	var bundle_path := sandbox.path_join("config.kdat")
+	var sample_tables := {
+		"domains.combat.mechanics": {"crit_cap": 0.75, "tag": "kdat_release_smoke"},
+		"infrastructure.resource_catalog": {"critical_boot_tables": ["domains.combat.mechanics"], "custom_entries": []},
+		"infrastructure.domains": {"domains": [{"id": "combat", "config": "domains.combat.mechanics"}]},
+		"infrastructure.contracts": {"$schema_version": 1, "infra_domains": [], "entries": []},
+		"i18n.zh_CN": {"test.bundle.hello": "来自单包"},
+		"i18n.en_US": {"test.bundle.hello": "From Bundle"},
+	}
+
+	var encoded_bundle := BinaryConfigWriter.encode_monolithic_bundle(sample_tables, true)
+	var encode_ok := not encoded_bundle.is_empty()
+	if encode_ok:
+		var out_handle := FileAccess.open(bundle_path, FileAccess.WRITE)
+		if out_handle != null:
+			out_handle.store_buffer(encoded_bundle)
+			out_handle.close()
+		else:
+			encode_ok = false
+
+	GameConfigLoader.set_config_bundle_path_override_for_test(bundle_path)
+	AssetPathResolver.set_test_environment_override(AssetPathResolver.ENV_RELEASE)
+
+	var resolved_ok := GameConfigLoader.resolve_config_bundle_path() == bundle_path
+	var loaded_tables: Dictionary = {}
+	var scan_failures: Array = []
+	GameConfigLoader.load_all_tables_into(loaded_tables, scan_failures)
+	var bulk_ok := scan_failures.is_empty() \
+		and loaded_tables.size() == sample_tables.size() \
+		and is_equal_approx(float((loaded_tables.get("domains.combat.mechanics", {}) as Dictionary).get("crit_cap", 0.0)), 0.75) \
+		and str((loaded_tables.get("i18n.zh_CN", {}) as Dictionary).get("test.bundle.hello", "")) == "来自单包"
+
+	var snapshot_ok := GameConfigLoader.load_bundle_tables_snapshot().has("infrastructure.domains")
+	var jit_tables: Dictionary = {}
+	GameConfigLoader.ensure_table_loaded_jit("domains.combat.mechanics", jit_tables, scan_failures)
+	var jit_ok := jit_tables.has("domains.combat.mechanics") and not AssetPathResolver.is_engineering_build()
+
+	var probe_resolver := UITextResolver.new()
+	probe_resolver._dictionaries.clear()
+	probe_resolver._load_locale_dict("zh_CN", sandbox.path_join("absent_zh_CN.json"), "i18n.zh_CN")
+	var i18n_fallback_ok := (probe_resolver._dictionaries.get("zh_CN", {}) as Dictionary).size() > 0
+
+	GameConfigLoader.set_config_bundle_path_override_for_test("")
+	AssetPathResolver.reset_for_tests()
+	TestTier3ContentOverrideHelper.cleanup_directory_recursive(sandbox)
+
+	var passed := encode_ok and resolved_ok and bulk_ok and snapshot_ok and jit_ok and i18n_fallback_ok
+	return make_result("TC-KDAT-11: Monolithic config.kdat 发行路径解析与直读回退验证", passed, {
+		"encode_ok": encode_ok,
+		"resolved_ok": resolved_ok,
+		"bulk_ok": bulk_ok,
+		"snapshot_ok": snapshot_ok,
+		"jit_ok": jit_ok,
+		"i18n_fallback_ok": i18n_fallback_ok,
 	})

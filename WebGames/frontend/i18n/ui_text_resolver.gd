@@ -33,8 +33,8 @@ var _mod_dictionaries: Dictionary = {} # locale -> { key -> text }
 var _synced_mod_i18n_version: int = -1
 
 func _init() -> void:
-	_load_locale_dict("zh_CN", "res://config/i18n/zh_CN.json")
-	_load_locale_dict("en_US", "res://config/i18n/en_US.json")
+	_load_locale_dict("zh_CN", "res://config/i18n/zh_CN.json", "i18n.zh_CN")
+	_load_locale_dict("en_US", "res://config/i18n/en_US.json", "i18n.en_US")
 	sync_mod_dictionaries_from_config()
 
 ## 从 GameConfig 模组本地化覆盖层全量同步各语言字典（不污染静态基座词典）
@@ -61,19 +61,24 @@ func apply_mod_translations(locale: String, translations: Dictionary) -> void:
 func clear_mod_translations() -> void:
 	_mod_dictionaries.clear()
 
-## 加载本地化 JSON 文件
-func _load_locale_dict(locale: String, path: String) -> void:
-	if not FileAccess.file_exists(path):
-		return
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return
-	var raw_json_text := file.get_as_text()
-	file.close()
+## 加载本地化字典（开发期优先 JSON，发行态 res://config/ 剔除后回退 GameConfig/config.kdat）
+func _load_locale_dict(locale: String, path: String, fallback_table: String = "") -> void:
+	if FileAccess.file_exists(path):
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			return
+		var raw_json_text := file.get_as_text()
+		file.close()
 
-	var parsed_json: Variant = JSON.parse_string(raw_json_text)
-	if parsed_json is Dictionary:
-		_dictionaries[locale] = parsed_json
+		var parsed_json: Variant = JSON.parse_string(raw_json_text)
+		if parsed_json is Dictionary:
+			_dictionaries[locale] = parsed_json
+		return
+
+	if not fallback_table.is_empty() and GameConfig.has_table(fallback_table):
+		var table_payload: Variant = GameConfig.get_table(fallback_table, {})
+		if table_payload is Dictionary and not (table_payload as Dictionary).is_empty():
+			_dictionaries[locale] = (table_payload as Dictionary).duplicate(true)
 
 ## 核心翻译函数: resolve(i18n_key, template_payload) → 翻译后模板字符串（已填充参数）
 ## 单引擎模板解析收敛：本函数只负责提取模板，参数填充唯一由 PlaceholderFiller 承担，

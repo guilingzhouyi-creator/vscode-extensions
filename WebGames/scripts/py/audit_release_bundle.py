@@ -48,6 +48,22 @@ REQUIRED_SDK_RELPATHS: tuple[str, ...] = (
     "mod_sdk/examples/companion_ipc/README.md",
 )
 SCANNABLE_TEXT_SUFFIXES: frozenset[str] = frozenset({".json", ".jsonl", ".md", ".txt", ".cfg"})
+REQUIRED_EXPORT_EXCLUDES: tuple[str, ...] = (
+    "tests/*",
+    "dev_harness/*",
+    "benchmarks/*",
+    "mods/*",
+    "config/*",
+    "mod_sdk/*",
+    "scripts/*",
+    "reports/*",
+    "docs/*",
+)
+FORBIDDEN_PCK_MARKERS: tuple[bytes, ...] = (
+    b"res://dev_harness/",
+    b"res://mods/official_kalar/pack.json",
+    b"res://config/domains/combat/mechanics.json",
+)
 DRIVE_OR_URI_RE: re.Pattern[str] = re.compile(r"(?<![A-Za-z0-9_])(?:[A-Za-z]:[/\\]{1,2}|file:" + r"///" + r")[A-Za-z0-9_.\-]+")
 
 
@@ -79,6 +95,12 @@ def scan_release_directory(release_dir: Path, require_sdk: bool) -> list[str]:
             if lower_name in FORBIDDEN_SECRET_NAMES or lower_name.startswith(".env.") or file_path.suffix.lower() in FORBIDDEN_SECRET_SUFFIXES:
                 violations.append(f"[敏感凭证文件泄漏] {rel_file}")
                 continue
+            if file_path.suffix.lower() in {".pck", ".exe"}:
+                raw_blob = file_path.read_bytes()
+                for marker in FORBIDDEN_PCK_MARKERS:
+                    if marker in raw_blob:
+                        violations.append(f"[PCK 包体明文/调试残留] {rel_file} 包含 {marker.decode('ascii')}")
+                continue
             if file_path.suffix.lower() in SCANNABLE_TEXT_SUFFIXES and file_path.stat().st_size <= 512 * 1024:
                 text_content = file_path.read_text(encoding="utf-8", errors="ignore")
                 if DRIVE_OR_URI_RE.search(text_content):
@@ -109,6 +131,24 @@ def run_packaging_wiring_self_check() -> list[str]:
         script_text = target_file.read_text(encoding="utf-8", errors="ignore")
         if required_token not in script_text:
             violations.append(f"[未接线 {required_token}] {target_file.name}")
+
+    export_presets = WEBGAMES_ROOT / "export_presets.cfg"
+    if not export_presets.is_file():
+        violations.append("[缺失导出预设] export_presets.cfg")
+    else:
+        preset_text = export_presets.read_text(encoding="utf-8", errors="ignore")
+        preset_names = re.findall(r'^name="([^"]+)"', preset_text, re.MULTILINE)
+        for required_preset in ("Windows Desktop", "Linux", "Web"):
+            if required_preset not in preset_names:
+                violations.append(f"[export_presets.cfg 缺失目标预设] {required_preset}")
+        filter_matches = re.findall(r'^exclude_filter="([^"]*)"', preset_text, re.MULTILINE)
+        if not filter_matches:
+            violations.append("[export_presets.cfg 缺失 exclude_filter 配置]")
+        for preset_idx, raw_filter in enumerate(filter_matches):
+            excluded_tokens = {item.strip() for item in raw_filter.split(",") if item.strip()}
+            for required_excl in REQUIRED_EXPORT_EXCLUDES:
+                if required_excl not in excluded_tokens:
+                    violations.append(f"[export_presets.cfg preset.{preset_idx} exclude_filter 缺失排除项] {required_excl}")
     return violations
 
 
