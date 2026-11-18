@@ -220,6 +220,27 @@ def _test_gd_strict_style_evasion() -> list[str]:
         for tag in ("STYLE-HDR-001", "STYLE-DOC-001", "STYLE-NAM-002"):
             if tag not in view_joined:
                 failures.append(f"frontend/views 严格治理未拦截 {tag} (实得: {view_violations})")
+
+        test_dir = root / "tests" / "unit"
+        test_dir.mkdir(parents=True, exist_ok=True)
+        bad_test = test_dir / "probe_test_suite.gd"
+        bad_test.write_text(
+            "# 文件路径: res://tests/unit/probe_test_suite.gd\n"
+            "# 职责: 端到端全链路闭环及延迟基准验证\n"
+            "static func test_latency() -> void:\n"
+            "\tvar p95: int = 10\n"
+            "\tvar limit: int = p95\n"
+            "\tassert(limit == 10)\n",
+            encoding="utf-8",
+        )
+        test_violations: list[str] = []
+        style_rules.audit_file(bad_test, test_violations, base_root=root)
+        test_joined = "\n".join(test_violations)
+        for jargon_tok in ("全链路", "闭环"):
+            if jargon_tok not in test_joined or "STYLE-JRG-001" not in test_joined:
+                failures.append(f"tests/ 目录术语守卫未拦截 {jargon_tok} (实得: {test_violations})")
+        if "p95" in test_joined or "STYLE-NAM-002" in test_joined:
+            failures.append(f"tests/ 目录术语守卫误伤了 p95 或非严格命名规则 (实得: {test_violations})")
     return failures
 
 

@@ -210,6 +210,21 @@ def _record_decl_violations(
         )
 
 
+def check_forbidden_jargon(
+    rel: Path,
+    lines: list[str],
+    violations: list[str],
+) -> None:
+    """校验脚本中零残留过程术语与批次标签，豁免 p50/p95/p99 分位数标记 (STYLE-JRG-001)。"""
+    for idx, ln in enumerate(lines):
+        lineno = idx + 1
+        for hit in FORBIDDEN_JARGON_RE.findall(ln):
+            if not PERCENTILE_ALLOW_RE.match(hit):
+                violations.append(
+                    f"{rel}:{lineno}: 检测到未清理黑话或过程批次标签「{hit}」(STYLE-JRG-001)"
+                )
+
+
 def check_strict_jargon_and_decls(
     rel: Path,
     lines: list[str],
@@ -218,16 +233,13 @@ def check_strict_jargon_and_decls(
     var_re: re.Pattern[str],
 ) -> None:
     """校验零内部黑话/批次标签以及参数、Lambda、局部变量、循环变量与非模型类字段命名 (STYLE-JRG-001 / STYLE-NAM-002)。"""
+    check_forbidden_jargon(rel, lines, violations)
     in_func = False
     func_indent = 0
     inner_class_name = ""
     inner_class_indent = 0
     for idx, ln in enumerate(lines):
         lineno = idx + 1
-        for hit in FORBIDDEN_JARGON_RE.findall(ln):
-            if not PERCENTILE_ALLOW_RE.match(hit):
-                violations.append(f"{rel}:{lineno}: 检测到未清理黑话或过程批次标签「{hit}」(STYLE-JRG-001)")
-
         stripped = ln.strip()
         if not stripped or stripped.startswith("#"):
             continue

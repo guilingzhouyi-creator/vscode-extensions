@@ -27,6 +27,7 @@ from gd.gd_common import (
 )
 from gd.strict_governance_rules import (
     CLASS_NAME_STRICT_RE,
+    check_forbidden_jargon,
     check_strict_class_and_docs,
     check_strict_header,
     check_strict_jargon_and_decls,
@@ -147,9 +148,25 @@ def audit_file(path: Path, violations: list[str], base_root: Path | None = None)
         check_strict_jargon_and_decls(
             rel, lines, violations, STYLE_FUNC_RE, STYLE_VAR_RE
         )
+    elif rel_posix.startswith("tests/"):
+        check_forbidden_jargon(rel, lines, violations)
 
     for i, ln in enumerate(lines, 1):
         _audit_line_style(rel, i, ln, violations)
+
+
+def _audit_tests_jargon(violations: list[str]) -> None:
+    """对 tests/ 目录执行术语净空审查，避免触发非严格域的长度或函数名规范限制。"""
+    test_root = ROOT / "tests"
+    if not test_root.exists():
+        return
+    for test_file in sorted(p for p in test_root.rglob("*.gd") if p.is_file()):
+        try:
+            _, test_lines = GDFileCache.get(test_file)
+        except (UnicodeDecodeError, OSError) as exc:
+            violations.append(f"{test_file.relative_to(ROOT)}: 非 UTF-8 编码或读取失败（{exc}）")
+            continue
+        check_forbidden_jargon(test_file.relative_to(ROOT), test_lines, violations)
 
 
 def run_style_audit(include_tests: bool = False) -> int:
@@ -159,6 +176,8 @@ def run_style_audit(include_tests: bool = False) -> int:
     violations: list[str] = []
     for f in files:
         audit_file(f, violations)
+    if not include_tests:
+        _audit_tests_jargon(violations)
 
     print(f"【audit-gd-style】审查文件: {len(files)} 个")
     if violations:
