@@ -113,9 +113,9 @@ def compile_data_to_kdat(
     compressed_size = len(final_payload)
     crc32_val = zlib.crc32(final_payload) & 0xFFFFFFFF
 
-    # 组装 32 字节 Header
+    # 组装 32 字节 Header (u32 magic, u16 version, u16 flags, u8 compress, u8 payload_type, u16 header_size, u32 uncomp, u32 comp, u32 crc, 8B reserved)
     header = struct.pack(
-        "<IHBBHHIII8x",
+        "<IHHBBHIII8x",
         MAGIC_KDAT,
         FORMAT_VERSION_1_0,
         flags,
@@ -147,7 +147,7 @@ def decompile_kdat_to_data(
         uncompressed_size,
         compressed_size,
         crc32_val,
-    ) = struct.unpack_from("<IHBBHHIII", kdat_bytes, 0)
+    ) = struct.unpack_from("<IHHBBHIII", kdat_bytes, 0)
 
     if magic != MAGIC_KDAT:
         raise ValueError(f"非法魔数: 0x{magic:08X} (期望 0x{MAGIC_KDAT:08X})")
