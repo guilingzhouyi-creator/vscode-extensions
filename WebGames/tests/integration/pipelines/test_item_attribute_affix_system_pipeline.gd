@@ -1,7 +1,7 @@
 # ==============================================================================
 # 单元测试：物品属性双 UID 联动与隐藏特殊词缀体系
 # 文件路径: res://tests/integration/pipelines/test_item_attribute_affix_system_pipeline.gd
-# 职责: 验证双 UID 身份解耦、ABC 三类属性生命周期、隐藏鉴定、品质升格、非负下界与防伪守卫
+# 职责: 验证双 UID 身份解耦、ABC 三类属性生命周期、隐藏鉴定、品质升格、非负下界与签名防篡改守卫
 # ==============================================================================
 class_name TestItemAttributeAffixSystemPipeline
 extends RefCounted
@@ -159,7 +159,7 @@ static func _test_appraisal_state_lifecycle() -> Dictionary:
 	if mount.visibility != ItemAttributeMountInstance.VisibilityState.APPRAISED:
 		return {"test": "TC-AFFIX-03: 可见性跃迁", "passed": false, "error": "Visibility not APPRAISED"}
 	if r3.audit_token.is_empty():
-		return {"test": "TC-AFFIX-03: 防伪留痕签发", "passed": false, "error": "Audit token empty"}
+		return {"test": "TC-AFFIX-03: 审计凭证签发", "passed": false, "error": "Audit token empty"}
 
 	return {"test": "TC-AFFIX-03: C类隐藏属性鉴定与激活生命周期", "passed": true}
 
@@ -218,7 +218,7 @@ static func _test_non_negative_lower_bound_and_caps() -> Dictionary:
 	)
 	var final_def: float = float(res.get("final_stats", {}).get("defense", -1.0))
 
-	# 铁律断言：计算结果为 -20，必须严格截断为 0.0
+	# 约束断言：计算结果为 -20，必须严格截断为 0.0
 	if absf(final_def - 0.0) > 0.001:
 		return {"test": "TC-AFFIX-05: 非负下界截断", "passed": false, "error": "Defense was negative or invalid: %f" % final_def}
 
@@ -239,7 +239,7 @@ static func _test_non_negative_lower_bound_and_caps() -> Dictionary:
 
 	return {"test": "TC-AFFIX-05: 属性非负下界截断与有效值上界约束", "passed": true}
 
-## TC-AFFIX-06: 伪造已鉴定状态的客户端作弊拦截与防伪凭证验证
+## TC-AFFIX-06: 伪造已鉴定状态的客户端作弊拦截与审计凭证校验
 static func _test_anti_spoofing_audit_security() -> Dictionary:
 	# 1. 客户端伪造：声明为已鉴定，但签名缺失
 	var fake_mount1 := ItemAttributeMountInstance.new()
@@ -291,4 +291,4 @@ static func _test_anti_spoofing_audit_security() -> Dictionary:
 	if not ItemAttributeSecurityGuard.verify_mount_integrity(valid_mount):
 		return {"test": "TC-AFFIX-06: 合法签名校验", "passed": false, "error": "Legit signature was rejected"}
 
-	return {"test": "TC-AFFIX-06: 鉴定状态防伪签名与客户端篡改拦截", "passed": true}
+	return {"test": "TC-AFFIX-06: 鉴定状态完整性签名与客户端篡改拦截", "passed": true}

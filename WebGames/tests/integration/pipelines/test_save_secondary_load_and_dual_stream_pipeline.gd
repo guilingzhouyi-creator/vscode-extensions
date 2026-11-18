@@ -1,9 +1,9 @@
 # ==============================================================================
-# 单元测试：存档二次载入与复合鉴权双轨分流全链路流水线
+# 单元测试：存档二次载入与复合鉴权双模式分流端到端流水线
 # 文件路径: res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd
-# 职责: 覆盖「复合鉴权自动注册/登录 ➔ 多世界槽位占位符防御 ➔ 边界A/B双轨判定与分流 ➔
+# 职责: 覆盖「复合鉴权自动注册/登录 ➔ 多世界默认槽位防御 ➔ 边界A/B双模式判定与分流 ➔
 #       世界主页HUD汇聚同步 ➔ ESC呼出菜单 ➔ 优雅停机安全反装配」全生命周期无头断言。
-# 需求源: 路线图短期施工区存档二次载入与复合鉴权双轨分流规范
+# 需求源: 路线图规划阶段存档二次载入与复合鉴权双模式分流规范
 # ==============================================================================
 class_name TestSaveSecondaryLoadAndDualStreamPipeline
 extends TestCase
@@ -23,7 +23,7 @@ static func run_all_tests() -> Dictionary:
 
 	if not had_overlay:
 		TestCase.unmount_mod_overlay_for_test()
-	return TestCase.pack_results("存档二次载入与复合鉴权双轨分流全链路流水线", results)
+	return TestCase.pack_results("存档二次载入与复合鉴权双模式分流端到端流水线", results)
 
 static func _make_test_account_store() -> Dictionary:
 	# Non-empty sentinel keeps AuthService strictly in-memory so test accounts never touch user://accounts.

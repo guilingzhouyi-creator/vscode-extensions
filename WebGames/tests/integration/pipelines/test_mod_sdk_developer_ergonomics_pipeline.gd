@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd
 # 架构定位: Integration Test Pipeline / Mod SDK Developer Ergonomics Harness
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, persistence_protocol, lifecycle
-# 职责说明: MOD 开发者便利套件协议同步与全链路调试推演端到端流水线 (TC-MDE-01 ~ TC-MDE-08)
+# 职责说明: MOD 开发者便利套件协议同步与调试推演端到端流水线 (TC-MDE-01 ~ TC-MDE-08)
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -22,7 +22,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_mde_07_mock_dispatcher_dual_track_envelope_roundtrip())
 	results.append(test_tc_mde_08_python_toolchain_and_with_hud_equivalence())
 	results.append(test_tc_mde_09_mod_topological_sort_and_dependencies())
-	return TestCase.pack_results("MOD开发者便利套件协议同步与全链路调试推演流水线", results)
+	return TestCase.pack_results("MOD开发者便利套件协议同步与端到端调试推演流水线", results)
 
 static func _setup_env() -> void:
 	WorldSessionRuntimeService.reset_for_tests()
@@ -39,7 +39,7 @@ static func _teardown_env() -> void:
 	UnifiedProtocolFactory.reset_for_tests()
 
 ## -----------------------------------------------------------------------------
-## TC-MDE-01: 权威能力清单与双轨 Schema 零漂移静态一致性断言
+## TC-MDE-01: 权威能力清单与双份 Schema 零漂移静态一致性断言
 ## -----------------------------------------------------------------------------
 static func test_tc_mde_01_mod_sdk_drift_free_audit() -> Dictionary:
 	_setup_env()
@@ -85,7 +85,7 @@ static func test_tc_mde_01_mod_sdk_drift_free_audit() -> Dictionary:
 			and spec_text.find("dispatch") >= 0
 
 	var passed: bool = cap_exists and cap_valid and lease_aligned and error_codes_ok and spec_has_envelope
-	return TestCase.make_result("TC-MDE-01: 权威能力清单与双轨 Schema 零漂移静态一致性断言", passed, {
+	return TestCase.make_result("TC-MDE-01: 权威能力清单与双份 Schema 零漂移静态一致性断言", passed, {
 		"cap_exists": cap_exists,
 		"cap_valid": cap_valid,
 		"lease_aligned": lease_aligned,
@@ -274,7 +274,7 @@ static func test_tc_mde_07_mock_dispatcher_dual_track_envelope_roundtrip() -> Di
 	})
 
 ## -----------------------------------------------------------------------------
-## TC-MDE-08: 跨平台 CLI dispatch 与 play --with-hud 全链路贯通断言
+## TC-MDE-08: 跨平台 CLI dispatch 与 play --with-hud 端到端贯通断言
 ## -----------------------------------------------------------------------------
 static func test_tc_mde_08_python_toolchain_and_with_hud_equivalence() -> Dictionary:
 	_setup_env()
@@ -304,7 +304,7 @@ static func test_tc_mde_08_python_toolchain_and_with_hud_equivalence() -> Dictio
 		play_has_hud = text.find("initial_hud_snapshot") >= 0 and text.find("--with-hud") >= 0
 
 	var passed: bool = cli_has_dispatch and client_ok and play_has_hud
-	return TestCase.make_result("TC-MDE-08: 跨平台 CLI dispatch 与 play --with-hud 全链路贯通断言", passed, {
+	return TestCase.make_result("TC-MDE-08: 跨平台 CLI dispatch 与 play --with-hud 端到端贯通断言", passed, {
 		"cli_has_dispatch": cli_has_dispatch,
 		"client_ok": client_ok,
 		"play_has_hud": play_has_hud,

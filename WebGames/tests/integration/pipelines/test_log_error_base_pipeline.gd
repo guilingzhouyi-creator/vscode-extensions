@@ -1,5 +1,5 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 统一日志错误底座测试套件
+# 卡拉尔世界引擎 (Kalar World Engine) - 统一日志错误基础框架测试套件
 # 文件路径: res://tests/integration/pipelines/test_log_error_base_pipeline.gd
 # 职责: 验收统一日志记录模型（LogRecordDTO）、日志导出器（LogFileExporter）、
 #       错误码注册表（ErrorCodeRegistry）、统一爆错通道（ErrorReporter）与存量收敛
@@ -17,7 +17,7 @@ const GMArbitrationAuditServiceClass = preload("res://backend/domains/admin_sand
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	var domain_name := "统一日志错误底座与英文爆错收敛治理验收流水线"
+	var domain_name := "统一日志错误基础框架与英文报错收敛治理验收流水线"
 
 	results.append(_test_lg_01_log_record_dto_serialization_and_deep_copy())
 	results.append(_test_lg_02_log_export_config_dto_from_config())
@@ -509,7 +509,7 @@ static func _test_lg_22_errors_catalog_required_table_present() -> Dictionary:
 		return {"test": "TC-LG-22", "passed": false, "error": "errors_catalog table entries too small (%d)" % errors_dict.size()}
 	return {"test": "TC-LG-22: errors_catalog 必需配置表就绪", "passed": true}
 
-## TC-LG-23: 全链路闭环回归断言
+## TC-LG-23: 端到端回归断言
 static func _test_lg_23_full_integration_pipeline_regression() -> Dictionary:
 	EventBusCore.reset_sequence_for_test()
 	LogFileExporterClass.reset_for_test()
@@ -522,7 +522,7 @@ static func _test_lg_23_full_integration_pipeline_regression() -> Dictionary:
 
 	if captured.is_empty():
 		return {"test": "TC-LG-23", "passed": false, "error": "Full pipeline failed to emit record"}
-	return {"test": "TC-LG-23: 全链路闭环回归", "passed": true}
+	return {"test": "TC-LG-23: 端到端回归", "passed": true}
 
 ## TC-LG-24: 加固改造断言（动态诊断保真、信包双载荷与持久化契约）
 static func _test_lg_24_hardened_observability_and_preservation() -> Dictionary:

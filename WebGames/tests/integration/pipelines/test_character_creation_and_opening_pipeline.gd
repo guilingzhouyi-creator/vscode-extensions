@@ -2,8 +2,8 @@
 # 单元测试：配置驱动角色创建系统升级与开局事件流接入
 # 文件路径: res://tests/integration/pipelines/test_character_creation_and_opening_pipeline.gd
 # 职责: 验证 RaceDefinitionDTO 配置驱动种族元数据、创角顺序状态机防跃迁、
-#       后端权威属性派生防伪（前端伪造战斗属性零信任丢弃）、首次开档开局事件
-#       流广播、种族扩展灰度拦截，以及世界栏网关到开局叙事全链路无断裂。
+#       后端权威属性派生防篡改（前端伪造战斗属性零信任丢弃）、首次开档开局事件
+#       流广播、种族扩展灰度拦截，以及世界栏网关到开局叙事全流程无断裂。
 # 需求源: 验收矩阵 TC-CC-01 ~ TC-CC-06
 # ==============================================================================
 class_name TestCharacterCreationAndOpeningPipeline
@@ -223,7 +223,7 @@ static func _test_race_expansion_canary_gating() -> Dictionary:
 	return { "test": "TC-CC-05: 种族灰度互锁（非白名单 RACE_CANARY_RESTRICTED / 白名单放行）", "passed": passed }
 
 
-## TC-CC-06: 世界栏网关到开局叙事全链路闭环（网关 → 创角 → 开局事件）
+## TC-CC-06: 世界栏网关到开局叙事完整流程（网关 → 创角 → 开局事件）
 static func _test_full_lifecycle_gateway_to_opening_narrative() -> Dictionary:
 	var account_id := "ACC_FULL_FLOW_01"
 
@@ -258,7 +258,7 @@ static func _test_full_lifecycle_gateway_to_opening_narrative() -> Dictionary:
 		and not opening.character_id.is_empty() and not opening.character_name.is_empty()
 	var broadcast_ok: bool = seen_channels.has("opening_narrative.triggered")
 
-	# 4. 创角完成后回挂网关并正式进入世界（全链路状态无断裂）
+	# 4. 创角完成后回挂网关并正式进入世界（全流程状态无断裂）
 	var char_id: String = ""
 	if opening != null:
 		char_id = opening.character_id
@@ -267,4 +267,4 @@ static func _test_full_lifecycle_gateway_to_opening_narrative() -> Dictionary:
 	var enter_world_ok: bool = bool(fsm.enter_world().get("success", false))
 
 	var passed: bool = gateway_ok and mode_ok and creation_ok and opening_ok and broadcast_ok and attach_ok and enter_world_ok
-	return { "test": "TC-CC-06: 网关→模式路由→创角→开局事件→回挂进世界全链路闭环", "passed": passed }
+	return { "test": "TC-CC-06: 网关→模式路由→创角→开局事件→回挂进世界完整流程", "passed": passed }

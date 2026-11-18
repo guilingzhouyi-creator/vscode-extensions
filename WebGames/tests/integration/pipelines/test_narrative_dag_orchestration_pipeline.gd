@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 通用剧情因果 DAG 编排与多角色差异化序章测试套件
 # 文件路径: res://tests/integration/pipelines/test_narrative_dag_orchestration_pipeline.gd
-# 职责: 验证 DAG 静态拓扑排序、循环依赖环拦截、汇聚等待、条件分支、多角色路由与全生命周期闭环
+# 职责: 验证 DAG 静态拓扑排序、循环依赖环拦截、汇聚等待、条件分支、多角色路由与全生命周期流转
 # ==============================================================================
 class_name TestNarrativeDagOrchestrationPipeline
 extends RefCounted
@@ -17,9 +17,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_conditional_branching_path())
 	results.append(_test_multi_race_dag_routing())
 	results.append(_test_full_lifecycle_creation_to_dag_completion())
-	# 审查修复闭环：R1 权重仲裁单选 + R2 悬挂告警
+	# 审查修复验证：R1 权重仲裁单选 + R2 悬挂告警
 	results.append(_test_branch_arbitration_and_hanging_detection())
-	# 审查修复闭环：R3 全字段装配 + R4 路由单源 + O1 校验守卫
+	# 审查修复验证：R3 全字段装配 + R4 路由单源 + O1 校验守卫
 	results.append(_test_registry_full_assembly_and_validator_guards())
 
 	if not had_overlay:
@@ -178,11 +178,11 @@ static func _test_multi_race_dag_routing() -> Dictionary:
 	var passed: bool = elf_ok and human_ok and fallback_ok
 	return { "test": "TC-DAG-05: 角色种族差异化序章配置路由", "passed": passed }
 
-## TC-DAG-06: 创角到序章 DAG 完结全生命周期闭环
+## TC-DAG-06: 创角到序章 DAG 完结全生命周期流转
 static func _test_full_lifecycle_creation_to_dag_completion() -> Dictionary:
 	var dag := PrologueDagRegistry.get_graph_by_id("DAG_PROLOGUE_HUMAN_CAPITAL")
 	if dag == null:
-		return { "test": "TC-DAG-06: 创角到序章 DAG 完结全生命周期闭环", "passed": false }
+		return { "test": "TC-DAG-06: 创角到序章 DAG 完结全生命周期流转", "passed": false }
 
 	var bus := EventBusCore.get_instance()
 	var seen_events: Array[String] = []
@@ -211,7 +211,7 @@ static func _test_full_lifecycle_creation_to_dag_completion() -> Dictionary:
 
 	var passed: bool = init_ok and s1.get("success", false) and s2.get("success", false) \
 		and s3.get("success", false) and completed_ok and events_ok
-	return { "test": "TC-DAG-06: 创角到序章 DAG 完结全生命周期闭环", "passed": passed }
+	return { "test": "TC-DAG-06: 创角到序章 DAG 完结全生命周期流转", "passed": passed }
 
 
 ## TC-DAG-07: 审查修复 R1 分支权重仲裁单选 + R2 悬挂死路显式告警

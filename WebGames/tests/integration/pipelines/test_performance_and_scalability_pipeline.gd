@@ -250,7 +250,7 @@ static func _test_inventory_metric_snapshot_and_cdkey_rate_limits() -> Dictionar
 	}
 
 ## 修复回归（红证：修复前 init_or_rebuild_cache 零外部触发点，
-## 配置热重载后移动参数/别名静默冻结，与 S3「缓存热重载失效机制已闭环」不符）：
+## 配置热重载后移动参数/别名静默冻结，与 S3「缓存热重载失效机制已完善」不符）：
 ## 热重载版本推进后，下一次调用必须重建缓存并同步到新版本。
 static func _test_movement_cache_rebuild_on_config_reload() -> Dictionary:
 	var v_north: Vector2 = MovementVectorBridgeSolver.translate_text_step_to_vector("NORTH", 10.0)

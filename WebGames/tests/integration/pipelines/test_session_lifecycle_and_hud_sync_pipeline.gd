@@ -162,7 +162,7 @@ static func test_hud_push_stream_and_payload_contract() -> Dictionary:
 				and (ev["payload"].get("args") is Array)
 	return {"test": "TC-HDS-05: 推轨事件流与载荷契约", "passed": stat_hit and wallet_hit}
 
-# ---- TC-HDS-06：全生命周期无头闭环（注册→登录→进世界首帧→注销） ----
+# ---- TC-HDS-06：全生命周期无头流程（注册→登录→进世界首帧→注销） ----
 static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 	var store := _make_account_store()
 	var captured: Array = []
@@ -327,7 +327,7 @@ static func _simulate_shutdown(account_id: String, slot_id: String, token: Strin
 	GameLifecycleManager.reset_for_test()
 	return resp
 
-# ---- TC-HDS-09：十阶段全链路端到端无头串联与自定义 Hook 导通 ----
+# ---- TC-HDS-09：十阶段端到端无头串联与自定义 Hook 导通 ----
 static func test_ten_stage_custom_hook_conduction_pipeline() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

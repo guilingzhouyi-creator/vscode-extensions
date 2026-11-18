@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_authoritative_character_creation_pipeline.gd
 # 架构定位: Integration Test Suite / Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: WorldCharacterCreationOrchestrator, WorldArchiveRepository, AccountRepository, SaveDataAccessLayer, WorldGatewayFSM | 配置: config/domains/*.json | 信号: 无直接监听
-# 职责说明: 自动化全链路测试世界内角色权威创建流水线。覆盖纯名字权威解算、前端篡改防御、全景呈现快照契约、背包装备物理水化、世界历史片段单调追加及网关状态机自动回挂跃迁。
+# 职责说明: 自动化端到端测试世界内角色权威创建流水线。覆盖纯名字权威解算、前端篡改防御、全景呈现快照契约、背包装备实体装配、世界历史片段单调追加及网关状态机自动回挂跃迁。
 # 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -215,7 +215,7 @@ static func test_presentation_envelope_completeness() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-ACC-04: 背包装备真实物理水化（ItemEntity 挂载到 WearableInventoryAggregate）
+## TC-ACC-04: 背包装备真实实体装配（ItemEntity 挂载到 WearableInventoryAggregate）
 static func test_starter_loadout_physical_hydration() -> Dictionary:
 	_setup_environment()
 
@@ -244,7 +244,7 @@ static func test_starter_loadout_physical_hydration() -> Dictionary:
 
 	var passed: bool = ok_success and ok_profile and ok_inv and ok_equip
 	return {
-		"test": "TC-ACC-04: 背包装备真实物理水化",
+		"test": "TC-ACC-04: 背包装备真实实体装配",
 		"passed": passed
 	}
 

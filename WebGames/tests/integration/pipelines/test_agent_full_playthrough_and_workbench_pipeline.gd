@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_agent_full_playthrough_and_workbench_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: ModManifestValidator, WorldGatewayFSM, PrologueHandoffDTO, AccountSlotCreationDTO, AgentPlaythroughSession, CompositeEventExtractor
-# 职责说明: 开发者集成工作台、.kmod 清单审计、创角参数收敛、序章大地图跃迁与循环零瞬态堆分配全链路回归套件
+# 职责说明: 开发者集成工作台、.kmod 清单审计、创角参数收敛、序章大地图跃迁与循环零瞬态堆分配端到端回归套件
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -134,7 +134,7 @@ static func test_tc_afw_03_account_slot_context_and_binding_solver() -> Dictiona
 		"bind_ok": bind_ok
 	})
 
-## TC-AFW-04: AgentPlaythroughSession 端到端推演完结后与大地图流转全链路
+## TC-AFW-04: AgentPlaythroughSession 端到端推演完结后与大地图完整流转
 static func test_tc_afw_04_agent_playthrough_to_world_exploration_e2e() -> Dictionary:
 	_setup_environment()
 
@@ -180,7 +180,7 @@ static func test_tc_afw_04_agent_playthrough_to_world_exploration_e2e() -> Dicti
 
 	var passed: bool = start_ok and session_ended and e2e_ok
 	_teardown_environment()
-	return make_result("TC-AFW-04: AgentPlaythroughSession 端到端推演完结后与大地图流转全链路", passed, {
+	return make_result("TC-AFW-04: AgentPlaythroughSession 端到端推演完结后与大地图完整流转", passed, {
 		"start_ok": start_ok,
 		"session_ended": session_ended,
 		"e2e_ok": e2e_ok

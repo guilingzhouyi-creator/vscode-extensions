@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd
 # 架构定位: Integration Test Pipeline / Acceptance Harness
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, lifecycle, frontend/systems
-# 职责说明: 统一协议工厂、双轨租约抢占、HUD 事件桥接与 ESC 菜单全链路无头验收套件
+# 职责说明: 统一协议工厂、双模式租约抢占、HUD 事件桥接与 ESC 菜单端到端无头验收套件
 # 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -21,7 +21,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_upe_07_esc_quit_game_graceful_shutdown())
 	results.append(test_tc_upe_08_protocol_objects_zero_heap_recycling())
 	results.append(test_tc_upe_09_custom_domain_handler_scalability())
-	return TestCase.pack_results("统一协议工厂与ESC系统菜单后端联动全链路流水线", results)
+	return TestCase.pack_results("统一协议工厂与ESC系统菜单后端联动端到端流水线", results)
 
 static func _reset_env() -> void:
 	WorldSessionRuntimeService.reset_for_tests()
@@ -33,7 +33,7 @@ static func _reset_env() -> void:
 	UnifiedProtocolDispatcher.reset_custom_handlers_for_tests()
 
 ## -----------------------------------------------------------------------------
-## TC-UPE-01: 统一协议工厂双轨请求装箱与反装箱一致性断言
+## TC-UPE-01: 统一协议工厂双模式请求装箱与反装箱一致性断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_01_protocol_factory_packing_roundtrip() -> Dictionary:
 	_reset_env()
@@ -81,7 +81,7 @@ static func test_tc_upe_01_protocol_factory_packing_roundtrip() -> Dictionary:
 
 	_reset_env()
 	var passed: bool = h_ok and h_roundtrip and a_ok and r_ok
-	return TestCase.make_result("TC-UPE-01: 统一协议工厂双轨请求装箱与反装箱一致性断言", passed)
+	return TestCase.make_result("TC-UPE-01: 统一协议工厂双模式请求装箱与反装箱一致性断言", passed)
 
 ## -----------------------------------------------------------------------------
 ## TC-UPE-02: 人类控制租约抢占与 Agent 动作冲突拦截断言
@@ -249,7 +249,7 @@ static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 	return TestCase.make_result("TC-UPE-05: ESC 菜单安全保存与物理落盘断言", passed)
 
 ## -----------------------------------------------------------------------------
-## TC-UPE-06: ESC 退出到世界档案触发网关全量内存洗脱断言
+## TC-UPE-06: ESC 退出到世界档案触发网关全量内存清理断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 	_reset_env()
@@ -270,7 +270,7 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 	var resp_exit := UnifiedProtocolDispatcher.dispatch_request(req_exit, gateway)
 	var exit_ok: bool = resp_exit.success
 
-	# 断言内存全量洗脱指标
+	# 断言内存全量清理指标
 	var phase_back: bool = (gateway.context.current_phase == WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED)
 	var mode_scrubbed: bool = (gateway.context.selected_mode == WorldGatewayModel.GameMode.UNSELECTED)
 	var slot_scrubbed: bool = (gateway.context.selected_slot_id == "")
@@ -280,7 +280,7 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 
 	_reset_env()
 	var passed: bool = in_world_before and exit_ok and phase_back and mode_scrubbed and slot_scrubbed and char_scrubbed and mods_scrubbed and lease_released
-	return TestCase.make_result("TC-UPE-06: ESC 退出到世界档案触发网关全量内存洗脱断言", passed, {
+	return TestCase.make_result("TC-UPE-06: ESC 退出到世界档案触发网关全量内存清理断言", passed, {
 		"in_world_before": in_world_before,
 		"exit_ok": exit_ok,
 		"phase_back": phase_back,

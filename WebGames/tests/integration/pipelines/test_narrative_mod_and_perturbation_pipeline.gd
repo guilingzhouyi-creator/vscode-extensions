@@ -1,9 +1,9 @@
 # ==============================================================================
-# 模块归属: 集成测试流水线 (Tests · 自动化测试底座)
+# 模块归属: 集成测试流水线 (Tests · 自动化测试框架)
 # 文件路径: res://tests/integration/pipelines/test_narrative_mod_and_perturbation_pipeline.gd
 # 架构定位: Integration Test Pipeline / Narrative MOD & Perturbation Harness
 # 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, CrossWorldPerturbationBroker, WorldModAffinityManager, WorldGatewayFSM, WorldArchiveRepository | 配置: config/domains/narrative_orchestration/core.json
-# 职责说明: 自动化全链路测试剧情 MOD 级联发现、Kahn 拓扑排序、跨世界虚空因果扰动、世界亲和锁文件固化、防坏档拦截与安全降级
+# 职责说明: 自动化端到端测试剧情 MOD 级联发现、Kahn 拓扑排序、跨世界虚空因果扰动、世界亲和锁文件固化、防坏档拦截与安全降级
 # 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -180,7 +180,7 @@ static func test_topological_sort_and_cyclic_detection() -> Dictionary:
 		}
 	}
 
-## TC-NMP-03: 跨世界虚空扰动广播、半衰期衰减与已读标记闭环
+## TC-NMP-03: 跨世界虚空扰动广播、半衰期衰减与已读标记流转
 static func test_cross_world_perturbation_lifecycle() -> Dictionary:
 	CrossWorldPerturbationBroker.reset_for_tests()
 	var broker := CrossWorldPerturbationBroker.get_instance()
@@ -222,7 +222,7 @@ static func test_cross_world_perturbation_lifecycle() -> Dictionary:
 	var passed: bool = emit_ok and origin_isolated and target_found and decay_formula_ok and target_visited_excluded
 	return {
 		"test_id": "TC-NMP-03",
-		"name": "跨世界虚空扰动广播、半衰期衰减与已读标记闭环",
+		"name": "跨世界虚空扰动广播、半衰期衰减与已读标记流转",
 		"passed": passed,
 		"details": {
 			"emit_ok": emit_ok,

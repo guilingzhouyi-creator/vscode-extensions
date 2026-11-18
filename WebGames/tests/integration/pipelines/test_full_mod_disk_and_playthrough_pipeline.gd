@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_full_mod_disk_and_playthrough_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, WorldGatewayFSM, PrologueExecutionKernel, ModPrecheckAndAdaptationSolver, ProloguePlaceholderResolver | 配置: config/domains/*.json | 信号: 无直接监听
-# 职责说明: 全链路验证磁盘五件套模板聚合与双态Schema归一化、网关单机一键磁盘发现与挂载、悬空序章与套件跨表拦截、内联文本语法糖与双轨占位符水化、后端无头试玩推演与因果突变结算闭环、以及Python工具链同构等价性。
+# 职责说明: 端到端验证磁盘五件套模板聚合与双态Schema归一化、网关单机一键磁盘发现与挂载、悬空序章与套件跨表拦截、内联文本语法糖与大小写占位符展开、后端无头试玩推演与因果突变结算流程、以及Python工具链同构等价性。
 # 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (全目录MOD磁盘发现与推演内核架构规范)
 # ==============================================================================
 
@@ -99,7 +99,7 @@ static func test_disk_mod_package_discovery_and_normalization() -> Dictionary:
 		"sync_ok": sync_ok
 	})
 
-## TC-FMP-02: 网关单机一站式磁盘发现预检挂载闭环
+## TC-FMP-02: 网关单机一站式磁盘发现预检挂载流程
 static func test_world_gateway_single_player_disk_discovery_and_precheck() -> Dictionary:
 	_setup_environment()
 	var fsm := WorldGatewayFSM.new(TEST_ACCOUNT_ID)
@@ -120,7 +120,7 @@ static func test_world_gateway_single_player_disk_discovery_and_precheck() -> Di
 	_teardown_environment()
 
 	var passed: bool = disc_ok and manifest_has_dag and poison_blocked
-	return TestCase.make_result("TC-FMP-02: 网关单机一站式磁盘发现预检挂载闭环", passed, {
+	return TestCase.make_result("TC-FMP-02: 网关单机一站式磁盘发现预检挂载流程", passed, {
 		"disc_ok": disc_ok,
 		"manifest_has_dag": manifest_has_dag,
 		"poison_blocked": poison_blocked
@@ -174,7 +174,7 @@ static func test_dangling_dag_and_kit_cross_table_rejection() -> Dictionary:
 		"graph_blocked": graph_blocked
 	})
 
-## TC-FMP-04: 内联文本语法糖与大小写双轨占位符水化
+## TC-FMP-04: 内联文本语法糖与大小写双格式占位符展开
 static func test_inline_text_and_dual_track_placeholders() -> Dictionary:
 	var inline_tmpl := "勇敢的 {player_name}（{PLAYER_NAME}）携 {STARTER_KIT_NAME} 起程于 {birth_region}。"
 	var placeholders: Dictionary = {
@@ -208,7 +208,7 @@ static func test_inline_text_and_dual_track_placeholders() -> Dictionary:
 	var node_ok: bool = node.inline_text == "你好 {player_name}" and node.choices.size() == 1
 
 	var passed: bool = text_ok and node_ok
-	return TestCase.make_result("TC-FMP-04: 内联文本语法糖与大小写双轨占位符水化", passed, {
+	return TestCase.make_result("TC-FMP-04: 内联文本语法糖与大小写双格式占位符展开", passed, {
 		"text_ok": text_ok,
 		"node_ok": node_ok,
 		"hydrated_text": hydrated_text
@@ -229,7 +229,7 @@ static func _make_starter_playthrough_config(include_trait_and_seed: bool) -> Di
 		config["seed"] = 1337
 	return config
 
-## TC-FMP-05: 后端无头试玩推演与因果突变结算闭环
+## TC-FMP-05: 后端无头试玩推演与因果突变结算流程
 static func test_headless_mod_playthrough_and_causal_mutations() -> Dictionary:
 	var config := _make_starter_playthrough_config(true)
 
@@ -253,7 +253,7 @@ static func test_headless_mod_playthrough_and_causal_mutations() -> Dictionary:
 	var gold_ok: bool = int(char_sheet.get("initial_gold", 0)) == 150
 
 	var passed: bool = success and schema_match and steps_count_ok and completed and has_completed_mutation and gold_ok
-	return TestCase.make_result("TC-FMP-05: 后端无头试玩推演与因果突变结算闭环", passed, {
+	return TestCase.make_result("TC-FMP-05: 后端无头试玩推演与因果突变结算流程", passed, {
 		"success": success,
 		"schema_match": schema_match,
 		"steps_count_ok": steps_count_ok,

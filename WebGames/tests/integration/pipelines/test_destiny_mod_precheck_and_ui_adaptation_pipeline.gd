@@ -3,7 +3,7 @@
 # 文件路径: res://tests/integration/pipelines/test_destiny_mod_precheck_and_ui_adaptation_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: ModPrecheckAndAdaptationSolver, WorldGatewayFSM, WorldCharacterCreationOrchestrator, AccountEntryView, SnapshotInjectionSolver, PrologueDagRegistry, WorldModAffinityManager | 配置: config/domains/*.json | 信号: 无直接监听
-# 职责说明: 全链路验证单机显性MOD合规预检拦截、多MOD列表协同合并、冲突检测阻断、前端AccountEntryView受控UI解锁与载荷构建、后端受控权威创角与初始装备入包及序章路由与世界锁前置固化、以及SnapshotInjectionSolver虚拟MOD水化与对称清理。
+# 职责说明: 端到端验证单机显性MOD合规预检拦截、多MOD列表协同合并、冲突检测阻断、前端AccountEntryView受控UI解锁与载荷构建、后端受控权威创角与初始装备入包及序章路由与世界锁前置固化、以及SnapshotInjectionSolver虚拟MOD注入装配与对称清理。
 # 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -401,7 +401,7 @@ static func test_frontend_snapshot_controlled_ui_unlock_and_lock() -> Dictionary
         "passed": passed
     }
 
-## TC-DMP-05: 后端受控权威创角、专属初始装备入包、专属序章路由与 world_mod_lock.json 前置锁定全链路闭环
+## TC-DMP-05: 后端受控权威创角、专属初始装备入包、专属序章路由与 world_mod_lock.json 前置锁定完整流程
 static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> Dictionary:
     _setup_environment()
     var kalar_mount: Dictionary = TestCase.mount_official_kalar_for_test()
@@ -476,11 +476,11 @@ static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> 
 
     var passed: bool = ok_precheck and ok_created and ok_origin_and_trait and ok_equip and ok_dag and ok_lock and ok_zero_trust
     return {
-        "test": "TC-DMP-05: 后端受控权威创角、装备水化、序章路由与世界锁前置固化闭环",
+        "test": "TC-DMP-05: 后端受控权威创角、装备装配、序章路由与世界锁前置固化流程",
         "passed": passed
     }
 
-## TC-DMP-06: 工程方 SnapshotInjectionSolver 内存虚拟 MOD 一键注入水化与 teardown 对称清理验证
+## TC-DMP-06: 工程方 SnapshotInjectionSolver 内存虚拟 MOD 一键注入装配与 teardown 对称清理验证
 static func test_harness_virtual_mod_injection_and_teardown() -> Dictionary:
     var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
     var snap_payload: Dictionary = {
@@ -515,6 +515,6 @@ static func test_harness_virtual_mod_injection_and_teardown() -> Dictionary:
 
     var passed: bool = ok_inject and ok_adapted and ok_teardown_clean
     return {
-        "test": "TC-DMP-06: 工程方 SnapshotInjectionSolver 内存虚拟 MOD 水化与对称清理",
+        "test": "TC-DMP-06: 工程方 SnapshotInjectionSolver 内存虚拟 MOD 装配与对称清理",
         "passed": passed
     }

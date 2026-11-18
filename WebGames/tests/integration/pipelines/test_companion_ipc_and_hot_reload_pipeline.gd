@@ -1,11 +1,11 @@
 # ==============================================================================
 # 模块归属: 集成测试流水线 (Integration Pipelines · Companion IPC & Hot Reload)
 # 文件路径: res://tests/integration/pipelines/test_companion_ipc_and_hot_reload_pipeline.gd
-# 架构定位: 跨进程回环 IPC 协议、MOD 热重载回滚与工坊增删改全链路集成测试套件
+# 架构定位: 跨进程回环 IPC 协议、MOD 热重载回滚与工坊增删改端到端集成测试套件
 # 依赖与触发: 上游: TestRegistry | 下游: CompanionIPCServer, ModHotReloadSolver, WorldModLifecycleHelper
 # ==============================================================================
 
-## 跨进程伴侣 IPC 回环、MOD 热重载原子回滚与生命周期增删改全链路测试套件
+## 跨进程伴侣 IPC 回环、MOD 热重载原子回滚与生命周期增删改端到端测试套件
 class_name TestCompanionIpcAndHotReloadPipeline
 extends RefCounted
 

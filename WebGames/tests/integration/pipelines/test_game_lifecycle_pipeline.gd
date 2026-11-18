@@ -311,4 +311,4 @@ static func _test_s4_02_save_failure_graceful_degradation() -> Dictionary:
 	GameLifecycleManager.reset_for_test()
 
 	var passed: bool = resp.success and resp.current_phase == GameLifecycleModel.LifecyclePhase.STOPPED and (not resp.is_save_completed)
-	return {"test": "TC-EX-S4-02: 存盘失败降级容错推进停机闭环", "passed": passed}
+	return {"test": "TC-EX-S4-02: 存盘失败降级容错推进停机流程", "passed": passed}

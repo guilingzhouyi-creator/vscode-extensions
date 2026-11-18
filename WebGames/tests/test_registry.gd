@@ -159,25 +159,25 @@ const SuiteCutsceneHookAndPlaybackPipeline = preload("res://tests/integration/te
 const SuiteAssetPathResolver = preload("res://tests/unit/infrastructure/test_asset_path_resolver.gd")
 # 端到端生命周期与ESC菜单后端双分流无头流水线
 const SuiteFullLifecycleChainAndEscFlowPipeline = preload("res://tests/integration/pipelines/test_full_lifecycle_chain_and_esc_flow_pipeline.gd")
-# 全链路前后端交互数据流契约与后端闭环改造无头验收流水线
+# 端到端前后端交互数据流契约与后端流程改造无头验收流水线
 const SuiteFullChainBackendProtocolAndLifecyclePipeline = preload("res://tests/integration/pipelines/test_full_chain_backend_protocol_and_lifecycle_pipeline.gd")
-# 注册后端校验、原子持久化与二次重载插槽回灌流水线
+# 注册后端校验、原子持久化与二次重载插槽恢复流水线
 const SuiteAccountRegistrationAndRealReloadPipeline = preload("res://tests/integration/pipelines/test_account_registration_and_real_reload_pipeline.gd")
 # 客户端交互协议空间标准化与边界适配器验收流水线
 const SuiteClientProtocolSpaceAndBoundaryPipeline = preload("res://tests/integration/pipelines/test_client_protocol_space_and_boundary_pipeline.gd")
 # Tier 3 MOD 运行时差分加载、统一磁盘发现与结构化诊断验收流水线
 const SuiteTier3ContentOverridePipeline = preload("res://tests/integration/pipelines/test_tier3_content_override_pipeline.gd")
-# 零 MOD Fail-Closed 全链路验证流水线
+# 零 MOD Fail-Closed 端到端验证流水线
 const SuiteZeroModFailClosedPipeline = preload("res://tests/integration/pipelines/test_zero_mod_fail_closed_pipeline.gd")
 # 纯插件化异世界 MOD 组合叠加与零泄漏隔离流水线
 const SuitePluginModCompositionAndIsolation = preload("res://tests/integration/pipelines/test_plugin_mod_composition_and_isolation.gd")
-# 真实前端场景与 RealServiceContainer 全链路无头推演流水线
+# 真实前端场景与 RealServiceContainer 端到端无头推演流水线
 const SuiteRealFrontendGatewayWorkbenchPrologue = preload("res://tests/integration/pipelines/test_real_frontend_gateway_workbench_prologue.gd")
 # 世界档案 MOD 锁重入复原与漂移阻断验收流水线
 const SuiteWorldModLockReentryAndDrift = preload("res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd")
-# 全端真实可点击UI闭环与锁安全端到端验收流水线
+# 全端真实可点击UI交互与锁安全端到端验收流水线
 const SuiteRealUiChainAndLockSecurityPipeline = preload("res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd")
-# MOD运行时全消费链路、真异步 UI 与 .kmod 资产安全闭环验收流水线
+# MOD运行时全消费链路、真异步 UI 与 .kmod 资产安全端到端验收流水线
 const SuiteModRuntimeAsyncAndAssetsPipeline = preload("res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd")
 # 全领域真实服务、基座去卡拉尔中性化、SDK强校验与门禁收口验收流水线
 const SuiteNeutralitySdkAndGatesPipeline = preload("res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd")
@@ -185,7 +185,7 @@ const SuiteNeutralitySdkAndGatesPipeline = preload("res://tests/integration/pipe
 const SuiteRealColdStartBootstrapPipeline = preload("res://tests/integration/pipelines/test_real_cold_start_bootstrap_pipeline.gd")
 # KMOD 归档多媒体解码与 Tier3 中立隔离集成流水线
 const SuiteKmodAudioMediaAndTier3Pipeline = preload("res://tests/integration/pipelines/test_kmod_audio_media_and_tier3_pipeline.gd")
-# 伴侣回环 IPC、MOD 热重载原子回滚与生命周期增删改全链路集成流水线
+# 伴侣回环 IPC、MOD 热重载原子回滚与生命周期增删改端到端集成流水线
 const SuiteCompanionIpcAndHotReloadPipeline = preload("res://tests/integration/pipelines/test_companion_ipc_and_hot_reload_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
@@ -253,7 +253,7 @@ static func get_all_test_classes() -> Array:
 		TestCombatTertiaryTimelinePipeline, TestItemAttributeAffixSystemPipeline,
 		TestCharacterCreationAndOpeningPipeline, TestPrologueCoreAndPlaceholderPipeline,
 		TestNarrativeDagOrchestrationPipeline, TestGameLoopFSMPipeline,
-		# 横切：配置层护栏 + 架构护栏 + 契约流水线 + 生命周期安全停机 + 性能扩展性加固 + 战斗双随机预排期 + 日志错误底座收敛 + 全域结构化日志升级 + 存档统一数据基础设施 + 新一代EventBus
+		# 横切：配置层护栏 + 架构护栏 + 契约流水线 + 生命周期安全停机 + 性能扩展性加固 + 战斗双随机预排期 + 日志错误基础收敛 + 全域结构化日志升级 + 存档统一数据基础设施 + 新一代EventBus
 		TestConfigurationGuard, TestArchitectureGuardDomain, TestContractRegistryPipeline, TestGameLifecyclePipeline,
 		TestFrontendBoundaryGuard,
 		TestPerformanceAndScalabilityPipeline, TestCombatDualRandomAndTimelinePipeline, TestLogErrorBasePipeline,

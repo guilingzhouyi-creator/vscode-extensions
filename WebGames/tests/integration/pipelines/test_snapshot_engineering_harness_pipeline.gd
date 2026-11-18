@@ -1,9 +1,9 @@
 # ==============================================================================
-# 单元测试：快照测试工程模式与全域数据流插桩全链路流水线
+# 单元测试：快照测试工程模式与全域数据流插桩端到端流水线
 # 文件路径: res://tests/integration/pipelines/test_snapshot_engineering_harness_pipeline.gd
 # 职责: 覆盖快照 DTO 往返、环境守卫熔断、典型快照目录、链式 Builder 构造、
-#       全域状态水化灌溉、HUD 状态就绪、现场冻结抓取与对称清理反装配全生命周期。
-# 需求源: 路线图短期施工区快照测试工程模式与数据插桩流水线规范
+#       全域状态实体装配、HUD 状态就绪、现场冻结抓取与对称清理反装配全生命周期。
+# 需求源: 路线图规划阶段快照测试工程模式与数据插桩流水线规范
 # ==============================================================================
 class_name TestSnapshotEngineeringHarnessPipeline
 extends TestCase
@@ -123,7 +123,7 @@ static func test_fluent_snapshot_builder() -> Dictionary:
 
 	return make_result("TC-SEH-04: 链式 Builder 动态构造与目标字段自洽", ok)
 
-# ---- TC-SEH-05: 全域快照注入水化与 HUD 首帧同步直达 ----
+# ---- TC-SEH-05: 全域快照注入装配与 HUD 首帧同步直达 ----
 static func test_snapshot_injection_hydration_and_hud_sync() -> Dictionary:
 	var ok := true
 	var snap := SnapshotCatalog.fixture_mid_explorer()
@@ -143,7 +143,7 @@ static func test_snapshot_injection_hydration_and_hud_sync() -> Dictionary:
 	ok = assert_not_null(hud_snapshot, "TC-SEH-05G: HUD快照不应为空") and ok
 	if hud_snapshot != null:
 		ok = assert_eq(hud_snapshot.character_name, "SylphExplorer", "TC-SEH-05H: HUD角色名应一致") and ok
-		ok = assert_eq(hud_snapshot.wallet_gold, 5000, "TC-SEH-05I: HUD金币数应真实水化自快照") and ok
+		ok = assert_eq(hud_snapshot.wallet_gold, 5000, "TC-SEH-05I: HUD金币数应真实装载自快照") and ok
 
 	var fsm = GameLifecycleManager.get_instance()
 	ok = assert_eq(fsm.get_current_phase(), GameLifecycleModel.LifecyclePhase.RUNNING, "TC-SEH-05J: 状态机应已激活进入 RUNNING") and ok
@@ -151,7 +151,7 @@ static func test_snapshot_injection_hydration_and_hud_sync() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	ok = assert_true(repo.has_account(snap.account_id), "TC-SEH-05K: AccountRepository 应已登记快照账号") and ok
 	var hydrated_acc: AccountProfile = repo.find_by_id(snap.account_id)
-	ok = assert_not_null(hydrated_acc, "TC-SEH-05L: 快照水化账号聚合不应为空") and ok
+	ok = assert_not_null(hydrated_acc, "TC-SEH-05L: 快照装载账号聚合不应为空") and ok
 	if hydrated_acc != null:
 		ok = assert_eq(hydrated_acc.username, snap.username, "TC-SEH-05M: 账号用户名应与快照一致") and ok
 		ok = assert_eq(hydrated_acc.active_slot_id, snap.slot_id, "TC-SEH-05N: 活跃槽位应正确注入") and ok
@@ -159,9 +159,9 @@ static func test_snapshot_injection_hydration_and_hud_sync() -> Dictionary:
 	ok = assert_not_null(acc_by_name, "TC-SEH-05O: 用户名大小写不敏感索引应命中") and ok
 
 	SnapshotInjectionSolver.teardown_snapshot(ctx)
-	return make_result("TC-SEH-05: 全域快照注入水化与 HUD 首帧同步直达", ok)
+	return make_result("TC-SEH-05: 全域快照注入装配与 HUD 首帧同步直达", ok)
 
-# ---- TC-SEH-06: 运行时现场状态抓取与二次注入复原闭环 ----
+# ---- TC-SEH-06: 运行时现场状态抓取与二次注入复原流程 ----
 static func test_runtime_state_capture_and_rehydration() -> Dictionary:
 	var ok := true
 	# 1. 注入初始快照
@@ -189,7 +189,7 @@ static func test_runtime_state_capture_and_rehydration() -> Dictionary:
 
 	var second_ctx = second_inject.get("session_context", null)
 	SnapshotInjectionSolver.teardown_snapshot(second_ctx)
-	return make_result("TC-SEH-06: 运行时现场状态抓取与二次注入复原闭环", ok)
+	return make_result("TC-SEH-06: 运行时现场状态抓取与二次注入复原流程", ok)
 
 # ---- TC-SEH-07: 测试执行后对称清理与状态机反装配零残留 ----
 static func test_teardown_isolation_and_no_residual() -> Dictionary:

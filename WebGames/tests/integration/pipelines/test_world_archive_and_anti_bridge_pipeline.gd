@@ -1,9 +1,9 @@
 # ==============================================================================
-# 模块归属: 集成测试流水线 (Tests · 自动化测试底座)
+# 模块归属: 集成测试流水线 (Tests · 自动化测试框架)
 # 文件路径: res://tests/integration/pipelines/test_world_archive_and_anti_bridge_pipeline.gd
 # 架构定位: Integration Test Pipeline / Security & World Archive Harness
 # 跨域依赖: 上游: world_gateway, world_state | 下游: EventBus | 配置: config/domains/world_gateway/core.json
-# 职责说明: 验证单机世界档案独立落盘与自愈、角色死亡世界连续性、模式探针诊断、防越权守卫与全量内存洗脱
+# 职责说明: 验证单机世界档案独立落盘与自愈、角色死亡世界连续性、模式探针诊断、防越权守卫与全量内存清理
 # 设计依据: 业务域第一性原理与气密级防越权安全验收契约
 # ==============================================================================
 
@@ -71,7 +71,7 @@ static func test_world_archive_multi_instance_and_recovery() -> Dictionary:
 		and int(reloaded_w1.world_time.get("tick", 0)) == 25 \
 		and int(reloaded_w2.world_time.get("tick", 0)) == 0
 
-	# 3. 原子落盘自愈断言（删除主档，利用 .bak 备份文件原子自愈水化）
+	# 3. 原子落盘自愈断言（删除主档，利用 .bak 备份文件原子修复装载）
 	var state_file := repo.get_world_dir("WORLD_SP_ALPHA") + "world_state.json"
 	var bak_file := state_file + ".bak"
 	var bak_exists: bool = FileAccess.file_exists(bak_file)
@@ -184,7 +184,7 @@ static func test_anti_bridge_hot_swap_blocking() -> Dictionary:
 	var sel_sp: Dictionary = fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
 	var sp_ok: bool = bool(sel_sp.get("success", false)) and fsm.context.selected_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER
 
-	# 2. 未退网关洗脱，直接热切换至联机模式：必须被防越权守卫拦截
+	# 2. 未退网关清空，直接热切换至联机模式：必须被防越权守卫拦截
 	var hot_swap_res: Dictionary = fsm.select_mode(WorldGatewayModel.GameMode.MULTIPLAYER, {}, [])
 	var hot_swap_blocked: bool = not bool(hot_swap_res.get("success", false)) \
 		and str(hot_swap_res.get("error_code", "")) == AntiBridgeGuard.SECURITY_ERR_CROSS_MODE_HOT_SWAP
@@ -261,7 +261,7 @@ static func test_anti_bridge_network_mute_violation() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-WAB-07: 网关 exit_to_gateway 内存全量洗脱与会话重置隔离
+## TC-WAB-07: 网关 exit_to_gateway 内存全量清理与会话重置隔离
 static func test_gateway_memory_scrubbing_and_session_reset() -> Dictionary:
 	var fsm := WorldGatewayFSM.new("ACC_SCRUB_01")
 	fsm.enter_gateway()
@@ -272,7 +272,7 @@ static func test_gateway_memory_scrubbing_and_session_reset() -> Dictionary:
 		and not fsm.context.active_character_id.is_empty() \
 		and not fsm.context.selected_world_id.is_empty()
 
-	# 触发内存全量洗脱
+	# 触发内存全量清理
 	var scrub_res: Dictionary = fsm.exit_to_gateway()
 	var scrub_ok: bool = bool(scrub_res.get("success", false)) \
 		and fsm.context.current_phase == WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED \
@@ -281,13 +281,13 @@ static func test_gateway_memory_scrubbing_and_session_reset() -> Dictionary:
 		and fsm.context.selected_world_id.is_empty() \
 		and fsm.context.active_character_id.is_empty()
 
-	# 洗脱重置后，模式已回归 UNSELECTED，此时重新选择其他模式不再受热切换阻断
+	# 清理重置后，模式已回归 UNSELECTED，此时重新选择其他模式不再受热切换阻断
 	var flags := GameModeRoutingSolver.load_default_canary_flags()
 	var reselect_res: Dictionary = fsm.select_mode(WorldGatewayModel.GameMode.MULTIPLAYER, flags, [])
 	var reselect_allowed_or_routed: bool = str(reselect_res.get("error_code", "")) != AntiBridgeGuard.SECURITY_ERR_CROSS_MODE_HOT_SWAP
 
 	var passed: bool = pre_scrub_ok and scrub_ok and reselect_allowed_or_routed
 	return {
-		"test": "TC-WAB-07: 网关 exit_to_gateway 内存全量洗脱与会话重置隔离",
+		"test": "TC-WAB-07: 网关 exit_to_gateway 内存全量清理与会话重置隔离",
 		"passed": passed
 	}

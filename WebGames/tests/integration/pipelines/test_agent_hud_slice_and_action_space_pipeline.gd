@@ -5,7 +5,7 @@
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, narrative_orchestration | 配置: config/domains/world_state/core.json
 # 职责说明: 主页 HUD 面向 Agent 结构化切片流与动态行动空间无头集成测试流水线。
 #           覆盖 TC-AHS-01 ~ TC-AHS-11，验证四段式标准包拓扑、因果差分贯穿、对象池守恒、专属动作通道与人类优先抢占只读租约。
-# 设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎验收测试矩阵规约与卡拉尔架构解耦契约
+# 设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestAgentHudSliceAndActionSpacePipeline
@@ -304,7 +304,7 @@ static func test_object_pool_reuse_and_reset_conservation() -> Dictionary:
 	return TestCase.make_result("test_object_pool_reuse_and_reset_conservation", true)
 
 ## -----------------------------------------------------------------------------
-## TC-AHS-08: 端到端 LLM 逐包解读与决策闭环模拟验证
+## TC-AHS-08: 端到端 LLM 逐包解读与决策流程模拟验证
 ## -----------------------------------------------------------------------------
 static func test_end_to_end_llm_packet_by_packet_decision_loop() -> Dictionary:
 	var ctx := _create_base_context()

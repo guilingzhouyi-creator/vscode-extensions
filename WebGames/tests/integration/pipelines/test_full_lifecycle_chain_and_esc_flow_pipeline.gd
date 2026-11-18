@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_full_lifecycle_chain_and_esc_flow_pipeline.gd
 # 架构定位: Integration Test Pipeline / Acceptance Harness
 # 跨域依赖: 上游: TestRegistry | 下游: account, world_gateway, character_creation, world_state, lifecycle, frontend
-# 职责说明: 全链路生命周期与ESC菜单后端双分流无头集成测试流水线
-# 设计依据: 业务域第一性原理与全链路闭环架构契约
+# 职责说明: 完整生命周期与ESC菜单后端双分流无头集成测试流水线
+# 设计依据: 业务域第一性原理与端到端架构契约
 # ==============================================================================
 
 class_name TestFullLifecycleChainAndEscFlowPipeline
@@ -25,7 +25,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_flc_10_account_landing_view_state_reset())
 	results.append(test_tc_flc_11_game_exit_graceful_shutdown_pipeline())
 	_reset_env()
-	return TestCase.pack_results("全链路生命周期与ESC菜单后端双分流无头集成测试流水线", results)
+	return TestCase.pack_results("完整生命周期与ESC菜单后端双分流无头集成测试流水线", results)
 
 static func _reset_env() -> void:
 	SaveDataAccessLayer.reset_for_tests()
@@ -39,7 +39,7 @@ static func _reset_env() -> void:
 	ServiceLocator.reset()
 
 ## -----------------------------------------------------------------------------
-## TC-FLC-01: 注册账号与生成游客速通凭证
+## TC-FLC-01: 注册账号与生成游客快速凭证
 ## -----------------------------------------------------------------------------
 static func test_tc_flc_01_account_registration_and_guest_creation() -> Dictionary:
 	var reg_req := AccountRegistrationDTO.Request.new()
@@ -56,7 +56,7 @@ static func test_tc_flc_01_account_registration_and_guest_creation() -> Dictiona
 	var hash_ok: bool = not AuthService.hash_password("test_pass").is_empty()
 
 	var passed: bool = reg_ok and guest_ok and hash_ok
-	return make_result("TC-FLC-01: 注册账号与生成游客速通凭证", passed, {
+	return make_result("TC-FLC-01: 注册账号与生成游客快速凭证", passed, {
 		"reg_account_id": reg_resp.account_id,
 		"guest_account_id": guest_acc.account_id
 	})
@@ -183,7 +183,7 @@ static func test_tc_flc_06_esc_menu_readiness_and_auto_save() -> Dictionary:
 	})
 
 ## -----------------------------------------------------------------------------
-## TC-FLC-07: ESC 退出到世界档案（自动存盘并洗脱网关内存）
+## TC-FLC-07: ESC 退出到世界档案（自动存盘并清空网关内存）
 ## -----------------------------------------------------------------------------
 static func test_tc_flc_07_esc_exit_to_archive_and_memory_scrubbing() -> Dictionary:
 	var gw: WorldGatewayFSM = ServiceLocator.get_active_gateway() as WorldGatewayFSM
@@ -208,7 +208,7 @@ static func test_tc_flc_07_esc_exit_to_archive_and_memory_scrubbing() -> Diction
 	var char_scrubbed: bool = gw.context.active_character_id.is_empty()
 
 	var passed: bool = in_world_before and exit_ok and phase_scrubbed and mode_scrubbed and char_scrubbed
-	return make_result("TC-FLC-07: ESC退出到世界档案自动存盘并洗脱网关内存", passed, {
+	return make_result("TC-FLC-07: ESC退出到世界档案自动存盘并清空网关内存", passed, {
 		"phase_after": gw.context.current_phase,
 		"mode_after": gw.context.selected_mode
 	})
@@ -307,7 +307,7 @@ static func test_tc_flc_10_account_landing_view_state_reset() -> Dictionary:
 	})
 
 ## -----------------------------------------------------------------------------
-## TC-FLC-11: 退出游戏（五阶段优雅停机管线闭环）
+## TC-FLC-11: 退出游戏（五阶段优雅停机管线流程）
 ## -----------------------------------------------------------------------------
 static func test_tc_flc_11_game_exit_graceful_shutdown_pipeline() -> Dictionary:
 	var shut_req := GameShutdownDTO.Request.new()
@@ -321,6 +321,6 @@ static func test_tc_flc_11_game_exit_graceful_shutdown_pipeline() -> Dictionary:
 	var resp_ok: bool = resp_valid and shut_resp.is_success
 
 	var passed: bool = resp_ok
-	return make_result("TC-FLC-11: 退出游戏五阶段优雅停机管线闭环", passed, {
+	return make_result("TC-FLC-11: 退出游戏五阶段优雅停机管线流程", passed, {
 		"is_success": shut_resp.is_success if resp_valid else false
 	})

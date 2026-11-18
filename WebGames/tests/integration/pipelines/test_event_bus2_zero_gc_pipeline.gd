@@ -182,7 +182,7 @@ static func _test_subscription_token_lifecycle() -> Dictionary:
 	bus.recycle_packet(packet_second)
 	if counter["n"] != 1:
 		return {"name": tname, "test": tname, "passed": false, "message": "解绑后仍触发 count=%d" % counter["n"]}
-	return {"name": tname, "test": tname, "passed": true, "message": "订阅令牌幂等解绑闭环通过"}
+	return {"name": tname, "test": tname, "passed": true, "message": "订阅令牌幂等解绑验证通过"}
 
 # ---- 7. 配置驱动与下限防御 ----
 static func _test_config_driven_cell_size_and_limits() -> Dictionary:
@@ -268,7 +268,7 @@ static func _test_iteration_safety_under_concurrent_modification() -> Dictionary
 
 # ---- 11. 2D 投影与无头路由 ----
 static func _test_2d_projection_and_headless_routing() -> Dictionary:
-	var tname := "TC-EB2-11: 2D/2.5D 平面投影无缝降维路由"
+	var tname := "TC-EB2-11: 2D/2.5D 平面投影坐标映射路由"
 	var bus := EventBusCore.new()
 	var counter := {"n": 0}
 	_track_subscription(bus.on_spatial_2d(Vector2(100, 200), 20.0, func(_p: EventPacket) -> void: counter["n"] += 1))
@@ -286,9 +286,9 @@ static func _test_2d_projection_and_headless_routing() -> Dictionary:
 		return {"name": tname, "test": tname, "passed": false, "message": "2D 远端误唤醒"}
 	return {"name": tname, "test": tname, "passed": true, "message": "2D 投影与空间裁剪通过"}
 
-# ---- 12. 无模型表现适配闭环 ----
+# ---- 12. 无模型表现适配流程 ----
 static func _test_headless_presentation_api_control_without_models() -> Dictionary:
-	var tname := "TC-EB2-12: 无模型纯 API 表现解耦控制闭环"
+	var tname := "TC-EB2-12: 无模型纯 API 表现解耦控制流程"
 	var mock := HeadlessPresentationMockAdapter.new()
 	mock.on_entity_spawned("HERO_01", Vector3(10, 0, 10))
 	if not mock.spawned_entities.has("HERO_01"):
@@ -306,11 +306,11 @@ static func _test_headless_presentation_api_control_without_models() -> Dictiona
 	mock.on_entity_despawned("HERO_01")
 	if mock.spawned_entities.has("HERO_01"):
 		return {"name": tname, "test": tname, "passed": false, "message": "注销未清空"}
-	return {"name": tname, "test": tname, "passed": true, "message": "无模型纯 API 控制闭环通过"}
+	return {"name": tname, "test": tname, "passed": true, "message": "无模型纯 API 控制流程验证通过"}
 
-# ---- 13. 100,000次高频因果派发吞吐与遥测指标闭环 ----
+# ---- 13. 100,000次高频因果派发吞吐与遥测指标验证 ----
 static func _test_high_throughput_100k_burst_ops() -> Dictionary:
-	var tname := "TC-EB2-13: 100,000次高频因果派发吞吐与遥测指标闭环"
+	var tname := "TC-EB2-13: 100,000次高频因果派发吞吐与遥测指标验证"
 	var bus := EventBusCore.new()
 	bus.initialize_from_config()
 	var counter := {"n": 0}
@@ -358,9 +358,9 @@ static func _test_dense_spatial_1000_entity_burst() -> Dictionary:
 		return {"name": tname, "test": tname, "passed": false, "message": "半影外存在幽灵唤醒 far_hit=%d" % hit_far}
 	return {"name": tname, "test": tname, "passed": true, "message": "1000高密度实体无开方距离平方裁剪 100% 精确"}
 
-# ---- 15. 环形缓冲饱和背压与丢弃遥测闭环 ----
+# ---- 15. 环形缓冲饱和背压与丢弃遥测验证 ----
 static func _test_ring_buffer_saturation_and_drop_metrics() -> Dictionary:
-	var tname := "TC-EB2-15: 环形缓冲饱和背压与丢弃遥测闭环"
+	var tname := "TC-EB2-15: 环形缓冲饱和背压与丢弃遥测验证"
 	var bus := EventBusCore.new()
 	bus.initialize_from_config()
 	var cap: int = bus.get_frame_buffer_capacity()
@@ -378,9 +378,9 @@ static func _test_ring_buffer_saturation_and_drop_metrics() -> Dictionary:
 		return {"name": tname, "test": tname, "passed": false, "message": "溢出事件回收残留 borrowed=%d" % bus.get_pool().get_borrowed_count()}
 	return {"name": tname, "test": tname, "passed": true, "message": "环形缓冲饱和背压与丢弃自动回收零残留"}
 
-# ---- 16. 死亡空间监听器惰性自愈剔除闭环 ----
+# ---- 16. 死亡空间监听器惰性清理剔除验证 ----
 static func _test_dead_spatial_listener_auto_eviction() -> Dictionary:
-	var tname := "TC-EB2-16: 死亡空间监听器惰性自愈剔除闭环"
+	var tname := "TC-EB2-16: 死亡空间监听器惰性清理剔除验证"
 	var grid := HeadlessSpatialHashGrid3D.new(16.0)
 	var dummy := RefCounted.new()
 	var valid_called := {"n": 0}
@@ -397,7 +397,7 @@ static func _test_dead_spatial_listener_auto_eviction() -> Dictionary:
 		return {"name": tname, "test": tname, "passed": false, "message": "死亡监听器未自动清理 remaining=%d" % grid.get_listener_count()}
 	if valid_called["n"] != 1:
 		return {"name": tname, "test": tname, "passed": false, "message": "有效监听器未正常触发"}
-	return {"name": tname, "test": tname, "passed": true, "message": "死亡空间监听器惰性自愈剔除闭环生效"}
+	return {"name": tname, "test": tname, "passed": true, "message": "死亡空间监听器惰性清理剔除机制生效"}
 
 # ---- 17. 配置驱动全域信道动态解析与极速派发 ----
 static func _test_config_driven_channel_resolution() -> Dictionary:
@@ -418,4 +418,4 @@ static func _test_config_driven_channel_resolution() -> Dictionary:
 	tok.unbind()
 	if not received["hit"]:
 		return {"name": tname, "test": tname, "passed": false, "message": "字符串信道广播未命中订阅"}
-	return {"name": tname, "test": tname, "passed": true, "message": "配置驱动全域信道动态解析与极速广播闭环"}
+	return {"name": tname, "test": tname, "passed": true, "message": "配置驱动全域信道动态解析与广播机制验证"}

@@ -175,4 +175,4 @@ pwsh -File scripts/ps1/audit-all.ps1
 | **高频堆分配污染** | 循环体内高频 `.new()` / `.duplicate(true)` | 遵守 `ADV-PRF-002`，预分配固定容器或对象复用 | `ADV-PRF-002` 门禁 |
 | **环境与状态泄漏** | 总线监听未解绑、测试存档未清理 | `teardown()` 中幂等解绑 EventBus，沙箱路径销毁 | 测试无副作用契约 |
 | **伪数据工厂倒错** | 工厂命名为 `test_<entity>_factory.gd` | 统一命名为 `<entity>_factory.gd`（严禁 `test_` 前缀） | `test_architecture_guard.gd` |
-| **裸脚本无底座** | 脚本未继承 `TestCase`、自制断言 | 统一继承 `TestCase` 并调用 `pack_results` 打包汇总 | CI/CD 自动化汇总 |
+| **裸脚本未继承基类** | 脚本未继承 `TestCase`、自制断言 | 统一继承 `TestCase` 并调用 `pack_results` 打包汇总 | CI/CD 自动化汇总 |

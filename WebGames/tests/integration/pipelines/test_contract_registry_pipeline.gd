@@ -62,7 +62,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_s3_07_gate_19d_infra_exempt_consistency_pass())
 	results.append(test_s3_08_gate_19e_reverse_orphan_registered_pass())
 
-	# ---- S4 阶段：端到端与全链路验收断言 (12 条) ----
+	# ---- S4 阶段：端到端验收断言 (12 条) ----
 	results.append(test_s4_01_e2e_config_to_index_pipeline())
 	results.append(test_s4_02_e2e_index_to_parser_consumption())
 	results.append(test_s4_03_e2e_parser_to_guard_full_scan())
@@ -233,7 +233,7 @@ static func test_s1_11_unknown_fields_discarded_and_defaults() -> Dictionary:
 		entry.field_mapping.is_empty() and
 		not serialized.has("random_unknown_field_123")
 	)
-	return {"test": "TC-CT-S1-11: 未知字段静默丢弃与缺失字段兜底（Inv-CT-4）", "passed": ok}
+	return {"test": "TC-CT-S1-11: 未知字段静默丢弃与缺失字段默认填充（Inv-CT-4）", "passed": ok}
 
 
 static func test_s1_12_contract_entries_read_only_protection() -> Dictionary:
@@ -519,7 +519,7 @@ static func test_s4_04_e2e_guard_to_broadcaster_event_bus() -> Dictionary:
 static func test_s4_05_e2e_config_reload_pipeline() -> Dictionary:
 	CacheClass.reload_from_config()
 	var after_reload: int = IndexClass.find_all().size()
-	return {"test": "TC-CT-S4-05: 端到端：配置变更触发再扫描与热重载闭环", "passed": after_reload == EXPECTED_ENTRY_COUNT}
+	return {"test": "TC-CT-S4-05: 端到端：配置变更触发再扫描与热重载联动", "passed": after_reload == EXPECTED_ENTRY_COUNT}
 
 
 static func test_s4_06_gate_19_blocks_corrupted_configs() -> Dictionary:
