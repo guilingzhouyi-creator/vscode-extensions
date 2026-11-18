@@ -85,27 +85,12 @@ static func _parse_manifest_at_path(manifest_path: String, fallback_pack_id: Str
 
     return manifest
 
-## 从 .kmod 归档包中读取并解析清单
+## 从 .kmod 二进制归档包中读取并解析 manifest.kdat 清单
 static func _parse_manifest_from_kmod(kmod_path: String, fallback_pack_id: String) -> NarrativePackManifestDTO:
-    var reader := ZIPReader.new()
-    var open_error := reader.open(kmod_path)
-    if open_error != OK:
-        ErrorReporter.emit_error(LOG_CHANNEL, "CONFIG_FILE_READ_FAIL", TemplateFormatter.format("Failed to open .kmod archive package: {path}", {"path": kmod_path}), {"file_path": kmod_path})
+    var parsed_manifest := ModPackageArchiveReader.read_kmod_kdat_dict(kmod_path, ModPackageArchiveReader.KMOD_MANIFEST_FILENAME)
+    if parsed_manifest.is_empty():
         return null
-    var manifest_content := ""
-    if reader.file_exists("pack.json"):
-        manifest_content = reader.read_file("pack.json").get_string_from_utf8()
-    elif reader.file_exists("manifest.json"):
-        manifest_content = reader.read_file("manifest.json").get_string_from_utf8()
-    reader.close()
-    if manifest_content.is_empty():
-        ErrorReporter.emit_error(LOG_CHANNEL, "CONFIG_FILE_NOT_FOUND", TemplateFormatter.format(".kmod archive missing pack.json or manifest.json: {path}", {"path": kmod_path}), {"file_path": kmod_path})
-        return null
-    var parsed_manifest: Variant = JSON.parse_string(manifest_content)
-    if not (parsed_manifest is Dictionary):
-        ErrorReporter.emit_error(LOG_CHANNEL, "CONFIG_JSON_PARSE_FAIL", TemplateFormatter.format(".kmod archive manifest parse error: {path}", {"path": kmod_path}), {"file_path": kmod_path})
-        return null
-    var manifest := NarrativePackManifestDTO.from_dto(parsed_manifest as Dictionary)
+    var manifest := NarrativePackManifestDTO.from_dto(parsed_manifest)
     if manifest.pack_id.is_empty():
         manifest.pack_id = fallback_pack_id
     if manifest.root_path.is_empty():
@@ -516,20 +501,9 @@ static func _read_declared_content_sha256(package_root: String) -> String:
     if package_root.is_empty():
         return ""
     if package_root.ends_with(".kmod"):
-        var archive_reader := ZIPReader.new()
-        if archive_reader.open(package_root) != OK:
-            return ""
-        var manifest_text := ""
-        if archive_reader.file_exists("pack.json"):
-            manifest_text = archive_reader.read_file("pack.json").get_string_from_utf8()
-        elif archive_reader.file_exists("manifest.json"):
-            manifest_text = archive_reader.read_file("manifest.json").get_string_from_utf8()
-        archive_reader.close()
-        if manifest_text.is_empty():
-            return ""
-        var parsed_archive: Variant = JSON.parse_string(manifest_text)
-        if parsed_archive is Dictionary:
-            return String((parsed_archive as Dictionary).get("content_sha256", "")).strip_edges().to_lower()
+        var parsed_archive := ModPackageArchiveReader.read_kmod_kdat_dict(package_root, ModPackageArchiveReader.KMOD_MANIFEST_FILENAME)
+        if not parsed_archive.is_empty():
+            return String(parsed_archive.get("content_sha256", "")).strip_edges().to_lower()
         return ""
     var manifest_path := package_root.path_join(MANIFEST_FILENAME)
     if not FileAccess.file_exists(manifest_path):
