@@ -77,10 +77,6 @@
       "level": 1,
       "gold": 0
     },
-    "unwired_policy": {
-      "require_explicit_character_name": false,
-      "require_explicit_world_ref": false
-    },
     "defaults": {
       "slot_id": "SLOT_01",
       "character_name": "Nameless Wanderer",

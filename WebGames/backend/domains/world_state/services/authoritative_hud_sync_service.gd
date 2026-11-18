@@ -232,9 +232,8 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 	if raw_race.is_empty() and physiology != null and "race_id" in physiology:
 		raw_race = String(physiology.race_id)
 
-	var should_allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
 	if raw_race.is_empty() or raw_race == "UNBOUND":
-		snapshot.race_id = "HUMAN" if should_allow_default_fallback else "UNBOUND"
+		snapshot.race_id = "UNBOUND"
 	else:
 		snapshot.race_id = raw_race
 

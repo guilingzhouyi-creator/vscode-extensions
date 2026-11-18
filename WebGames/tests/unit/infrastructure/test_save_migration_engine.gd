@@ -101,13 +101,15 @@ static func test_full_save_migration_chain() -> Dictionary:
 ## TC-SV-08: 迁移断链回滚（Inv-SV-7）
 static func test_migration_broken_path_rollback() -> Dictionary:
 	var old_data := { "account": { "id": "acc_broken" } }
+	var empty_result := SaveMigrationEngine.migrate(old_data, "")
+	var empty_rejected: bool = (not bool(empty_result.get("success", true))) and String(empty_result.get("error_code", "")) == "MISSING_SAVE_VERSION"
 	# 请求迁移未注册的无路径版本 0.5.0
 	var result := SaveMigrationEngine.migrate(old_data, "0.5.0")
 	var success: bool = bool(result.get("success", false))
 	var error_code: String = String(result.get("error_code", ""))
 
 	# 预期：返回 MIGRATION_PATH_BROKEN，原数据未被修改
-	var passed := not success and error_code == "MIGRATION_PATH_BROKEN"
+	var passed := empty_rejected and not success and error_code == "MIGRATION_PATH_BROKEN"
 	return {
 		"test": "TC-SV-08: 迁移路径断裂拦截与原档安全回滚断言",
 		"passed": passed,

@@ -62,7 +62,9 @@ static func migrate_domain(domain_id: String, domain_payload: Dictionary, from_v
 ## 整档迁移执行：复制 -> 链式迁移 -> 校验 -> 提交/回滚（Inv-SV-7）
 static func migrate(save_payload: Dictionary, detected_version: String) -> Dictionary:
 	var target_version: String = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
-	if detected_version.is_empty() or detected_version == target_version:
+	if detected_version.is_empty():
+		return {"success": false, "error_code": "MISSING_SAVE_VERSION", "at_version": "", "partial": save_payload.duplicate(true)}
+	if detected_version == target_version:
 		return {"success": true, "data": save_payload.duplicate(true), "steps": []}
 
 	# 1. 深度复制工作副本，绝不原地污染（Inv-SV-7）

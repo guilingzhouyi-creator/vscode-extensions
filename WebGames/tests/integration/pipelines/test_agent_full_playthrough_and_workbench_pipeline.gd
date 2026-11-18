@@ -116,7 +116,6 @@ static func test_tc_afw_03_account_slot_context_and_binding_solver() -> Dictiona
 		"character_name": "槽位测试勇士",
 		"title_prefix": "开拓者",
 		"is_permadeath": false,
-		"allow_default_fallback": true,
 		"provision_disk": false
 	})
 

@@ -25,26 +25,18 @@ static func evaluate_entry_path(slot: SaveSlotDTO) -> int:
 	return ENTRY_PATH_DIRECT_RESTORE
 
 ## 世界槽位与占位符防御校验
-static func validate_world_slot(account: AccountProfile, world_id: String, should_allow_default_fallback: bool = true) -> Dictionary:
-	var target_id := world_id
-	if target_id.is_empty():
-		if not should_allow_default_fallback:
-			return {"success": false, "error_code": "UNBOUND_WORLD_ID", "message": "Target world slot not specified"}
-		target_id = AccountProfile.WORLD_DEFAULT_SP_01
-
-	if account != null and account.is_world_slot_placeholder(target_id):
-		if not should_allow_default_fallback:
-			return {"success": false, "error_code": "UNBOUND_WORLD_SLOT", "message": "Target world slot is unbound or in placeholder state"}
-		target_id = AccountProfile.WORLD_DEFAULT_SP_01
-
-	return {"success": true, "world_id": target_id}
+static func validate_world_slot(account: AccountProfile, world_id: String) -> Dictionary:
+	if world_id.is_empty():
+		return {"success": false, "error_code": "UNBOUND_WORLD_ID", "message": "Target world slot not specified"}
+	if account != null and account.is_world_slot_placeholder(world_id):
+		return {"success": false, "error_code": "UNBOUND_WORLD_SLOT", "message": "Target world slot is unbound or in placeholder state"}
+	return {"success": true, "world_id": world_id}
 
 ## 执行边界 A：序章重放与初始生理/货币重新派发（严格走活跃 MOD 因果 DAG，无 Kalar 默认回退）
 static func _execute_prologue_replay_branch(
 	account: AccountProfile,
 	slot: SaveSlotDTO,
 	context: Dictionary,
-	should_allow_default_fallback: bool,
 	adapted_mod_manifest: Dictionary = {}
 ) -> Dictionary:
 	slot.prologue_completed = false
@@ -61,7 +53,7 @@ static func _execute_prologue_replay_branch(
 		opening_stream.opening_quest_line_id = str(context.get("opening_quest_line_id", ""))
 		opening_stream.race_id = str(context.get("race_id", _infer_first_manifest_race(manifest)))
 
-	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening_stream, opening_stream.race_id, should_allow_default_fallback, manifest)
+	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening_stream, opening_stream.race_id, manifest)
 	if not bool(boot_result.get("success", false)):
 		return boot_result
 
@@ -184,14 +176,13 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	var account: AccountProfile = context.get("account", null)
 	var slot: SaveSlotDTO = context.get("slot", null)
 	var target_world_id: String = String(context.get("target_world_id", ""))
-	var should_allow_default_fallback: bool = bool(context.get("allow_default_fallback", false))
 
 	if account == null:
 		return {"success": false, "error_code": "ERR_ACCOUNT_MISSING", "message": "Account aggregate root missing"}
 	if slot == null:
 		return {"success": false, "error_code": "ERR_SLOT_MISSING", "message": "Target save slot summary missing"}
 
-	var world_validation := validate_world_slot(account, target_world_id, should_allow_default_fallback)
+	var world_validation := validate_world_slot(account, target_world_id)
 	if not bool(world_validation.get("success", false)):
 		return world_validation
 	var effective_world_id: String = world_validation["world_id"]
@@ -205,7 +196,7 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	var load_result: Dictionary = {}
 
 	if entry_path_type == ENTRY_PATH_PROLOGUE_REPLAY:
-		load_result = _execute_prologue_replay_branch(account, slot, context, should_allow_default_fallback, adapted_mod_manifest)
+		load_result = _execute_prologue_replay_branch(account, slot, context, adapted_mod_manifest)
 	else:
 		load_result = _execute_direct_restore_branch(slot)
 
@@ -232,8 +223,7 @@ static func synchronize_hud_entry(
 		"race_id": race_id,
 		"physiology": physiology,
 		"wallet": wallet,
-		"current_location_id": slot.current_location_name,
-		"allow_default_fallback": true
+		"current_location_id": slot.current_location_name
 	})
 
 ## ESC 呼出菜单项配置获取
@@ -248,11 +238,10 @@ static func get_esc_menu_options() -> Array[Dictionary]:
 ## ESC 菜单确认退出触发优雅停机管线
 static func execute_esc_exit(
 	slot_id: String,
-	providers: Dictionary = {},
-	should_allow_default_fallback: bool = true
+	providers: Dictionary = {}
 ) -> GameShutdownDTO.Response:
 	var shutdown_request := GameShutdownDTO.Request.new()
 	shutdown_request.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
 	shutdown_request.target_save_slot = slot_id
 	shutdown_request.idempotency_key = "ESC_EXIT_" + slot_id + "_" + str(Time.get_ticks_usec())
-	return GameLifecycleService.execute_graceful_shutdown(shutdown_request, providers, should_allow_default_fallback)
+	return GameLifecycleService.execute_graceful_shutdown(shutdown_request, providers)

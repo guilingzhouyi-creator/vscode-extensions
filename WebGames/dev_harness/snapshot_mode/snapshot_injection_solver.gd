@@ -88,8 +88,7 @@ static func inject_and_hydrate(snapshot: Variant, target_stage_key: String = "")
         "race_id": bundle.race_id,
         "physiology": physiology,
         "wallet": wallet,
-        "current_location_id": bundle.location_name,
-        "allow_default_fallback": true
+        "current_location_id": bundle.location_name
     })
     var hud_snapshot := auth_hud_snapshot
     ctx.hud_snapshot = hud_snapshot.to_dto() if hud_snapshot != null else {}

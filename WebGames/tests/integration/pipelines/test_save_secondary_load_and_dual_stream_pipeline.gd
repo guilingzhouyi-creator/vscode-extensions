@@ -82,14 +82,14 @@ static func test_multi_world_slot_placeholder_defense() -> Dictionary:
 	ok = assert_true(account.is_world_slot_placeholder("WORLD_RESERVED_SP_02"), "TC-SLD-02B: 预留槽位应判定为占位符") and ok
 	ok = assert_true(account.is_world_slot_placeholder("WORLD_NON_EXISTENT"), "TC-SLD-02C: 未登记世界应判定为占位符") and ok
 
-	# 占位符校验拒绝与回退
-	var strict_val := SaveLoadRoutingSolver.validate_world_slot(account, "WORLD_RESERVED_SP_02", false)
-	ok = assert_false(strict_val.success, "TC-SLD-02D: 非回退模式访问占位符世界应阻断") and ok
+	# 占位符校验严格阻断（Fail-Closed，无默然降级）
+	var strict_val := SaveLoadRoutingSolver.validate_world_slot(account, "WORLD_RESERVED_SP_02")
+	ok = assert_false(strict_val.success, "TC-SLD-02D: 访问占位符世界应阻断") and ok
 	ok = assert_eq(strict_val.error_code, "UNBOUND_WORLD_SLOT", "TC-SLD-02E: 错误码应为 UNBOUND_WORLD_SLOT") and ok
 
-	var fallback_val := SaveLoadRoutingSolver.validate_world_slot(account, "WORLD_RESERVED_SP_02", true)
-	ok = assert_true(fallback_val.success, "TC-SLD-02F: 启用回退时应安全降级至默认世界") and ok
-	ok = assert_eq(fallback_val.world_id, AccountProfile.WORLD_DEFAULT_SP_01, "TC-SLD-02G: 降级目标应为默认世界") and ok
+	var bound_val := SaveLoadRoutingSolver.validate_world_slot(account, AccountProfile.WORLD_DEFAULT_SP_01)
+	ok = assert_true(bound_val.success, "TC-SLD-02F: 已绑定默认世界槽位应校验通过") and ok
+	ok = assert_eq(bound_val.world_id, AccountProfile.WORLD_DEFAULT_SP_01, "TC-SLD-02G: 返回世界 ID 应与输入一致") and ok
 
 	return make_result("TC-SLD-02: 多世界槽位占位符防御校验", ok)
 
@@ -97,8 +97,7 @@ static func _run_default_secondary_load(account: AccountProfile, slot: SaveSlotD
 	var ctx := {
 		"account": account,
 		"slot": slot,
-		"target_world_id": AccountProfile.WORLD_DEFAULT_SP_01,
-		"allow_default_fallback": true
+		"target_world_id": AccountProfile.WORLD_DEFAULT_SP_01
 	}
 	return SaveLoadRoutingSolver.execute_secondary_load(ctx)
 

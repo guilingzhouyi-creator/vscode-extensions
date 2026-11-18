@@ -43,8 +43,7 @@
       "object_pool_manager"
     ],
     "resource_policies": {},
-    "unwired_slot_sentinel": "UNBOUND",
-    "require_explicit_save_slot": false
+    "unwired_slot_sentinel": "UNBOUND"
   },
   "session_context_pool": {
     "max_free": 1

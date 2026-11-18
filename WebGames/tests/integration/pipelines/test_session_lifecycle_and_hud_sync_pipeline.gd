@@ -136,8 +136,7 @@ static func test_hud_snapshot_real_source_derivation() -> Dictionary:
 		"race_id": "HUMAN",
 		"physiology": sheet,
 		"wallet": wallet,
-		"current_location_id": "TOWN_VALAN",
-		"allow_default_fallback": true
+		"current_location_id": "TOWN_VALAN"
 	})
 	var keys := snapshot.to_dto().keys()
 	var no_myth := not keys.has("exp_next")
@@ -191,8 +190,7 @@ static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 		"character_name": "生命会话",
 		"physiology": sheet,
 		"wallet": wallet,
-		"current_location_id": "TOWN_VALAN",
-		"allow_default_fallback": true
+		"current_location_id": "TOWN_VALAN"
 	})
 	AuthService.revoke_token(String(auth.get("token", "")))
 	detach.call()
@@ -320,8 +318,7 @@ static func _simulate_world_and_hud(
 		"race_id": "HUMAN",
 		"physiology": sheet,
 		"wallet": wallet,
-		"current_location_id": "CENTRAL_CITY_PLAZA",
-		"allow_default_fallback": true
+		"current_location_id": "CENTRAL_CITY_PLAZA"
 	})
 
 static func _simulate_shutdown(account_id: String, slot_id: String, token: String) -> GameShutdownDTO.Response:
@@ -456,17 +453,17 @@ static func test_unwired_slots_explicit_reservation_no_default_binding() -> Dict
 
 	var raw_account := AccountProfile.new()
 	raw_account.account_id = "ACC_UNBOUND_TEST"
-	var bind_res := AccountSlotBindingSolver.create_character_in_slot(raw_account, "SLOT_01", "", "", false, false)
+	var bind_res := AccountSlotBindingSolver.create_character_in_slot(raw_account, "SLOT_01", "", "", false)
 	var name_guarded: bool = not bool(bind_res.get("success", true)) \
 		and String(bind_res.get("error_code", "")) == "PENDING_CHARACTER_NAME"
-	var world_ref := AccountSlotBindingSolver.ensure_account_world_ref(raw_account, false)
+	var world_ref := AccountSlotBindingSolver.ensure_account_world_ref(raw_account)
 	var world_guarded: bool = world_ref == "UNBOUND"
 
 	var opening := OpeningEventStreamDTO.new()
 	opening.account_id = "ACC_UNBOUND_TEST"
 	opening.character_id = "CHAR_UNBOUND"
 	opening.character_name = "未命名开拓者"
-	var pro_res := PrologueExecutionKernel.boot_character_prologue(opening, "", false)
+	var pro_res := PrologueExecutionKernel.boot_character_prologue(opening, "")
 	var pro_guarded: bool = not bool(pro_res.get("success", true)) \
 		and String(pro_res.get("error_code", "")) == "UNBOUND_RACE_ID"
 

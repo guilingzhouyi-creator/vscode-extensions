@@ -180,14 +180,16 @@ static func test_save_assembler_manifest_order_roundtrip() -> Dictionary:
 		"saved": built.saved, "ordered": ordered
 	}
 
-## 回归守护：同版/legacy 档直接兼容；未知旧版无迁移链则明确拒绝；登记迁移链后可逐版迁移
+## 回归守护：同版直接通过；空版本严格拒绝（MISSING_SAVE_VERSION）；未知旧版无迁移链则明确拒绝；登记迁移链后可逐版迁移
 static func test_save_version_migration_guard() -> Dictionary:
 	var current := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
+	var empty_ver := GameSaveAssembler.migrate_save_data({ "gold": 1 }, "")
 	var same_version := GameSaveAssembler.migrate_save_data({ "gold": 1 }, current)
 	var unknown_old := GameSaveAssembler.migrate_save_data({ "gold": 1 }, "0.0.1-test")
 	GameSaveAssembler.register_migration("0.0.1-test", current, Callable(TestPersistenceDomain, "_fake_migrate"))
 	var migrated := GameSaveAssembler.migrate_save_data({ "gold": 1 }, "0.0.1-test")
-	var passed = same_version.compatible and not unknown_old.compatible \
+	var passed = (not empty_ver.compatible and empty_ver.get("error", "") == "MISSING_SAVE_VERSION") \
+		and same_version.compatible and not unknown_old.compatible \
 		and migrated.compatible and migrated.data.get("migrated", false) and migrated.data.get("gold", 0) == 1
 	return {
 		"test": "TC-PERS-08: 存档版本兼容校验与链式迁移", "passed": passed,

@@ -23,7 +23,6 @@ extends RefCounted
 static func boot_character_prologue(
 	opening: OpeningEventStreamDTO,
 	race_id: String = "",
-	_should_allow_default_fallback: bool = false,
 	adapted_mod_manifest: Dictionary = {},
 	profile: Variant = null
 ) -> Dictionary:

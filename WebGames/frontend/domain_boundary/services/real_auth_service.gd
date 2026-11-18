@@ -170,7 +170,6 @@ func create_character_async(account_id: String, request_payload: Dictionary, res
         "character_name": character_name,
         "title_prefix": str(request_payload.get("title_prefix", "")),
         "is_permadeath": bool(request_payload.get("is_permadeath", false)),
-        "allow_default_fallback": true,
         "provision_disk": true,
         "race": chosen_race
     })

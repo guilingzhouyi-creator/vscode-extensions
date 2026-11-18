@@ -32,6 +32,6 @@ flowchart LR
     Res --> Stopped["transition_to(STOPPED) + 广播停机事件"]
 ```
 
-1. **降级停机可控**：`policies/allow_degraded_shutdown_on_save_failure` 与 `shutdown_hooks/require_explicit_save_slot` 均由 [lifecycle.json](../../../config/infrastructure/lifecycle.json) 驱动，确保存档异常时可按策略明确拒绝退出或受控降级。
+1. **降级停机可控**：`policies/allow_degraded_shutdown_on_save_failure` 由 [lifecycle.json](../../../config/infrastructure/lifecycle.json) 驱动，空存档槽位严格返回 `UNBOUND_SAVE_SLOT`，确保存档异常时可按策略明确拒绝退出或受控降级。
 2. **上下文对象池化**：`SessionFlowContextDTO` 自建 `acquire()`/`release()` 复用池，并在流程收尾裁剪中间快照防止长驻内存膨胀。
 3. **关联测试**：[test_game_lifecycle_pipeline.gd](../../../tests/integration/pipelines/test_game_lifecycle_pipeline.gd)。

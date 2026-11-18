@@ -79,7 +79,7 @@ static func test_synthetic_dag_prologue_progression() -> Dictionary:
 	opening.world_id = "WORLD_CHRONO_SP_01"
 	opening.narrative_context = {"origin_id": "CLOCKWORK_SCRIBE"}
 
-	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "AUTOMATON", false, manifest)
+	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "AUTOMATON", manifest)
 	var p_ctx: CharacterPrologueContext = boot_res.get("context", null)
 	var boot_packet: Variant = boot_res.get("packet", null)
 	var boot_ok: bool = bool(boot_res.get("success", false)) and p_ctx != null \

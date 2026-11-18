@@ -72,8 +72,7 @@ static func test_world_mod_lock_reentry_restores_overlay() -> Dictionary:
 	var sec_res := SaveLoadRoutingSolver.execute_secondary_load({
 		"account": acc,
 		"slot": dto,
-		"target_world_id": LOCKED_WORLD_ID,
-		"allow_default_fallback": false
+		"target_world_id": LOCKED_WORLD_ID
 	})
 
 	reentry_fsm.logout()

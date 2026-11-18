@@ -155,7 +155,7 @@ static func execute_creation_and_boot_prologue(
     opening.timestamp_utc = int(Time.get_unix_time_from_system())
 
     EventBusCore.get_instance().emit_domain_event("opening_narrative.triggered", opening.to_dto())
-    var prologue_boot := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, false, effective_manifest, profile)
+    var prologue_boot := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, effective_manifest, profile)
     if not bool(prologue_boot.get("success", false)):
         return prologue_boot
 

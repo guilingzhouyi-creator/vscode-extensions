@@ -16,7 +16,6 @@ var slot_id: String = ""
 var character_name: String = ""
 var title_prefix: String = ""
 var is_permadeath: bool = false
-var allow_default_fallback: bool = true
 var provision_disk: bool = false
 var race: String = ""
 
@@ -28,6 +27,5 @@ func _init(initial_parameters: Dictionary = {}) -> void:
 	character_name = str(initial_parameters.get("character_name", ""))
 	title_prefix = str(initial_parameters.get("title_prefix", ""))
 	is_permadeath = bool(initial_parameters.get("is_permadeath", false))
-	allow_default_fallback = bool(initial_parameters.get("allow_default_fallback", true))
 	provision_disk = bool(initial_parameters.get("provision_disk", false))
 	race = str(initial_parameters.get("race", ""))

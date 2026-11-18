@@ -185,7 +185,6 @@ class ShutdownStageContext extends RefCounted:
 	var stage: String = ""
 	var request: GameShutdownDTO.Request
 	var providers: Dictionary = {}
-	var should_allow_default_fallback: bool = true
 	var fsm: Variant
 	var response: GameShutdownDTO.Response
 	var bus: Variant
@@ -203,7 +202,7 @@ static func _execute_shutdown_stage(stage_context: ShutdownStageContext) -> Dict
 			var save_result: Dictionary = {}
 			var auto_save_policy := GameConfig.get_bool("infrastructure.lifecycle", "policies/auto_save_on_exit", true)
 			if stage_context.request.save_before_quit and auto_save_policy:
-				save_result = _flush_domain_saves(stage_context.request.target_save_slot, stage_context.providers, stage_context.should_allow_default_fallback)
+				save_result = _flush_domain_saves(stage_context.request.target_save_slot, stage_context.providers)
 				stage_context.response.is_save_completed = bool(save_result.get("success", false))
 				stage_context.response.save_sha256 = String(save_result.get("sha256", ""))
 				if not stage_context.response.is_save_completed:
@@ -263,8 +262,7 @@ static func _execute_shutdown_stage(stage_context: ShutdownStageContext) -> Dict
 ## 执行安全优雅停机总管线
 static func execute_graceful_shutdown(
 	request: GameShutdownDTO.Request,
-	providers: Dictionary = {},
-	should_allow_default_fallback: bool = true
+	providers: Dictionary = {}
 ) -> GameShutdownDTO.Response:
 	var fsm: Variant = GameLifecycleManager.get_instance()
 	var start_time := Time.get_ticks_msec()
@@ -313,7 +311,6 @@ static func execute_graceful_shutdown(
 	var stage_context := ShutdownStageContext.new()
 	stage_context.request = request
 	stage_context.providers = providers
-	stage_context.should_allow_default_fallback = should_allow_default_fallback
 	stage_context.fsm = fsm
 	stage_context.response = response
 	stage_context.bus = bus
@@ -389,27 +386,24 @@ static func _freeze_world_and_inputs() -> void:
 		"timestamp_utc": int(Time.get_unix_time_from_system())
 	})
 
-## 阶段二：收集并落盘存档（经 SaveDataAccessLayer 统一访问门面；未接线严格模式下拒绝静默绑定 quicksave_exit）
-static func _flush_domain_saves(target_slot: String, providers: Dictionary = {}, should_allow_default_fallback: bool = true) -> Dictionary:
-	var is_explicit_slot_required := GameConfig.get_bool("infrastructure.lifecycle", "shutdown_hooks/require_explicit_save_slot", false)
+## 阶段二：收集并落盘存档（经 SaveDataAccessLayer 统一访问门面；空存档槽位严格返回 UNBOUND_SAVE_SLOT）
+static func _flush_domain_saves(target_slot: String, providers: Dictionary = {}) -> Dictionary:
 	var sentinel: String = GameConfig.get_string("infrastructure.lifecycle", "shutdown_hooks/unwired_slot_sentinel", "")
 	if sentinel.is_empty():
 		return {"success": false, "error_code": "INVALID_UNBOUND_SENTINEL_CONFIG", "unwired_slot": "UNBOUND_SENTINEL", "sha256": ""}
 	if target_slot.is_empty() or target_slot == sentinel:
-		if not should_allow_default_fallback or is_explicit_slot_required:
-			return {
-				"success": false,
-				"error_code": "UNBOUND_SAVE_SLOT",
-				"unwired_slot": "target_save_slot",
-				"sha256": ""
-			}
-	var slot_name := target_slot if not target_slot.is_empty() else "quicksave_exit"
+		return {
+			"success": false,
+			"error_code": "UNBOUND_SAVE_SLOT",
+			"unwired_slot": "target_save_slot",
+			"sha256": ""
+		}
 	var registered: Array[String] = []
 	for domain_id in providers.keys():
 		SaveDataAccessLayer.register_provider(String(domain_id), providers[domain_id])
 		registered.append(String(domain_id))
 	var payload := SaveDataAccessLayer.build_save_payload()
-	var save_operation_result := SaveDataAccessLayer.save_game(slot_name, payload)
+	var save_operation_result := SaveDataAccessLayer.save_game(target_slot, payload)
 	for domain_id in registered:
 		SaveDataAccessLayer.unregister_provider(domain_id)
 	return save_operation_result
@@ -436,7 +430,7 @@ static func execute_logout_to_menu(request: GameShutdownDTO.Request, providers: 
 	var response := GameShutdownDTO.Response.new()
 	var fsm: Variant = GameLifecycleManager.get_instance()
 	if request != null and request.save_before_quit and not request.target_save_slot.is_empty():
-		var save_result := _flush_domain_saves(request.target_save_slot, providers, false)
+		var save_result := _flush_domain_saves(request.target_save_slot, providers)
 		response.is_save_completed = bool(save_result.get("success", false))
 		response.save_sha256 = String(save_result.get("sha256", ""))
 		if not response.is_save_completed and request.require_save_success:

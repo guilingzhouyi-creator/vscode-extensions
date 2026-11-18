@@ -131,7 +131,7 @@ static func test_character_creation_in_slot() -> Dictionary:
 
 	var quick := AccountSlotBindingSolver.quick_create_in_next_slot(acc, "莫德雷德")
 
-	var prov_res := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_03", "高文", "圆桌骑士", false, true, true)
+	var prov_res := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_03", "高文", "圆桌骑士", false, true)
 	var load_prov := SaveDataAccessLayer.load_game("SLOT_03")
 	var prov_ok: bool = bool(prov_res.get("success", false)) \
 		and bool(prov_res.get("provision_result", {}).get("success", false)) \

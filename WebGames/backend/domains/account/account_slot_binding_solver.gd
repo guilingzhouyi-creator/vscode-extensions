@@ -33,7 +33,6 @@ static func create_character_in_slot(
 	character_name: String,
 	title_prefix: String = "",
 	is_permadeath: bool = false,
-	should_allow_default_fallback: bool = true,
 	should_provision_disk: bool = false
 ) -> Dictionary:
 	var creation_context := AccountSlotCreationDTO.new({
@@ -42,7 +41,6 @@ static func create_character_in_slot(
 		"character_name": character_name,
 		"title_prefix": title_prefix,
 		"is_permadeath": is_permadeath,
-		"allow_default_fallback": should_allow_default_fallback,
 		"provision_disk": should_provision_disk
 	})
 	return _create_character_in_slot_internal(creation_context)
@@ -57,7 +55,7 @@ static func _create_character_in_slot_internal(creation_context: AccountSlotCrea
 	if not _can_bind_slot(account, slot_id):
 		return {"success": false, "error_code": "SLOT_OCCUPIED", "slot_id": slot_id}
 
-	var name_result: Dictionary = _resolve_character_name(slot_id, creation_context.character_name, creation_context.allow_default_fallback)
+	var name_result: Dictionary = _resolve_character_name(slot_id, creation_context.character_name)
 	if not bool(name_result.get("success", false)):
 		return name_result
 	var character_name: String = str(name_result.get("character_name", ""))
@@ -80,7 +78,7 @@ static func _create_character_in_slot_internal(creation_context: AccountSlotCrea
 	if repository.has_account(account.account_id):
 		repository.save_account(account)
 
-	var world_reference := ensure_account_world_ref(account, creation_context.allow_default_fallback)
+	var world_reference := ensure_account_world_ref(account)
 	return {
 		"success": true,
 		"slot_id": slot_id,
@@ -102,19 +100,13 @@ static func _can_bind_slot(account: AccountProfile, slot_id: String) -> bool:
 	# fallen 槽位可重挂：外层以全新 DTO 整体替换（零继承；不就地重置旧 DTO，无死代码）
 	return existing != null and existing.is_fallen
 
-static func _resolve_character_name(slot_id: String, raw_name: String, should_allow_default_fallback: bool) -> Dictionary:
-	var is_explicit_name_required := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_character_name", false)
+static func _resolve_character_name(slot_id: String, raw_name: String) -> Dictionary:
 	if raw_name.strip_edges().is_empty():
-		if not should_allow_default_fallback or is_explicit_name_required:
-			return {
-				"success": false,
-				"error_code": "PENDING_CHARACTER_NAME",
-				"unwired_slot": "character_name",
-				"slot_id": slot_id
-			}
 		return {
-			"success": true,
-			"character_name": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/character_name", "Nameless Wanderer")
+			"success": false,
+			"error_code": "PENDING_CHARACTER_NAME",
+			"unwired_slot": "character_name",
+			"slot_id": slot_id
 		}
 	return {"success": true, "character_name": raw_name}
 
@@ -160,32 +152,28 @@ static func _provision_slot_disk_if_needed(
 # ==============================================================================
 
 ## 快捷创建：优先重挂 fallen 槽位，无 fallen 再自动选空槽（鼠标点击空槽热区触发）
-static func quick_create_in_next_slot(account: AccountProfile, character_name: String, should_allow_default_fallback: bool = true, should_provision_disk: bool = false) -> Dictionary:
+static func quick_create_in_next_slot(account: AccountProfile, character_name: String, should_provision_disk: bool = false) -> Dictionary:
 	if account == null:
 		return {"success": false, "error_code": "INVALID_ACCOUNT"}
 	for slot_id in account.save_slot_summaries:
 		var slot_summary: SaveSlotDTO = account.save_slot_summaries[slot_id]
 		if slot_summary != null and slot_summary.is_fallen:
-			return create_character_in_slot(account, str(slot_id), character_name, "", false, should_allow_default_fallback, should_provision_disk)
+			return create_character_in_slot(account, str(slot_id), character_name, "", false, should_provision_disk)
 	var next_id := account.get_next_available_slot_id()
 	if next_id.is_empty():
 		return {"success": false, "error_code": "NO_AVAILABLE_SLOT"}
-	return create_character_in_slot(account, next_id, character_name, "", false, should_allow_default_fallback, should_provision_disk)
+	return create_character_in_slot(account, next_id, character_name, "", false, should_provision_disk)
 
-## 账号世界引用沿用：未接线严格模式下显式保留 UNBOUND 哨兵，不静默绑定默认世界
-static func ensure_account_world_ref(account: AccountProfile, should_allow_default_fallback: bool = true) -> String:
+## 账号世界引用沿用：未绑定世界时显式保留 UNBOUND 哨兵，禁止静默绑定默认世界
+static func ensure_account_world_ref(account: AccountProfile) -> String:
 	if account == null:
 		return ""
-	var is_explicit_world_required := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_world_ref", false)
 	var unbound_sentinel: String = GameConfig.get_string("infrastructure.lifecycle", "shutdown_hooks/unwired_slot_sentinel", "")
 	if unbound_sentinel.is_empty():
 		return ""
 	if account.world_state_ref.is_empty() or account.world_state_ref == unbound_sentinel:
-		if not should_allow_default_fallback or is_explicit_world_required:
-			account.world_state_ref = unbound_sentinel
-			return account.world_state_ref
-		var template: Dictionary = GameConfig.get_dict("domains.world", "default_template", {"world_id": "WORLD_DEFAULT"})
-		account.world_state_ref = String(template.get("world_id", "WORLD_DEFAULT"))
+		account.world_state_ref = unbound_sentinel
+		return account.world_state_ref
 	return account.world_state_ref
 
 ## 将账号下的 SaveSlotDTO 导出为网关兼容的纯 Dictionary 档位状态列表（零跨领域类引用）

@@ -117,7 +117,7 @@ static func test_zero_mod_creation_and_prologue_fail_closed() -> Dictionary:
 	opening.race_id = "HUMAN"
 	opening.world_id = world_id
 
-	var prologue_res := PrologueExecutionKernel.boot_character_prologue(opening, "HUMAN", false, {})
+	var prologue_res := PrologueExecutionKernel.boot_character_prologue(opening, "HUMAN", {})
 	var prologue_blocked: bool = not bool(prologue_res.get("success", true)) \
 		and str(prologue_res.get("error_code", "")) == "ERR_NO_BASE_CONTENT_MOD"
 
