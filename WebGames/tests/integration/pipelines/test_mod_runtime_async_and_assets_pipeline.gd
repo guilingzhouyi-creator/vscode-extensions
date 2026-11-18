@@ -381,58 +381,42 @@ static func _build_custom_routing_mod_package() -> Dictionary:
 
 
 static func _write_domain_tables_kmod(kmod_path: String) -> String:
-	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
-	var packer := ZIPPacker.new()
-	if packer.open(kmod_path) != OK:
-		return kmod_path
-	_pack_json_entry(packer, "pack.json", {
+	var manifest := {
 		"pack_id": "mod_sample_domains", "pack_name": "Sample Domains", "version": "1.0.0",
 		"pack_profile": "TOTAL_CONVERSION", "priority": 280, "is_active": true
-	})
-	_pack_json_entry(packer, "content/items/sample_items.json", {
-		"override_mode": "MERGE",
-		"items": [{
-			"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:SAMPLE_STAR_ORB", "english_name": "sample_star_orb",
-			"loc_name_key": "item.sample_star_orb.name", "category_major": "EQUIPMENT",
-			"category_minor": "WEAPON_BLADE", "tier_rank": 3, "default_mass_kg": 1.0,
-			"default_volume_slots": 1, "base_market_value": 300
-		}]
-	})
-	_pack_json_entry(packer, "content/skills/sample_skills.json", {
-		"override_mode": "MERGE",
-		"verbs": {"LUNGE": {"name": "突刺", "k_mom": 1.2, "k_edge": 1.1, "base_ap": -2}},
-		"skill_cards": [{"card_id": "CARD_MOD_ASTRAL", "verb_type": "LUNGE", "name": "星芒突刺", "ap_cost": -1, "base_potency": 42.0}]
-	})
-	_pack_json_entry(packer, "content/rules/sample_rules.json", {
-		"override_mode": "MERGE",
-		"cdkeys": {"MODSAMPLEFREE": {"gold": 777, "crystals": 5, "item_id": "KALAR:EQUIP:WEAPON_BLADE:SAMPLE_STAR_ORB", "item_name": "星辰宝珠"}}
-	})
-	_pack_json_entry(packer, "content/world/sample_world.json", {
-		"override_mode": "MERGE", "map_id": "MAP_MOD_SAMPLE", "map_name": "星辉裂隙", "default_entry_node": "NODE_GATE",
-		"nodes": [{"node_id": "NODE_GATE", "name": "星门", "terrain_type": "PLAINS", "x": 0.0, "y": 0.0}],
-		"edges": [{"from": "NODE_GATE", "to": "LM_SANCTUM", "distance": 6.5, "bidirectional": true}],
-		"landmarks": [{"id": "LM_SANCTUM", "name": "苍穹圣所", "terrain_type": "PLAINS", "x": 10.0, "y": 0.0}]
-	})
-	packer.close()
+	}
+	var source_entries := {
+		"content/items/sample_items.json": {
+			"override_mode": "MERGE",
+			"items": [{
+				"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:SAMPLE_STAR_ORB", "english_name": "sample_star_orb",
+				"loc_name_key": "item.sample_star_orb.name", "category_major": "EQUIPMENT",
+				"category_minor": "WEAPON_BLADE", "tier_rank": 3, "default_mass_kg": 1.0,
+				"default_volume_slots": 1, "base_market_value": 300
+			}]
+		},
+		"content/skills/sample_skills.json": {
+			"override_mode": "MERGE",
+			"verbs": {"LUNGE": {"name": "突刺", "k_mom": 1.2, "k_edge": 1.1, "base_ap": -2}},
+			"skill_cards": [{"card_id": "CARD_MOD_ASTRAL", "verb_type": "LUNGE", "name": "星芒突刺", "ap_cost": -1, "base_potency": 42.0}]
+		},
+		"content/rules/sample_rules.json": {
+			"override_mode": "MERGE",
+			"cdkeys": {"MODSAMPLEFREE": {"gold": 777, "crystals": 5, "item_id": "KALAR:EQUIP:WEAPON_BLADE:SAMPLE_STAR_ORB", "item_name": "星辰宝珠"}}
+		},
+		"content/world/sample_world.json": {
+			"override_mode": "MERGE", "map_id": "MAP_MOD_SAMPLE", "map_name": "星辉裂隙", "default_entry_node": "NODE_GATE",
+			"nodes": [{"node_id": "NODE_GATE", "name": "星门", "terrain_type": "PLAINS", "x": 0.0, "y": 0.0}],
+			"edges": [{"from": "NODE_GATE", "to": "LM_SANCTUM", "distance": 6.5, "bidirectional": true}],
+			"landmarks": [{"id": "LM_SANCTUM", "name": "苍穹圣所", "terrain_type": "PLAINS", "x": 10.0, "y": 0.0}]
+		},
+	}
+	TestKmodMediaFixtureHelper.write_binary_kmod_package(kmod_path, manifest, source_entries)
 	return kmod_path
 
 
 static func _write_single_file_kmod(kmod_path: String, pack_id: String, ver: String, entry_path: String, raw_bytes: PackedByteArray) -> void:
-	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
-	var packer := ZIPPacker.new()
-	if packer.open(kmod_path) != OK:
-		return
-	_pack_json_entry(packer, "pack.json", {"pack_id": pack_id, "version": ver})
-	packer.start_file(entry_path)
-	packer.write_file(raw_bytes)
-	packer.close_file()
-	packer.close()
-
-
-static func _pack_json_entry(packer: ZIPPacker, entry_path: String, payload: Variant) -> void:
-	packer.start_file(entry_path)
-	packer.write_file(JSON.stringify(payload).to_utf8_buffer())
-	packer.close_file()
+	TestKmodMediaFixtureHelper.write_binary_kmod_package(kmod_path, {"pack_id": pack_id, "version": ver}, {}, {entry_path: raw_bytes})
 
 
 static func _create_headless_app_root() -> Node:

@@ -15,67 +15,125 @@ extends RefCounted
 const SANDBOX_ROOT: String = "user://test_kmod_media_sandbox/"
 
 
-## 写入含 races_catalog、cutscenes/cutscene_hooks 与 assets/manifest 的全转换 .kmod
-static func write_custom_realm_kmod(kmod_path: String, wav_bytes: PackedByteArray) -> void:
+## 构建并写入纯二进制 .kmod 归档测试夹具（manifest.kdat + mod_data.kdat + 流式媒体，零明文 JSON）
+static func write_binary_kmod_package(
+	kmod_path: String,
+	manifest_dict: Dictionary,
+	source_entries: Dictionary = {},
+	media_entries: Dictionary = {}
+) -> void:
 	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
+	var mod_data: Dictionary = {
+		"pack_metadata": manifest_dict.duplicate(true),
+		"dag_graphs": {},
+		"custom_i18n": {},
+		"custom_i18n_by_locale": {},
+		"custom_routing_rules": [],
+		"prologue_routing_rules": [],
+		"content_records": [],
+	}
+	var sorted_sources: Array[String] = []
+	for key_var in source_entries.keys():
+		sorted_sources.append(String(key_var))
+	sorted_sources.sort()
+	for rel_path in sorted_sources:
+		var entry_val: Variant = source_entries[rel_path]
+		if entry_val is Dictionary:
+			ModPackageArchiveReader.merge_source_entry(rel_path, entry_val as Dictionary, mod_data)
+
+	var mod_data_kdat := BinaryConfigWriter.encode_kdat_buffer(mod_data, true, KDataHeaderDTO.PAYLOAD_MOD_PACKAGE)
+	var binary_entries: Dictionary = {ModPackageArchiveReader.KMOD_DATA_FILENAME: mod_data_kdat}
+	for media_key in media_entries.keys():
+		binary_entries[String(media_key)] = media_entries[media_key]
+
+	var sorted_paths: Array[String] = []
+	for path_var in binary_entries.keys():
+		sorted_paths.append(String(path_var))
+	sorted_paths.sort()
+
+	var sha_hasher := HashingContext.new()
+	sha_hasher.start(HashingContext.HASH_SHA256)
+	var files_manifest: Dictionary = {}
+	for entry_path in sorted_paths:
+		var raw_bytes := binary_entries[entry_path] as PackedByteArray
+		sha_hasher.update(entry_path.to_utf8_buffer())
+		sha_hasher.update(raw_bytes)
+		var item_hasher := HashingContext.new()
+		item_hasher.start(HashingContext.HASH_SHA256)
+		item_hasher.update(raw_bytes)
+		files_manifest[entry_path] = {
+			"sha256": item_hasher.finish().hex_encode(),
+			"size_bytes": raw_bytes.size(),
+		}
+
+	var full_manifest := manifest_dict.duplicate(true)
+	var p_id := str(full_manifest.get("pack_id", "test_mod"))
+	full_manifest["archive_format_version"] = 2
+	full_manifest["bundle_id"] = str(full_manifest.get("bundle_id", p_id))
+	full_manifest["bundle_name"] = str(full_manifest.get("bundle_name", full_manifest.get("pack_name", p_id)))
+	full_manifest["content_sha256"] = sha_hasher.finish().hex_encode()
+	full_manifest["files_manifest"] = files_manifest
+	var manifest_kdat := BinaryConfigWriter.encode_kdat_buffer(full_manifest, true, KDataHeaderDTO.PAYLOAD_MOD_PACKAGE)
+
 	var packer := ZIPPacker.new()
 	if packer.open(kmod_path) != OK:
 		return
-	pack_json(packer, "pack.json", {
+	packer.start_file(ModPackageArchiveReader.KMOD_MANIFEST_FILENAME)
+	packer.write_file(manifest_kdat)
+	packer.close_file()
+	for entry_path in sorted_paths:
+		packer.start_file(entry_path)
+		packer.write_file(binary_entries[entry_path] as PackedByteArray)
+		packer.close_file()
+	packer.close()
+
+
+## 写入含 races_catalog、cutscenes/cutscene_hooks 与 assets/manifest 的全转换二进制 .kmod
+static func write_custom_realm_kmod(kmod_path: String, wav_bytes: PackedByteArray) -> void:
+	var manifest := {
 		"pack_id": "mod_custom_realm",
 		"pack_name": "Custom Realm TC",
 		"version": "1.0.0",
 		"pack_profile": "TOTAL_CONVERSION",
 		"priority": 300,
-		"is_active": true
-	})
-	pack_json(packer, "races_catalog.json", {
-		"races_catalog": {
-			"ASTRAL_ELF": {"attribute_coefficients": {"AGI": 1.35}}
-		}
-	})
-	pack_json(packer, "cutscenes/cutscene_registry.json", {
-		"cutscenes": {"cs_custom_entry": {"duration_sec": 3.0, "is_placeholder": true}}
-	})
-	pack_json(packer, "cutscenes/cutscene_hooks.json", {
-		"hooks": [{
-			"hook_id": "hook_custom_entry",
-			"trigger_type": "NARRATIVE_NODE_PRE",
-			"target_filter": {"dag_id": "DAG_CUSTOM_REALM", "node_id": "NODE_ENTRY"},
-			"cutscene_id": "cs_custom_entry"
-		}]
-	})
-	pack_json(packer, "assets/manifest.json", {
-		"asset_count": 1,
-		"assets": ["assets/audio/chime.wav"]
-	})
-	packer.start_file("assets/audio/chime.wav")
-	packer.write_file(wav_bytes)
-	packer.close_file()
-	packer.close()
+		"is_active": true,
+	}
+	var source_entries := {
+		"races_catalog.json": {
+			"races_catalog": {
+				"ASTRAL_ELF": {"attribute_coefficients": {"AGI": 1.35}}
+			}
+		},
+		"cutscenes/cutscene_registry.json": {
+			"cutscenes": {"cs_custom_entry": {"duration_sec": 3.0, "is_placeholder": true}}
+		},
+		"cutscenes/cutscene_hooks.json": {
+			"hooks": [{
+				"hook_id": "hook_custom_entry",
+				"trigger_type": "NARRATIVE_NODE_PRE",
+				"target_filter": {"dag_id": "DAG_CUSTOM_REALM", "node_id": "NODE_ENTRY"},
+				"cutscene_id": "cs_custom_entry",
+			}]
+		},
+		"assets/manifest.json": {
+			"asset_count": 1,
+			"assets": ["assets/audio/chime.wav"],
+		},
+	}
+	write_binary_kmod_package(kmod_path, manifest, source_entries, {"assets/audio/chime.wav": wav_bytes})
 
 
-## 写入含合法 WAV 与非法后缀音频的 .kmod 测试包
+## 写入含合法 WAV 与非法后缀音频的二进制 .kmod 测试包
 static func write_media_pack_kmod(kmod_path: String, wav_bytes: PackedByteArray) -> void:
-	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
-	var packer := ZIPPacker.new()
-	if packer.open(kmod_path) != OK:
-		return
-	pack_json(packer, "pack.json", {"pack_id": "mod_audio_pack", "version": "1.0.0"})
-	packer.start_file("assets/audio/chime.wav")
-	packer.write_file(wav_bytes)
-	packer.close_file()
-	packer.start_file("assets/audio/track.mp3")
-	packer.write_file("ID3_DUMMY".to_utf8_buffer())
-	packer.close_file()
-	packer.close()
-
-
-## 向 ZIPPacker 写入 JSON 字典条目
-static func pack_json(packer: ZIPPacker, entry_path: String, payload: Variant) -> void:
-	packer.start_file(entry_path)
-	packer.write_file(JSON.stringify(payload).to_utf8_buffer())
-	packer.close_file()
+	write_binary_kmod_package(
+		kmod_path,
+		{"pack_id": "mod_audio_pack", "version": "1.0.0"},
+		{},
+		{
+			"assets/audio/chime.wav": wav_bytes,
+			"assets/audio/track.mp3": "ID3_DUMMY".to_utf8_buffer(),
+		}
+	)
 
 
 ## 写入原始二进制测试文件到沙盒路径

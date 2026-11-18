@@ -132,13 +132,12 @@ static func test_cyclic_dependency_rejection() -> Dictionary:
 ## TC-PMC-04: .kmod ZIP 归档包资产二进制读取与路径穿越攻击防御
 static func test_kmod_zip_asset_resolution_and_traversal_guard() -> Dictionary:
 	var kmod_path := SANDBOX_MODS_ROOT.path_join("mod_chrono_kmod.kmod")
-	var packer := ZIPPacker.new()
-	var open_err := packer.open(kmod_path)
-	if open_err == OK:
-		packer.start_file("assets/media/chronicle.txt")
-		packer.write_file("CHRONO_KMOD_STREAM_OK".to_utf8_buffer())
-		packer.close_file()
-		packer.close()
+	TestKmodMediaFixtureHelper.write_binary_kmod_package(
+		kmod_path,
+		{"pack_id": "mod_chrono_kmod", "version": "1.0.0"},
+		{},
+		{"assets/media/chronicle.txt": "CHRONO_KMOD_STREAM_OK".to_utf8_buffer()}
+	)
 
 	AssetPathResolver.set_test_roots_override([SANDBOX_MODS_ROOT])
 	var loaded_bytes := AssetPathResolver.read_mod_asset_bytes("mod://mod_chrono_kmod/assets/media/chronicle.txt")

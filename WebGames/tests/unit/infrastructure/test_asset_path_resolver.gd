@@ -244,11 +244,24 @@ static func test_versioned_kmod_precedence_and_strict_traversal() -> Dictionary:
 
 static func _apr06_write_kmod(kmod_path: String, pack_id: String, ver: String, asset_entry: String, asset_bytes: PackedByteArray) -> void:
 	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
+	var manifest_kdat := BinaryConfigWriter.encode_kdat_buffer(
+		{"pack_id": pack_id, "version": ver, "archive_format_version": 2},
+		true,
+		KDataHeaderDTO.PAYLOAD_MOD_PACKAGE
+	)
+	var data_kdat := BinaryConfigWriter.encode_kdat_buffer(
+		{"dag_graphs": {}, "custom_i18n": {}, "content_records": []},
+		true,
+		KDataHeaderDTO.PAYLOAD_MOD_PACKAGE
+	)
 	var packer := ZIPPacker.new()
 	if packer.open(kmod_path) != OK:
 		return
-	packer.start_file("pack.json")
-	packer.write_file(JSON.stringify({"pack_id": pack_id, "version": ver}).to_utf8_buffer())
+	packer.start_file("manifest.kdat")
+	packer.write_file(manifest_kdat)
+	packer.close_file()
+	packer.start_file("mod_data.kdat")
+	packer.write_file(data_kdat)
 	packer.close_file()
 	packer.start_file(asset_entry)
 	packer.write_file(asset_bytes)

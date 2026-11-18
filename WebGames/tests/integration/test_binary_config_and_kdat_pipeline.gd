@@ -25,6 +25,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_kdat_07_binary_blob_embedding_and_decoding())
 	results.append(test_tc_kdat_08_encrypted_stream_and_client_secret_vault())
 	results.append(test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolation())
+	results.append(test_tc_kdat_10_binary_writer_roundtrip_and_kmod_binary_envelope())
 
 	return pack_results("Binary Config & KData Pipeline", results)
 
@@ -345,4 +346,98 @@ static func test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolati
 		"sp_ok": is_sp and caps_ok,
 		"mp_fail_fast_ok": is_mp and mp_caps_ok and mp_dispatch_fail_fast,
 		"stub_integration_ok": stub_sp_ok and stub_mp_ok
+	})
+
+
+## TC-KDAT-10: BinaryConfigWriter 编码往返、JSON 调试转 .kmod 编译封装零明文校验及等价读取
+static func test_tc_kdat_10_binary_writer_roundtrip_and_kmod_binary_envelope() -> Dictionary:
+	var sample := {
+		"flag_ok": true,
+		"small_int": -42,
+		"big_int": 9000000000,
+		"ratio": 1.625,
+		"title": "星界编译构筑",
+		"tags": ["alpha", "alpha", "beta"],
+		"raw_blob": "BIN_PAYLOAD".to_utf8_buffer(),
+	}
+	var encoded := BinaryConfigWriter.encode_kdat_buffer(sample, true, KDataHeaderDTO.PAYLOAD_MOD_PACKAGE)
+	var decoded_var: Variant = BinaryConfigReader.load_kdat_buffer(encoded)
+	var roundtrip_ok := decoded_var is Dictionary
+	if roundtrip_ok:
+		var decoded_table := decoded_var as Dictionary
+		var decoded_blob_entry: Variant = decoded_table.get("raw_blob", null)
+		var decoded_blob_ok := decoded_blob_entry is Dictionary \
+			and str((decoded_blob_entry as Dictionary).get("__type", "")) == "binary_blob" \
+			and ((decoded_blob_entry as Dictionary).get("data", PackedByteArray()) as PackedByteArray).get_string_from_utf8() == "BIN_PAYLOAD"
+		roundtrip_ok = bool(decoded_table.get("flag_ok", false)) \
+			and int(decoded_table.get("small_int", 0)) == -42 \
+			and int(decoded_table.get("big_int", 0)) == 9000000000 \
+			and is_equal_approx(float(decoded_table.get("ratio", 0.0)), 1.625) \
+			and str(decoded_table.get("title", "")) == "星界编译构筑" \
+			and decoded_blob_ok
+
+	var sandbox := "user://test_kdat10_mod_compile"
+	var src_dir := sandbox.path_join("mod_compile_debug")
+	var kmod_out := sandbox.path_join("mod_compile_debug_v1.0.0.kmod")
+	WorldModPackageOpsHelper.ensure_directory_recursive(src_dir.path_join("dag_graphs"))
+	WorldModPackageOpsHelper.ensure_directory_recursive(src_dir.path_join("i18n"))
+	WorldModPackageOpsHelper.ensure_directory_recursive(src_dir.path_join("assets"))
+	WorldModPackageOpsHelper.write_json_file(src_dir.path_join("pack.json"), {
+		"pack_id": "mod_compile_debug", "pack_name": "Compile Debug Mod", "version": "1.0.0", "is_active": true
+	})
+	WorldModPackageOpsHelper.write_json_file(src_dir.path_join("routing_rules.json"), {
+		"prologue_routing_rules": [{"rule_id": "R_CMPL", "priority": 500, "origin_id": "INITIATE", "dag_id": "DAG_CMPL"}]
+	})
+	WorldModPackageOpsHelper.write_json_file(src_dir.path_join("dag_graphs/DAG_CMPL.json"), {
+		"dag_id": "DAG_CMPL", "entry_node_id": "N0", "nodes": {"N0": {"node_type": "START_ENTRY", "narrative_key": "cmpl.n0"}}, "edges": []
+	})
+	WorldModPackageOpsHelper.write_json_file(src_dir.path_join("i18n/zh_CN.json"), {
+		"cmpl": {"n0": "星海序章"}
+	})
+	var asset_f := FileAccess.open(src_dir.path_join("assets/sigil.txt"), FileAccess.WRITE)
+	if asset_f != null:
+		asset_f.store_buffer("SIGIL_RAW".to_utf8_buffer())
+		asset_f.close()
+
+	var pack_res := WorldModArchiveOpsHelper.pack_mod_kmod({"source_dir": src_dir, "output_path": kmod_out})
+	var pack_ok := bool(pack_res.get("success", false)) and FileAccess.file_exists(kmod_out)
+
+	var reader := ZIPReader.new()
+	var zero_json_ok := false
+	if reader.open(kmod_out) == OK:
+		var files := reader.get_files()
+		var has_json := false
+		for entry_file in files:
+			if String(entry_file).to_lower().ends_with(".json"):
+				has_json = true
+		zero_json_ok = (not has_json) and files.has("manifest.kdat") and files.has("mod_data.kdat") and files.has("assets/sigil.txt")
+		reader.close()
+
+	var dir_pkg := ModPackageDiscoverySolver.load_full_mod_package_from_dir(src_dir)
+	var bin_pkg := ModPackageArchiveReader.load_full_package_from_kmod(kmod_out)
+	var parity_ok := str(dir_pkg.get("pack_id", "")) == str(bin_pkg.get("pack_id", "")) \
+		and (dir_pkg.get("dag_graphs", {}) as Dictionary).has("DAG_CMPL") \
+		and (bin_pkg.get("dag_graphs", {}) as Dictionary).has("DAG_CMPL") \
+		and str((dir_pkg.get("custom_i18n", {}) as Dictionary).get("cmpl.n0", "")) == str((bin_pkg.get("custom_i18n", {}) as Dictionary).get("cmpl.n0", ""))
+	var integrity_res := ModPackageDiscoverySolver.verify_package_content_integrity({"pack_id": "mod_compile_debug", "root_path": kmod_out})
+	var integrity_ok := bool(integrity_res.get("valid", false))
+
+	var leak_kmod := sandbox.path_join("mod_leak.kmod")
+	var leak_packer := ZIPPacker.new()
+	if leak_packer.open(leak_kmod) == OK:
+		leak_packer.start_file("pack.json")
+		leak_packer.write_file("{\"pack_id\":\"leak\"}".to_utf8_buffer())
+		leak_packer.close_file()
+		leak_packer.close()
+	var leak_rejected := ModPackageArchiveReader.load_full_package_from_kmod(leak_kmod).is_empty()
+
+	TestTier3ContentOverrideHelper.cleanup_directory_recursive(sandbox)
+	var passed := roundtrip_ok and pack_ok and zero_json_ok and parity_ok and integrity_ok and leak_rejected
+	return make_result("TC-KDAT-10: BinaryConfigWriter 往返与 JSON调试/.kmod纯二进制封装验证", passed, {
+		"roundtrip_ok": roundtrip_ok,
+		"pack_ok": pack_ok,
+		"zero_json_ok": zero_json_ok,
+		"parity_ok": parity_ok,
+		"integrity_ok": integrity_ok,
+		"leak_rejected": leak_rejected,
 	})
