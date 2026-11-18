@@ -63,7 +63,7 @@ from kmod_bundler import (
     scan_and_build_files_manifest,
     build_kmod_package,
     verify_kmod_package,
-    handle_kmod_pack_cli,
+    inspect_kmod_package,
 )
 
 
@@ -98,19 +98,52 @@ def run_workbench_self_test() -> int:
         print(f"  ✔ SHA-256 全量指纹与 manifest 校验 100% 吻合 (文件数: {len(manifest_data.get('files_manifest', {}))})")
 
         # 3. 测试防篡改判定
+        from kmod_bundler import inspect_kmod_package
+
+        with zipfile.ZipFile(target_kmod, "r") as check_zf:
+            json_entries = [n for n in check_zf.namelist() if n.lower().endswith(".json")]
+            if json_entries:
+                print(f"[FAIL] 正式 .kmod 内不得包含明文 JSON: {json_entries}", file=sys.stderr)
+                return 1
+            if "manifest.kdat" not in check_zf.namelist() or "mod_data.kdat" not in check_zf.namelist():
+                print("[FAIL] .kmod 缺少 manifest.kdat 或 mod_data.kdat！", file=sys.stderr)
+                return 1
+        print("  ✔ 正式 .kmod 二进制封装核验通过（含 manifest.kdat + mod_data.kdat，零明文 JSON）")
+
         corrupted_kmod = tmp_path / "corrupted.kmod"
         with zipfile.ZipFile(target_kmod, "r") as src_zf, zipfile.ZipFile(corrupted_kmod, "w") as dst_zf:
             for item in src_zf.infolist():
-                if item.filename == "routing_rules.json":
-                    dst_zf.writestr(item, b'{"corrupted": true}')
+                if item.filename == "mod_data.kdat":
+                    tampered = bytearray(src_zf.read(item.filename))
+                    if len(tampered) > 0:
+                        tampered[-1] ^= 0xFF
+                    dst_zf.writestr(item, bytes(tampered))
                 else:
                     dst_zf.writestr(item, src_zf.read(item.filename))
 
         bad_ok, _, bad_errs = verify_kmod_package(corrupted_kmod)
         if bad_ok:
-            print("[FAIL] 篡改文件未被拦截！", file=sys.stderr)
+            print("[FAIL] 篡改二进制载荷未被拦截！", file=sys.stderr)
             return 1
-        print(f"  ✔ 防篡改与单向指纹拦截生效: {bad_errs[0]}")
+        print(f"  ✔ 防篡改与指纹拦截生效: {bad_errs[0]}")
+
+        json_leak_kmod = tmp_path / "json_leak.kmod"
+        with zipfile.ZipFile(target_kmod, "r") as src_zf, zipfile.ZipFile(json_leak_kmod, "w") as dst_zf:
+            for item in src_zf.infolist():
+                dst_zf.writestr(item, src_zf.read(item.filename))
+            dst_zf.writestr("pack.json", b'{"pack_id": "leak"}')
+        leak_ok, _, leak_errs = verify_kmod_package(json_leak_kmod)
+        if leak_ok:
+            print("[FAIL] 注入明文 JSON 未被拦截！", file=sys.stderr)
+            return 1
+        print(f"  ✔ 明文 JSON 注入拦截生效: {leak_errs[0]}")
+
+        exported_dir = tmp_path / "exported_debug_json"
+        insp_ok, insp_summary, insp_errs = inspect_kmod_package(target_kmod, export_json_dir=exported_dir)
+        if not insp_ok or not (exported_dir / "pack.json").is_file():
+            print(f"[FAIL] 二进制反编译还原 JSON 调试工作区失败: {insp_errs}", file=sys.stderr)
+            return 1
+        print(f"  ✔ 二进制逆向导出 JSON 调试工作区成功 (DAGs={insp_summary.get('dag_count', 0)}, Records={insp_summary.get('content_record_count', 0)})")
 
         # 4. 测试二进制 .kdat 编译与往返等价反编译
         if compile_single_json_file is not None:
@@ -130,6 +163,8 @@ def run_workbench_self_test() -> int:
 
 def handle_workbench_cli(args: Any) -> int:
     """供 kalar_mod.py 调用的统一工作台分发入口。"""
+    from kmod_bundler import inspect_kmod_package
+
     if getattr(args, "self_test", False) or "self-test" in (getattr(args, "workbench_args", []) or []):
         return run_workbench_self_test()
     if getattr(args, "verify_target", None):
@@ -138,7 +173,16 @@ def handle_workbench_cli(args: Any) -> int:
         if not ok:
             print("❌ 校验失败:\n  " + "\n  ".join(errs), file=sys.stderr)
             return 1
-        print(f"✔ 校验通过: {manifest.get('bundle_id')} (v{manifest.get('version')})")
+        print(f"✔ 校验通过: {manifest.get('bundle_id')} (v{manifest.get('version')}, sha256={str(manifest.get('content_sha256', ''))[:12]}...)")
+        return 0
+    if getattr(args, "inspect_target", None):
+        target_file = Path(args.inspect_target).resolve()
+        export_dir = Path(args.export_json).resolve() if getattr(args, "export_json", None) else None
+        ok, summary, errs = inspect_kmod_package(target_file, export_json_dir=export_dir)
+        if not ok:
+            print("❌ 检查失败:\n  " + "\n  ".join(errs), file=sys.stderr)
+            return 1
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
     if getattr(args, "pack_target", None):
         target_dir = Path(args.pack_target).resolve()
@@ -149,7 +193,7 @@ def handle_workbench_cli(args: Any) -> int:
             return 1
         print(f"✔ 打包成功: {res_path}")
         return 0
-    print("kalar_workbench: 请指定 --self-test, --verify <path>, 或 -p/--pack <dir>")
+    print("kalar_workbench: 请指定 --self-test, --verify <path>, --inspect <path>, 或 -p/--pack <dir>")
     return 0
 
 
