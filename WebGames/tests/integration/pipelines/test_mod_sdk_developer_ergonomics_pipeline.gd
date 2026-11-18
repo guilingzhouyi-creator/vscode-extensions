@@ -164,11 +164,11 @@ static func test_tc_mde_03_human_control_lease_preemption_and_renewal() -> Dicti
 
 	# 2. Agent 动作尝试抢占 -> 遭到拦截
 	var agent_req := UnifiedProtocolFactory.create_agent_request(
-		"world_state", "ALLOCATE_POTENTIAL_STAT", {"stat": "STR"}, acc_id, "CHAR_01"
+		"world_state", "ALLOCATE_POTENTIAL_STAT", {"stat_target": "STR"}, acc_id, "CHAR_01"
 	)
 	agent_req.session_token = tok
 	var resp_blocked := UnifiedProtocolDispatcher.dispatch(agent_req)
-	var blocked_ok: bool = not resp_blocked.is_success \
+	var blocked_ok: bool = not resp_blocked.success \
 		and resp_blocked.error_code == "ERR_PREEMPTED_BY_HUMAN"
 
 	# 3. 模拟时间推进 3500ms（租约过期）
@@ -177,7 +177,7 @@ static func test_tc_mde_03_human_control_lease_preemption_and_renewal() -> Dicti
 
 	# 4. Agent 动作重试 -> 成功放行
 	var resp_allowed := UnifiedProtocolDispatcher.dispatch(agent_req)
-	var allowed_ok: bool = resp_allowed.is_success
+	var allowed_ok: bool = resp_allowed.success
 
 	var passed: bool = human_active and blocked_ok and expired_ok and allowed_ok
 	return TestCase.make_result("TC-MDE-03: 人类控制租约毫秒级抢占窗口拦截与续订断言", passed, {
@@ -201,16 +201,16 @@ static func test_tc_mde_04_esc_menu_action_payload_and_state_transition() -> Dic
 		"world_state", "ESC_QUERY_READINESS", {}, tok, acc_id, "CHAR_01"
 	)
 	var resp_query := UnifiedProtocolDispatcher.dispatch(req_query)
-	var query_ok: bool = resp_query.is_success \
-		and resp_query.payload.has("can_save") \
-		and resp_query.payload.has("can_exit")
+	var query_ok: bool = resp_query.success \
+		and resp_query.data.has("can_save") \
+		and resp_query.data.has("can_exit")
 
 	# 发射未知 ESC 指令 -> 拦截
 	var req_invalid := UnifiedProtocolFactory.create_human_request(
 		"world_state", "ESC_EXPLODE_UNIVERSE", {}, tok, acc_id, "CHAR_01"
 	)
 	var resp_invalid := UnifiedProtocolDispatcher.dispatch(req_invalid)
-	var invalid_ok: bool = not resp_invalid.is_success \
+	var invalid_ok: bool = not resp_invalid.success \
 		and resp_invalid.error_code == "ERR_INVALID_ESC_ACTION"
 
 	var passed: bool = query_ok and invalid_ok
@@ -236,14 +236,14 @@ static func test_tc_mde_05_save_guard_interception_semantics() -> Dictionary:
 	)
 	var resp_save := UnifiedProtocolDispatcher.dispatch(req_save)
 
-	var blocked_ok: bool = not resp_save.is_success \
+	var blocked_ok: bool = not resp_save.success \
 		and resp_save.error_code == "ERR_SAVE_GUARD_BLOCKED"
 
 	# 解除阻断
 	SaveDataAccessLayer.set_mock_busy_for_test(false)
 	var resp_ok := UnifiedProtocolDispatcher.dispatch(req_save)
-	var normal_save_ok: bool = resp_ok.is_success \
-		and resp_ok.payload.get("save_status") == "SUCCESS"
+	var normal_save_ok: bool = resp_ok.success \
+		and resp_ok.data.get("save_status") == "SUCCESS"
 
 	var passed: bool = blocked_ok and normal_save_ok
 	return TestCase.make_result("TC-MDE-05: 关键过渡与战斗防护存档阻断错误码 ERR_SAVE_GUARD_BLOCKED 语义断言", passed, {
@@ -274,14 +274,14 @@ static func test_tc_mde_06_home_hud_directives_and_snapshot_sync() -> Dictionary
 		"world_state", "REST_AND_ADVANCE_TIME", {}, tok, acc_id, "CHAR_01"
 	)
 	var resp_rest := UnifiedProtocolDispatcher.dispatch(req_rest)
-	var rest_ok: bool = resp_rest.is_success
+	var rest_ok: bool = resp_rest.success
 
 	# 派发 MARK_MAIL_READ
 	var req_mail := UnifiedProtocolFactory.create_human_request(
 		"world_state", "MARK_MAIL_READ", {"mail_id": "MAIL_01"}, tok, acc_id, "CHAR_01"
 	)
 	var resp_mail := UnifiedProtocolDispatcher.dispatch(req_mail)
-	var mail_ok: bool = resp_mail.is_success
+	var mail_ok: bool = resp_mail.success
 
 	var passed: bool = rest_ok and mail_ok
 	return TestCase.make_result("TC-MDE-06: 主页 HUD 7 大指令派发与快照切片同步断言", passed, {
@@ -302,17 +302,17 @@ static func test_tc_mde_07_mock_dispatcher_dual_track_envelope_roundtrip() -> Di
 
 	var resp_dict := resp.to_dto()
 	var has_fields: bool = resp_dict.has("request_id") \
-		and resp_dict.has("is_success") \
-		and resp_dict.has("payload") \
+		and resp_dict.has("success") \
+		and resp_dict.has("data") \
 		and resp_dict.has("server_timestamp_ms")
 
 	var ts_ok: bool = resp.server_timestamp_ms >= req.client_timestamp_ms
 
-	var passed: bool = has_fields and ts_ok and resp.is_success
+	var passed: bool = has_fields and ts_ok and resp.success
 	return TestCase.make_result("TC-MDE-07: 本地模拟派发器请求/响应信封双向回环与时戳断言", passed, {
 		"has_fields": has_fields,
 		"ts_ok": ts_ok,
-		"is_success": resp.is_success,
+		"success": resp.success,
 	})
 
 ## -----------------------------------------------------------------------------

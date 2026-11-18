@@ -33,6 +33,7 @@ var custom_traits: Dictionary = {}
 var paired_presets: Array[Dictionary] = []
 var custom_starter_kits: Dictionary = {}
 var custom_routing_rules: Array[Dictionary] = []
+var prologue_routing_rules: Array[Dictionary] = []
 var root_path: String = ""
 var dag_graphs: Dictionary = {}
 var custom_i18n: Dictionary = {}
@@ -61,6 +62,7 @@ func reset_state() -> void:
     paired_presets.clear()
     custom_starter_kits.clear()
     custom_routing_rules.clear()
+    prologue_routing_rules.clear()
     root_path = ""
     dag_graphs.clear()
     custom_i18n.clear()
@@ -90,6 +92,7 @@ func to_dto() -> Dictionary:
         "paired_presets": paired_presets.duplicate(true),
         "custom_starter_kits": custom_starter_kits.duplicate(true),
         "custom_routing_rules": custom_routing_rules.duplicate(true),
+        "prologue_routing_rules": prologue_routing_rules.duplicate(true),
         "root_path": root_path,
         "dag_graphs": dag_graphs.duplicate(true),
         "custom_i18n": custom_i18n.duplicate(true)
@@ -151,6 +154,7 @@ static func from_dto(serialized_manifest: Dictionary, fallback_pack_id: String =
     _populate_indexed_dict(serialized_manifest.get("custom_starter_kits", {}), manifest_dto.custom_starter_kits, "kit_id", Callable(DestinyModManifestDTO, "_normalize_kit_dict"))
 
     _populate_dict_array(serialized_manifest.get("custom_routing_rules", []), manifest_dto.custom_routing_rules)
+    _populate_dict_array(serialized_manifest.get("prologue_routing_rules", []), manifest_dto.prologue_routing_rules)
     return manifest_dto
 
 # ==============================================================================

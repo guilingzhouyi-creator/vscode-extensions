@@ -9,35 +9,22 @@
       "type": "string",
       "description": "响应所对应的原始客户端请求 ID"
     },
-    "is_success": {
+    "success": {
       "type": "boolean",
       "description": "指令执行是否成功标志"
     },
-    "success": {
-      "type": "boolean",
-      "description": "指令执行是否成功标志 (兼容字段)"
-    },
-    "payload": {
-      "type": "object",
-      "description": "领域服务返回的业务响应载荷字典",
-      "additionalProperties": true
-    },
     "data": {
       "type": "object",
-      "description": "业务返回实体数据字典 (兼容字段)",
+      "description": "领域服务返回的业务响应实体数据字典",
       "additionalProperties": true
     },
     "error_code": {
       "type": "string",
       "description": "错误码标识符（执行成功时为空串）"
     },
-    "message": {
-      "type": "string",
-      "description": "人类可读提示文本或错误详情信息"
-    },
     "error_message": {
       "type": "string",
-      "description": "本地化展示文案 Key 或调试信息 (兼容字段)"
+      "description": "本地化展示文案 Key 或诊断详情信息"
     },
     "causal_delta": {
       "type": "object",
@@ -52,8 +39,8 @@
   },
   "required": [
     "request_id",
-    "is_success",
-    "payload",
+    "success",
+    "data",
     "server_timestamp_ms"
   ],
   "additionalProperties": false

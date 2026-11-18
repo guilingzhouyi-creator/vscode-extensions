@@ -78,7 +78,7 @@ static func _validate_save_path_safety(
 	var game_mode: int = int(request.payload.get("game_mode", gateway_mode)) if should_use_request_mode else gateway_mode
 	var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
 	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], game_mode)
-	if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
+	if not bool(path_safety.get("safe", false)):
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
 		)
@@ -193,7 +193,7 @@ static func _handle_esc_quit_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 	shutdown_request.force_quit = bool(request.payload.get("force_quit", false))
 
 	var shutdown_response := GameLifecycleService.execute_graceful_shutdown(shutdown_request)
-	var is_shutdown_success: bool = bool(shutdown_response != null and shutdown_response.is_success)
+	var is_shutdown_success: bool = bool(shutdown_response != null and shutdown_response.success)
 	if is_shutdown_success:
 		HumanControlLeaseManager.release_lease()
 	var shutdown_payload: Dictionary = (shutdown_response.to_dto() as Dictionary) if shutdown_response != null else {}

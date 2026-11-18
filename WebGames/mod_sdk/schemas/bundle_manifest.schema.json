@@ -5,12 +5,12 @@
   "description": "卡拉尔世界引擎 .kmod 模组扩展包发行元数据契约 (kalar.mod_sdk.bundle_manifest.v1)",
   "type": "object",
   "properties": {
-    "bundle_id": {
+    "pack_id": {
       "type": "string",
       "pattern": "^[a-z0-9_]+$",
       "description": "模组扩展包全局唯一标识符，仅限小写字母、数字与下划线"
     },
-    "bundle_name": {
+    "pack_name": {
       "type": "string",
       "minLength": 1,
       "description": "模组扩展包可读显示名称"
@@ -46,7 +46,7 @@
       "items": {
         "type": "string"
       },
-      "description": "前置依赖模组 bundle_id 清单"
+      "description": "前置依赖模组 pack_id 清单"
     },
     "files_manifest": {
       "type": "object",
@@ -79,8 +79,8 @@
     }
   },
   "required": [
-    "bundle_id",
-    "bundle_name",
+    "pack_id",
+    "pack_name",
     "version",
     "engine_api_version",
     "tier",

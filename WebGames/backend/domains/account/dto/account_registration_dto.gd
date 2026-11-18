@@ -55,11 +55,6 @@ class Request extends PoolableDtoBase:
 ## 注册响应载荷（仅身份信息，无任何口令/哈希痕迹）
 class Response extends PoolableDtoBase:
 	var success: bool = false
-	var is_success: bool:
-		get:
-			return success
-		set(value):
-			success = value
 	var error_code: String = "OK"
 	var account_id: String = ""
 	var username: String = ""
@@ -78,7 +73,6 @@ class Response extends PoolableDtoBase:
 	func to_dto() -> Dictionary:
 		return {
 			"success": success,
-			"is_success": success,
 			"error_code": error_code,
 			"account_id": account_id,
 			"username": username,

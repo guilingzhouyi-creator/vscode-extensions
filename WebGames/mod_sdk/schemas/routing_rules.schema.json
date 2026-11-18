@@ -7,14 +7,15 @@
   "properties": {
     "prologue_routing_rules": {
       "type": "array",
-      "description": "有序路由匹配条目，按数组先后优先级命中首个满足条件的 target_dag_id",
+      "description": "有序路由匹配条目，按 priority 降序与数组先后命中首个满足条件的 target_dag_id",
       "items": {
         "type": "object",
         "properties": {
+          "rule_id": { "type": "string" },
           "priority": { "type": "integer", "default": 0 },
-          "race": { "type": "string" },
+          "race_id": { "type": "string" },
           "origin_id": { "type": "string" },
-          "birth_region": { "type": "string" },
+          "birth_region_id": { "type": "string" },
           "target_dag_id": {
             "type": "string",
             "pattern": "^DAG_[A-Z0-9_]+$"
@@ -22,9 +23,9 @@
           "is_default": { "type": "boolean", "default": false }
         },
         "required": ["target_dag_id"],
-        "additionalProperties": true
+        "additionalProperties": false
       }
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

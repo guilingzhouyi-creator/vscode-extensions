@@ -56,7 +56,7 @@ func to_dto() -> Dictionary:
 
 ## 从字典重建图（节点/边逐条反序列化）
 static func from_dto(serialized_payload: Dictionary) -> NarrativeDAGGraphDTO:
-	var resolved_graph_id := str(serialized_payload.get("dag_id", serialized_payload.get("graph_id", "")))
+	var resolved_graph_id := str(serialized_payload.get("dag_id", ""))
 	var graph := NarrativeDAGGraphDTO.new(resolved_graph_id)
 	graph.dag_id = resolved_graph_id
 	graph.graph_id = resolved_graph_id

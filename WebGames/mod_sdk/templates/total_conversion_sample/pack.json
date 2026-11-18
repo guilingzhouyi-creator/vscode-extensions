@@ -7,7 +7,7 @@
   "priority": 500,
   "tier": "TIER_3_OVERHAUL",
   "pack_profile": "TOTAL_CONVERSION",
-  "override_mode": "FULL_OVERRIDE",
+  "override_mode": "TOTAL_PURGE",
   "dependencies": [],
   "incompatible_packs": [],
   "semantic_tags": [

@@ -13,19 +13,9 @@ extends PoolableDtoBase
 
 var request_id: String = ""              # 关联的原始请求 ID
 var success: bool = false                # 执行是否成功
-var is_success: bool:                    # 兼容别名属性 (对齐 Mod SDK 语义契约)
-	get:
-		return success
-	set(value):
-		success = value
 var error_code: String = ""              # 错误码 (无错误为空)
 var error_message: String = ""           # Localized display message key or diagnostic text
 var data: Dictionary = {}                # 业务返回实体数据
-var payload: Dictionary:                 # 兼容别名属性 (对齐 Mod SDK 载荷契约)
-	get:
-		return data
-	set(value):
-		data = value
 var causal_delta: Dictionary = {}        # 操作引发的因果突变 (供 HUD 增量刷新与伴侣总线记录)
 var server_timestamp_ms: int = 0         # 服务端响应落盘时间戳
 
@@ -45,11 +35,9 @@ func to_dto() -> Dictionary:
 	return {
 		"request_id": request_id,
 		"success": success,
-		"is_success": success,
 		"error_code": error_code,
 		"error_message": error_message,
 		"data": data.duplicate(true),
-		"payload": data.duplicate(true),
 		"causal_delta": causal_delta.duplicate(true),
 		"server_timestamp_ms": server_timestamp_ms
 	}
@@ -58,14 +46,11 @@ func to_dto() -> Dictionary:
 static func from_dto(serialized_payload: Dictionary) -> UnifiedResponseEnvelopeDTO:
 	var response := UnifiedResponseEnvelopeDTO.new()
 	response.request_id = str(serialized_payload.get("request_id", ""))
-	if serialized_payload.has("is_success"):
-		response.success = bool(serialized_payload.get("is_success", false))
-	else:
-		response.success = bool(serialized_payload.get("success", false))
+	response.success = bool(serialized_payload.get("success", false))
 	response.error_code = str(serialized_payload.get("error_code", ""))
 	response.error_message = str(serialized_payload.get("error_message", ""))
-	var raw_payload: Variant = serialized_payload.get("payload", serialized_payload.get("data", {}))
-	response.data = (raw_payload as Dictionary).duplicate(true) if raw_payload is Dictionary else {}
+	var raw_data: Variant = serialized_payload.get("data", {})
+	response.data = (raw_data as Dictionary).duplicate(true) if raw_data is Dictionary else {}
 	var raw_causal_delta: Variant = serialized_payload.get("causal_delta", {})
 	response.causal_delta = (raw_causal_delta as Dictionary).duplicate(true) if raw_causal_delta is Dictionary else {}
 	response.server_timestamp_ms = int(serialized_payload.get("server_timestamp_ms", 0))

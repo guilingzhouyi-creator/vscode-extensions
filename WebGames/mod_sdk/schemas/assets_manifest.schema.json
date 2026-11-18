@@ -47,16 +47,6 @@
             "pattern": "^mod://([a-z0-9_]+/)?assets/.*$",
             "description": "可选：统一虚拟资产寻址定位符（如 mod://my_mod/assets/textures/hero.webp）"
           },
-          "asset_type": {
-            "type": "string",
-            "enum": ["TEXTURE", "AUDIO", "FONT", "SHADER", "MODEL", "VIDEO"],
-            "description": "可选兼容字段：大写资产大类名称"
-          },
-          "format": {
-            "type": "string",
-            "enum": ["WEBP", "PNG", "OGG", "WAV", "TTF", "OTF", "GDSHADER", "GLTF", "GLB", "OGV"],
-            "description": "可选兼容字段：合规媒体容器/编码格式"
-          },
           "size_bytes": {
             "type": "integer",
             "minimum": 1,

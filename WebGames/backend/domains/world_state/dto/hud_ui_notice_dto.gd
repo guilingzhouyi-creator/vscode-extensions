@@ -11,23 +11,13 @@
 class_name HudUiNoticeDTO
 extends PoolableDtoBase
 
-var notice_id: String = ""         # 唯一提示标识符 (如 "GUIDE_POTENTIAL_ALLOCATION")
-var category: String = "INFO"      # "INFO", "WARNING", "GUIDE", "MODAL"
-var priority: int = 0              # 通知优先级 (数字越大优先级越高)
-var title: String = ""             # 纯文本标题
-var body_text: String = ""         # 纯文本正文 (严格剔除 BBCode 与 HTML)
-var message_text: String:          # 兼容性属性
-	get:
-		return body_text if not body_text.is_empty() else title
-	set(value):
-		body_text = value
-var is_modal: bool = false         # 是否阻断性模态框 (需优先响应)
+var notice_id: String = "" # 唯一提示标识符 (如 "GUIDE_POTENTIAL_ALLOCATION")
+var category: String = "INFO" # "INFO", "WARNING", "GUIDE", "MODAL"
+var priority: int = 0 # 通知优先级 (数字越大优先级越高)
+var title: String = "" # 纯文本标题
+var body_text: String = "" # 纯文本正文 (严格剔除 BBCode 与 HTML)
+var is_modal: bool = false # 是否阻断性模态框 (需优先响应)
 var action_directive_ids: Array[String] = [] # 响应此通知绑定的动作指令 (如 ["DISMISS_UI_NOTICE", "CONFIRM_ALLOCATION"])
-var actions: Array[String]:        # 兼容性属性
-	get:
-		return action_directive_ids
-	set(value):
-		action_directive_ids = value
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
@@ -48,10 +38,8 @@ func to_dto() -> Dictionary:
 		"priority": priority,
 		"title": title,
 		"body_text": body_text,
-		"message_text": body_text if not body_text.is_empty() else title,
 		"is_modal": is_modal,
-		"action_directive_ids": action_directive_ids.duplicate(),
-		"actions": action_directive_ids.duplicate()
+		"action_directive_ids": action_directive_ids.duplicate()
 	}
 
 ## 从输入字典反序列化还原传输对象
@@ -61,10 +49,10 @@ static func from_dto(serialized_payload: Dictionary) -> HudUiNoticeDTO:
 	notice.category = str(serialized_payload.get("category", "INFO"))
 	notice.priority = int(serialized_payload.get("priority", 0))
 	notice.title = str(serialized_payload.get("title", ""))
-	notice.body_text = str(serialized_payload.get("body_text", serialized_payload.get("message_text", "")))
+	notice.body_text = str(serialized_payload.get("body_text", ""))
 	notice.is_modal = bool(serialized_payload.get("is_modal", false))
 	notice.action_directive_ids.clear()
-	var raw_actions: Array = serialized_payload.get("action_directive_ids", serialized_payload.get("actions", []))
+	var raw_actions: Array = serialized_payload.get("action_directive_ids", [])
 	for directive_entry in raw_actions:
 		notice.action_directive_ids.append(str(directive_entry))
 	return notice

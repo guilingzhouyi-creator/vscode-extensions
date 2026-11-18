@@ -250,7 +250,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 
 	var passed: bool = not sp_manifest.show_matchmaking and mp_manifest.show_matchmaking \
 		and hud_snap != null and bool(save_check.get("allowed", false)) and bool(path_check.get("safe", false)) \
-		and (shut_resp != null and shut_resp.is_success) and token_revoked
+		and (shut_resp != null and shut_resp.success) and token_revoked
 
 	return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端断言", passed)
 

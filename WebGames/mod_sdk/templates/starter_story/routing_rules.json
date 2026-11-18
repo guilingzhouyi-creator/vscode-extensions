@@ -1,15 +1,11 @@
 {
-  "routing_rules": [
+  "prologue_routing_rules": [
     {
-      "match_condition": {
-        "race_id": "HUMAN"
-      },
+      "race_id": "HUMAN",
       "target_dag_id": "DAG_STARTER_MINIMAL"
     },
     {
-      "match_condition": {
-        "is_default": true
-      },
+      "is_default": true,
       "target_dag_id": "DAG_STARTER_MINIMAL"
     }
   ]

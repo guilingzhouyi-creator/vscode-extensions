@@ -281,7 +281,7 @@ static func test_arr_06_creation_response_matches_slot_export() -> Dictionary:
 	_setup_env()
 	var auth_svc: Variant = ServiceLocator.get_instance().auth()
 	var reg_res: Dictionary = {}
-	auth_svc.register_async("SchemaParityHero", "ParityPass123", func(r: Dictionary) -> void: reg_res.merge(r, true))
+	auth_svc.register_async("SchemaParityHero", "ParityPass123", func(r: Dictionary) -> void: reg_res.merge(r, true), true)
 	var acc_id: String = str(reg_res.get("account_id", ""))
 
 	var create_res: Dictionary = {}

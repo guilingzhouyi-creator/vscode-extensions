@@ -58,11 +58,6 @@ class Request extends RefCounted:
 ## 停机响应 DTO
 class Response extends RefCounted:
 	var success: bool = false
-	var is_success: bool:
-		get:
-			return success
-		set(value):
-			success = value
 	var error_code: String = "OK"
 	var failed_stage: String = ""
 	var current_phase: int = GameLifecycleModel.LifecyclePhase.STOPPED
@@ -81,7 +76,6 @@ class Response extends RefCounted:
 	func to_dto() -> Dictionary:
 		return {
 			"success": success,
-			"is_success": success,
 			"error_code": error_code,
 			"failed_stage": failed_stage,
 			"current_phase": current_phase,

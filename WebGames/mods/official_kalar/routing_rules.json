@@ -1,32 +1,12 @@
 {
   "prologue_routing_rules": [
     {
-      "match_condition": {
-        "race_id": "ELF"
-      },
-      "target_dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"
-    },
-    {
-      "match_condition": {
-        "race_id": "HUMAN"
-      },
-      "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
-    },
-    {
-      "match_condition": {
-        "is_default": true
-      },
-      "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
-    }
-  ],
-  "custom_routing_rules": [
-    {
-      "race": "ELF",
+      "race_id": "ELF",
       "target_dag_id": "DAG_PROLOGUE_ELF_SANCTUARY",
       "priority": 20
     },
     {
-      "race": "HUMAN",
+      "race_id": "HUMAN",
       "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
       "priority": 10
     },

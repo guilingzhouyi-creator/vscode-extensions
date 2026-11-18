@@ -7,9 +7,9 @@
   "properties": {
     "override_mode": {
       "type": "string",
-      "enum": ["MERGE", "APPEND_MERGE", "REPLACE_ENTRY", "TOTAL_PURGE", "REPLACE_EXISTING", "FULL_OVERRIDE"],
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
       "default": "MERGE",
-      "description": "大魔改覆盖策略：MERGE/APPEND_MERGE(增量合并新条目并递归补丁现有条目), REPLACE_ENTRY(按 canonical_id 全量替换条目), TOTAL_PURGE/REPLACE_EXISTING/FULL_OVERRIDE(全量清洗原生物品库)"
+      "description": "大魔改覆盖策略：MERGE(增量合并新条目并递归补丁现有条目), REPLACE_ENTRY(按 canonical_id 全量替换条目), TOTAL_PURGE(全量清洗原生物品库)"
     },
     "items": {
       "type": "array",

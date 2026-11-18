@@ -318,9 +318,9 @@ static func test_tc_flc_11_game_exit_graceful_shutdown_pipeline() -> Dictionary:
 
 	var shut_resp := GameLifecycleService.execute_graceful_shutdown(shut_req)
 	var resp_valid: bool = (shut_resp != null)
-	var resp_ok: bool = resp_valid and shut_resp.is_success
+	var resp_ok: bool = resp_valid and shut_resp.success
 
 	var passed: bool = resp_ok
 	return make_result("TC-FLC-11: 退出游戏五阶段优雅停机管线流程", passed, {
-		"is_success": shut_resp.is_success if resp_valid else false
+		"success": shut_resp.success if resp_valid else false
 	})

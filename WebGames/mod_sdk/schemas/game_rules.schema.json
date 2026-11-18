@@ -7,9 +7,9 @@
   "properties": {
     "override_mode": {
       "type": "string",
-      "enum": ["MERGE", "APPEND_MERGE", "REPLACE_ENTRY", "TOTAL_PURGE", "REPLACE_EXISTING", "FULL_OVERRIDE"],
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
       "default": "MERGE",
-      "description": "规则覆盖模式：MERGE/APPEND_MERGE(增量合并), REPLACE_ENTRY(顶级段替换), TOTAL_PURGE/REPLACE_EXISTING/FULL_OVERRIDE(清除默认原版规则)"
+      "description": "规则覆盖模式：MERGE(增量合并), REPLACE_ENTRY(顶级段替换), TOTAL_PURGE(清除默认原版规则)"
     },
     "combat_constants": {
       "type": "object",

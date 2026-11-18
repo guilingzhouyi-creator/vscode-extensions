@@ -40,7 +40,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: Variant) -> Uni
 		"FORCE_SHUTDOWN":
 			var force_request := _build_shutdown_req(request, request_payload, int(request_payload.get("exit_reason", GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT)))
 			var force_response := GameLifecycleService.execute_force_shutdown(force_request)
-			var is_force_succeeded := bool(force_response != null and force_response.is_success)
+			var is_force_succeeded := bool(force_response != null and force_response.success)
 			if is_force_succeeded:
 				HumanControlLeaseManager.release_lease()
 			return UnifiedProtocolFactory.create_response(
@@ -58,7 +58,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: Variant) -> Uni
 					"Soft exit to menu failed."
 				)
 			var shutdown_response := GameLifecycleService.execute_graceful_shutdown(shutdown_request)
-			var is_shutdown_succeeded := bool(shutdown_response != null and shutdown_response.is_success)
+			var is_shutdown_succeeded := bool(shutdown_response != null and shutdown_response.success)
 			if is_shutdown_succeeded:
 				HumanControlLeaseManager.release_lease()
 			var error_code := "" if is_shutdown_succeeded else (String(shutdown_response.error_code) if shutdown_response != null else "ERR_SHUTDOWN_FAILED")
@@ -76,7 +76,7 @@ static func _execute_soft_logout_response(
 	failure_message: String
 ) -> UnifiedResponseEnvelopeDTO:
 	var logout_response := GameLifecycleService.execute_logout_to_menu(shutdown_request)
-	var is_logout_succeeded := bool(logout_response != null and logout_response.is_success)
+	var is_logout_succeeded := bool(logout_response != null and logout_response.success)
 	if is_logout_succeeded:
 		if gateway != null and gateway.has_method("logout"):
 			gateway.call("logout")

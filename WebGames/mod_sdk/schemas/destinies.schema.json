@@ -279,16 +279,20 @@
       "items": {
         "type": "object",
         "properties": {
-          "race": { "type": "string" },
+          "rule_id": { "type": "string" },
+          "priority": { "type": "integer", "default": 0 },
+          "race_id": { "type": "string" },
           "origin_id": { "type": "string" },
-          "birth_region": { "type": "string" },
+          "birth_region_id": { "type": "string" },
+          "is_default": { "type": "boolean", "default": false },
           "target_dag_id": {
             "type": "string",
             "pattern": "^DAG_[A-Z0-9_]+$",
             "description": "目标因果 DAG 剧情图唯一标识符"
           }
         },
-        "required": ["target_dag_id"]
+        "required": ["target_dag_id"],
+        "additionalProperties": false
       }
     }
   },
