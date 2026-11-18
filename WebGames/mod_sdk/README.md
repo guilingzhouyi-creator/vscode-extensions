@@ -225,6 +225,22 @@ python WebGames/mod_sdk/tools/kalar_mod.py dispatch --actor HUMAN_UI --domain ES
 python WebGames/mod_sdk/tools/kalar_mod.py bake ./mods/my_overhaul/content --monolithic -o ./dist/config.kdat
 ```
 
+### 10. `dev` & `inspect` —— 调试 (JSON) 与正式封装 (`.kmod`/`.kdat`) 一体化流水线
+
+开发调试阶段直接编辑与检验可读 JSON 目录；确认通过后一键编译封装为纯二进制 `.kmod` 分发包（内部仅含 `manifest.kdat`、`mod_data.kdat` 与 `assets/` 流式媒体，零明文 `.json`）：
+
+```bash
+# 一键完成静态检查 + 资产烹饪 + 无头推演 + 编译打包为 .kmod 并校验
+python WebGames/mod_sdk/tools/kalar_mod.py dev ./mods/my_prologue --simulate --pack
+
+# 编译打包后直接安装到引擎 mods/ 目录
+python WebGames/mod_sdk/tools/kalar_mod.py dev ./mods/my_prologue --install --force
+
+# 检查 .kmod 二进制段头部与指纹，或逆向导出还原为 JSON 调试工作区
+python WebGames/mod_sdk/tools/kalar_mod.py inspect ./dist/my_prologue_v1.0.0.kmod
+python WebGames/mod_sdk/tools/kalar_mod.py inspect ./dist/my_prologue_v1.0.0.kmod --export-json ./debug_extract/
+```
+
 ### 运行时接入与 Tier 1~3 能力边界
 
 - **统一目录发现**：引擎运行时（`ModPackageDiscoverySolver.get_discovery_roots()`）按优先级扫描 `res://config/narratives/packs/`、`res://mods/`、`res://mods/narratives/`（发布态对应 `<exe>/mods/` 与 `<exe>/mods/narratives/`）以及 `user://mods/`、`user://mods/narratives/`，同时兼容目录形式与 `.kmod` 归档包。

@@ -454,58 +454,20 @@ def _handle_bake(args: argparse.Namespace) -> int:
 
 def _handle_install(args: argparse.Namespace) -> int:
     """安装 .kmod 归档包或 MOD 源目录到引擎 mods 目标根目录。"""
-    source_path = Path(args.source).resolve()
-    mods_root = Path(args.mods_dir).resolve() if args.mods_dir else (TOOLS_DIR.parent.parent / "mods").resolve()
-    mods_root.mkdir(parents=True, exist_ok=True)
-    if not source_path.exists():
-        msg = f"安装源不存在: {source_path}"
-        print(json.dumps({"success": False, "error": msg}, ensure_ascii=False) if args.as_json else f"{Style.RED}❌ {msg}{Style.RESET}")
-        return 1
-    try:
-        import shutil
-        if source_path.is_file() and source_path.suffix.lower() == ".kmod":
-            with zipfile.ZipFile(source_path, "r") as zf:
-                names = set(zf.namelist())
-                raw_json = zf.read("pack.json") if "pack.json" in names else (zf.read("manifest.json") if "manifest.json" in names else b"")
-                manifest = json.loads(raw_json.decode("utf-8")) if raw_json else {}
-            pack_id = str(manifest.get("pack_id", source_path.stem)).strip()
-            if not pack_id or any(tok in pack_id for tok in ("/", "\\", "..")):
-                raise ValueError(f"非法 pack_id: {pack_id}")
-            dest_path = mods_root / source_path.name
-            if dest_path.exists() and not args.force:
-                raise FileExistsError(f"目标已存在（可加 --force 覆盖）: {dest_path}")
-            shutil.copy2(source_path, dest_path)
-            install_kind = "kmod"
-        elif source_path.is_dir():
-            manifest_file = source_path / "pack.json" if (source_path / "pack.json").is_file() else (source_path / "manifest.json")
-            if not manifest_file.is_file():
-                raise ValueError("MOD 源目录缺少 pack.json 或 manifest.json")
-            manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-            pack_id = str(manifest.get("pack_id", source_path.name)).strip()
-            if not pack_id or any(tok in pack_id for tok in ("/", "\\", "..")):
-                raise ValueError(f"非法 pack_id: {pack_id}")
-            dest_path = mods_root / pack_id
-            if dest_path.exists():
-                if not args.force:
-                    raise FileExistsError(f"目标已存在（可加 --force 覆盖）: {dest_path}")
-                shutil.rmtree(dest_path)
-            shutil.copytree(source_path, dest_path)
-            install_kind = "directory"
-        else:
-            raise ValueError("仅支持安装 .kmod 文件或含 pack.json 的 MOD 目录")
-    except Exception as exc:
-        if args.as_json:
-            print(json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False))
-        else:
-            print(f"{Style.RED}❌ MOD 安装失败: {exc}{Style.RESET}", file=sys.stderr)
-        return 1
+    from kalar_dev_pipeline import handle_install_cli
+    return handle_install_cli(args, TOOLS_DIR)
 
-    payload = {"success": True, "pack_id": pack_id, "install_kind": install_kind, "installed_path": str(dest_path)}
-    if args.as_json:
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-    else:
-        print(f"{Style.GREEN}✅ MOD 安装成功: {pack_id} ({install_kind}) -> {dest_path}{Style.RESET}")
-    return 0
+
+def _handle_dev(args: argparse.Namespace) -> int:
+    """分发 dev 子命令：调试(JSON) 与正式封装(.kmod/.kdat) 一体化流水线。"""
+    from kalar_dev_pipeline import handle_dev_cli
+    return handle_dev_cli(args, TOOLS_DIR)
+
+
+def _handle_inspect(args: argparse.Namespace) -> int:
+    """分发 inspect 子命令：检查 .kmod 二进制段或反向导出 JSON 调试工作区。"""
+    from kalar_dev_pipeline import handle_inspect_cli
+    return handle_inspect_cli(args)
 
 
 # ==============================================================================
@@ -649,6 +611,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_wb.add_argument("workbench_args", nargs="*", help="传递给工作台的子命令或参数")
     p_wb.add_argument("--self-test", action="store_true", dest="self_test", help="执行工作台内部集成自测试")
     p_wb.add_argument("--verify", dest="verify_target", default=None, help="校验指定 .kmod 归档包完整性与指纹")
+    p_wb.add_argument("--inspect", dest="inspect_target", default=None, help="检查指定 .kmod 二进制归档包头与段摘要")
+    p_wb.add_argument("--export-json", dest="export_json", default=None, help="与 --inspect 联用，将 .kmod 反编译还原为 JSON 调试目录")
     p_wb.add_argument("-p", "--pack", dest="pack_target", default=None, help="打包指定 MOD 物理目录为 .kmod")
     p_wb.add_argument("-o", "--output", dest="output", default=None, help="输出目标路径")
 
@@ -665,6 +629,23 @@ def _build_parser() -> argparse.ArgumentParser:
     p_install.add_argument("--mods-dir", dest="mods_dir", default=None, help="目标 mods/ 安装根目录 (默认: 引擎根目录 mods/)")
     p_install.add_argument("--force", action="store_true", help="若目标已存在则强制覆盖安装")
     p_install.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON 结果")
+
+    # 11. dev (调试 JSON <-> 正式二进制 .kmod 一体化流水线)
+    p_dev = subparsers.add_parser("dev", help="调试(JSON)与正式封装(.kmod/.kdat)一体化开发流水线")
+    p_dev.add_argument("mod_dir", nargs="?", default=".", help="待调试/封装的 MOD JSON 根目录 (默认: 当前目录)")
+    p_dev.add_argument("--simulate", action="store_true", help="附加运行无头 DAG 剧情仿真推演")
+    p_dev.add_argument("--pack", action="store_true", help="在校验通过后编译封装为正式二进制 .kmod")
+    p_dev.add_argument("-o", "--output", default=None, dest="output", help="指定正式 .kmod 输出路径 (自动启用 --pack)")
+    p_dev.add_argument("--install", action="store_true", help="打包后直接安装到目标 mods/ 目录 (自动启用 --pack)")
+    p_dev.add_argument("--mods-dir", dest="mods_dir", default=None, help="目标 mods/ 安装根目录")
+    p_dev.add_argument("--force", action="store_true", help="覆盖安装已存在的目标 .kmod")
+    p_dev.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON 报告")
+
+    # 12. inspect (检查 .kmod 二进制流 / 反编译还原 JSON 调试目录)
+    p_inspect = subparsers.add_parser("inspect", help="检查 .kmod 二进制归档段信息或反向还原 JSON 调试工作区")
+    p_inspect.add_argument("kmod_file", help="待检查的 .kmod 二进制归档包路径")
+    p_inspect.add_argument("--export-json", dest="export_json", default=None, help="反向反编译导出为可编辑 JSON 调试目录")
+    p_inspect.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON 结果")
 
     return parser
 
@@ -694,6 +675,8 @@ def main() -> None:
         "workbench": _handle_workbench,
         "bake": _handle_bake,
         "install": _handle_install,
+        "dev": _handle_dev,
+        "inspect": _handle_inspect,
     }
 
     handler = handlers.get(args.subcommand)

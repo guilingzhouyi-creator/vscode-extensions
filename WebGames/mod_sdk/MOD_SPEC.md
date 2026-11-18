@@ -396,7 +396,9 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 | **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进与文本插值 |
 | **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive] [--with-hud]` | 执行批量验收推演、Agent STDIO 交互或主页 HUD 贯通 |
 | **协议派发** | `python mod_sdk/tools/kalar_mod.py dispatch [--actor HUMAN_UI\|AGENT] [--domain <id>] [--action <type>] [--payload <json>] [--json]` | 离线派发全域统一协议请求并执行强类型信封校验 |
-| **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [-o <out.kmod>] [--format kmod]` | 前置门禁校验并压缩打包为防篡改 `.kmod` 生产分发包 |
+| **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [-o <out.kmod>] [--format kmod]` | 前置门禁校验并编译打包为纯二进制 `.kmod`（`manifest.kdat` + `mod_data.kdat` + `assets/`，零明文 JSON） |
+| **调试封装一体化** | `python mod_sdk/tools/kalar_mod.py dev <mod_dir> [--simulate] [--pack] [--install]` | 开发期 JSON 一体化校验、资产烹饪、剧情推演与正式 `.kmod` 二进制编译封装 |
+| **二进制检查导出** | `python mod_sdk/tools/kalar_mod.py inspect <kmod> [--export-json <dir>]` | 检查 `.kmod` 二进制段摘要与指纹，支持逆向还原 JSON 调试工作区 |
 | **集成工作台** | `python mod_sdk/tools/kalar_mod.py workbench [--self-test] [--verify <kmod>]` | 开发者一站式集成工作台、离线指纹校验与自动化自检 |
 
 ---
