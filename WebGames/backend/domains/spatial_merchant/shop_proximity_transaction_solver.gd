@@ -81,7 +81,7 @@ static func buy_item(
 
 	# 4. 背包空间检定
 	var fallback_template_id := GameConfig.get_string("domains.spatial_merchant", "goods/fallback_template_id", "ITEM_GOODS")
-	var template_id: Variant = shelf_item.get("item_template_id", fallback_template_id)
+	var template_id: Variant = shelf_item.get("template_id", fallback_template_id)
 	var new_item: ItemEntity = null
 	if inventory != null:
 		var catalog := GameBootstrap.catalog()
@@ -115,7 +115,7 @@ static func buy_item(
 
 	return {
 		"success": true,
-		"item_template_id": template_id,
+		"template_id": template_id,
 		"purchased_count": buy_count,
 		"cost_gold": total_gold,
 		"cost_silver": total_silver,

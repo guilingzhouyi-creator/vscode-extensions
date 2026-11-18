@@ -109,7 +109,7 @@ static func is_dag_choice_valid(active_node: NarrativeDAGNode, choice_id: String
     if choice_id.is_empty():
         return false
     for choice_entry in active_node.choices:
-        var candidate_id := str(choice_entry.get("choice_id", choice_entry.get("action", choice_entry.get("id", "")))).strip_edges()
+        var candidate_id := str(choice_entry.get("choice_id", "")).strip_edges()
         if candidate_id == choice_id:
             return true
     return false

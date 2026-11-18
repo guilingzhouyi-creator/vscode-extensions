@@ -120,8 +120,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 - **库存操作**：按 id 查找/移除走 `WearableInventoryAggregate.find_item_by_item_id()` / `remove_item()`，
   禁止外部直接 `storage_items` 查找后 `remove_at`。
 - **物品载荷契约**：跨域 payload 字典构造物品一律 `ItemEntity.from_payload(payload, fallback_*)`，
-  canonical 键 `template_id`（别名 `item_template_id`）/ `name`（别名 `custom_name` / `item_name`）/
-  `mass_kg` / `volume_slots`；禁止手工 `ItemEntity.new()` 后逐字段拷贝。
+  单一规范键 `template_id` / `name` / `mass_kg` / `volume_slots`；禁止手工 `ItemEntity.new()` 后逐字段拷贝。
 - **钱包账本**：多币种入账/扣账一律 `CharacterWalletEntity.apply_delta(delta)`
   （键 ∈ copper/silver/gold/platinum/mana_monocrystals，值为整数增量，未知键告警忽略）；
   「折算总额 + 阶梯扣除」语义用 `try_spend(cost_copper)`（银不够金来凑）；

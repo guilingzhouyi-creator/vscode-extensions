@@ -32,7 +32,7 @@ var is_temporary: bool = false
 var despawn_timestamp_utc: int = 0               # 撤摊转移时间戳
 
 # 货架动态库存列表 (Array of Dictionary)
-# [{"item_template_id": "POTION_HEALTH", "stock_count": 20, "price_gold": 5, "price_silver": 0}]
+# [{"template_id": "POTION_HEALTH", "stock_count": 20, "price_gold": 5, "price_silver": 0}]
 var shelf_inventory: Array[Dictionary] = []
 
 ## 商铺聚合构造（ID/招牌名/类型）
@@ -48,7 +48,7 @@ func _init(
 ## 上架货架商品（模板 ID/库存/金/银定价）
 func add_shelf_item(template_id: String, count: int, price_gold: int, price_silver: int = 0) -> void:
 	shelf_inventory.append({
-		"item_template_id": template_id,
+		"template_id": template_id,
 		"stock_count": count,
 		"price_gold": price_gold,
 		"price_silver": price_silver

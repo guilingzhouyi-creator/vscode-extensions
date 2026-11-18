@@ -114,7 +114,7 @@ func start_session(config: Dictionary) -> Dictionary:
 ## 推进推演单步：校验分支合法性、执行节点动作、应用突变、压栈快照并广播事件
 func step(action: Dictionary) -> Dictionary:
 	var action_type: String = str(action.get("action_type", "")).to_upper()
-	var choice_id: String = str(action.get("choice_id", action.get("action", ""))).strip_edges()
+	var choice_id: String = str(action.get("choice_id", "")).strip_edges()
 
 	if action_type == "ROLLBACK" or choice_id.to_upper() == "ROLLBACK":
 		return rollback()
@@ -304,7 +304,7 @@ func _validate_choice_legality(node: NarrativeDAGNode, choice_id: String) -> boo
 	if choice_id.is_empty():
 		return false
 	for choice_entry in node.choices:
-		var candidate_choice_id: String = str(choice_entry.get("choice_id", choice_entry.get("id", choice_entry.get("action", "")))).strip_edges()
+		var candidate_choice_id: String = str(choice_entry.get("choice_id", "")).strip_edges()
 		if candidate_choice_id == choice_id:
 			return true
 		var target_node_id: String = str(choice_entry.get("target_node_id", "")).strip_edges()
@@ -316,12 +316,11 @@ func _extract_choices_for_node(node: NarrativeDAGNode) -> Array[Dictionary]:
 	var extracted_choices: Array[Dictionary] = []
 	if not node.choices.is_empty():
 		for choice_entry in node.choices:
-			var resolved_choice_id: String = str(choice_entry.get("choice_id", choice_entry.get("id", choice_entry.get("action", "")))).strip_edges()
-			var choice_text: String = str(choice_entry.get("text", choice_entry.get("desc", resolved_choice_id)))
+			var resolved_choice_id: String = str(choice_entry.get("choice_id", "")).strip_edges()
+			var choice_text: String = str(choice_entry.get("text", resolved_choice_id))
 			extracted_choices.append({
 				"choice_id": resolved_choice_id,
 				"text": choice_text,
-				"action": resolved_choice_id,
 				"target_node_id": str(choice_entry.get("target_node_id", ""))
 			})
 		return extracted_choices

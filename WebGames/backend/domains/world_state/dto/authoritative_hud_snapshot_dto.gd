@@ -94,7 +94,7 @@ static func _populate_identity(serialized_payload: Dictionary, snapshot: Authori
 	snapshot.character_id = String(serialized_payload.get("character_id", ""))
 	snapshot.character_name = String(serialized_payload.get("character_name", ""))
 	snapshot.race_id = String(serialized_payload.get("race_id", "HUMAN"))
-	snapshot.current_location_id = String(serialized_payload.get("current_location_id", serialized_payload.get("current_location", "")))
+	snapshot.current_location_id = String(serialized_payload.get("current_location_id", ""))
 	snapshot.level = maxi(1, int(serialized_payload.get("level", 1)))
 
 static func _populate_physiology_and_wallet(serialized_payload: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:

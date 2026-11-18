@@ -92,7 +92,7 @@ static func _build_shutdown_req(request: ClientRequestEnvelopeDTO, request_paylo
 	shutdown_request.session_token = request.session_token
 	shutdown_request.account_id = request.account_id if not request.account_id.is_empty() else WorldSessionRuntimeService.get_active_account_id()
 	shutdown_request.exit_reason = int(request_payload.get("exit_reason", default_reason))
-	var explicit_slot := str(request_payload.get("slot_id", request_payload.get("target_save_slot", "")))
+	var explicit_slot := str(request_payload.get("slot_id", ""))
 	shutdown_request.target_save_slot = explicit_slot if not explicit_slot.is_empty() else WorldSessionRuntimeService.get_active_slot_id()
 	shutdown_request.save_before_quit = bool(request_payload.get("save_before_quit", true))
 	shutdown_request.require_save_success = bool(request_payload.get("require_save_success", false))

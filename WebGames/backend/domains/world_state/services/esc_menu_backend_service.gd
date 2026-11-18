@@ -232,7 +232,7 @@ static func _handle_esc_pause_resume(request: ClientRequestEnvelopeDTO, is_pause
 	)
 
 static func _resolve_effective_slot_id(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> String:
-	var explicit_slot_id := str(request.payload.get("slot_id", request.payload.get("target_save_slot", "")))
+	var explicit_slot_id := str(request.payload.get("slot_id", ""))
 	if not explicit_slot_id.is_empty():
 		return explicit_slot_id
 	if gateway != null and gateway.context != null and not gateway.context.selected_slot_id.is_empty():

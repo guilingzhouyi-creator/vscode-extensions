@@ -198,9 +198,9 @@ static func deserialize(serialized_item: Dictionary, _instance_discriminator: St
 	return item_entity
 
 ## 物品载荷统一工厂：跨域 payload 字典 -> ItemEntity，杜绝各管线手工逐字段赋值漂移。
-## 键名契约（canonical，括号内为兼容别名，检索顺序 canonical 优先）：
-##   template_id（item_template_id）——同时写入 item_id 与 template_id；
-##   name（custom_name / item_name）——显示名；
+## 键名契约（单轨 canonical）：
+##   template_id —— 同时写入 item_id 与 template_id；
+##   name        —— 显示名（写入 custom_name）；
 ##   mass_kg / volume_slots —— 物理属性。
 ## fallback_* 仅在 payload 未提供对应键时生效；未提供的字段保持本实体配置初值
 ## （fallback_mass_kg 传负值、fallback_volume_slots 传 0 表示「无领域默认回退，回落配置初值」）。
@@ -212,26 +212,11 @@ static func from_payload(
 	fallback_volume_slots: int = 0
 ) -> ItemEntity:
 	var item_entity := ItemEntity.new()
-	var resolved_template_id := ""
-	if payload.has("item_id"):
-		item_entity.item_id = str(payload["item_id"])
-		resolved_template_id = str(payload.get("template_id", item_entity.item_id))
-	elif payload.has("template_id"):
-		resolved_template_id = str(payload["template_id"])
-		item_entity.item_id = resolved_template_id
-	elif payload.has("item_template_id"):
-		resolved_template_id = str(payload["item_template_id"])
-		item_entity.item_id = resolved_template_id
-	else:
-		resolved_template_id = fallback_template_id
-		item_entity.item_id = resolved_template_id
+	var resolved_template_id := str(payload.get("template_id", fallback_template_id))
+	item_entity.item_id = resolved_template_id
 	item_entity.template_id = resolved_template_id
 	if payload.has("name"):
 		item_entity.custom_name = str(payload["name"])
-	elif payload.has("custom_name"):
-		item_entity.custom_name = str(payload["custom_name"])
-	elif payload.has("item_name"):
-		item_entity.custom_name = str(payload["item_name"])
 	elif not fallback_name.is_empty():
 		item_entity.custom_name = fallback_name
 	if payload.has("mass_kg"):

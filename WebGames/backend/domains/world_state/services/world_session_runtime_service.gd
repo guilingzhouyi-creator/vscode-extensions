@@ -162,7 +162,7 @@ static func activate_world_session(session_parameters: Dictionary, should_push_i
 		_state.adapted_mod_manifest = (session_parameters.get("adapted_mod_manifest") as Dictionary).duplicate(true)
 	elif _state.gateway_fsm != null and _state.gateway_fsm.has_method("get_adapted_mod_manifest"):
 		_state.adapted_mod_manifest = (_state.gateway_fsm.get_adapted_mod_manifest() as Dictionary).duplicate(true)
-	_state.current_location_id = String(session_parameters.get("current_location_id", session_parameters.get("location_id", "")))
+	_state.current_location_id = String(session_parameters.get("current_location_id", ""))
 	_state.game_mode = int(session_parameters.get("game_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
 	_state.level = maxi(1, int(session_parameters.get("level", 1)))
 
@@ -170,11 +170,11 @@ static func activate_world_session(session_parameters: Dictionary, should_push_i
 	var default_max_action_points := maxf(1.0, GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0))
 	_state.hp_max = maxf(1.0, float(session_parameters.get("hp_max", default_max_health_points)))
 	_state.hp_current = maxf(0.0, float(session_parameters.get("hp_current", _state.hp_max)))
-	_state.mp_max = maxf(1.0, float(session_parameters.get("mp_max", GameConfig.get_float("domains.world_state", "hud_defaults/mp_max_fallback", 50.0))))
+	_state.mp_max = maxf(1.0, float(session_parameters.get("mp_max", GameConfig.get_float("domains.world_state", "hud_defaults/mp_max", 50.0))))
 	_state.mp_current = maxf(0.0, float(session_parameters.get("mp_current", _state.mp_max)))
 	_state.ap_max = maxf(1.0, float(session_parameters.get("ap_max", default_max_action_points)))
 	_state.ap_current = maxf(0.0, float(session_parameters.get("ap_current", _state.ap_max)))
-	_state.wallet_gold = int(session_parameters.get("wallet_gold", session_parameters.get("gold", 0)))
+	_state.wallet_gold = int(session_parameters.get("wallet_gold", 0))
 	_state.wallet_mana_monocrystals = int(session_parameters.get("wallet_mana_monocrystals", 0))
 	_state.unallocated_potential_points = maxi(0, int(session_parameters.get("unallocated_potential_points", 0)))
 	_state.unread_mail_count = maxi(0, int(session_parameters.get("unread_mail_count", 0)))

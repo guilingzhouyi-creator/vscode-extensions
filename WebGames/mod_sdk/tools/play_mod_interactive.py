@@ -112,7 +112,7 @@ def apply_single_mutation(
         context["gold"] = char_state["gold"]
         context["GOLD"] = char_state["gold"]
     elif mtype == "LocationAssigned":
-        loc = str(m.get("location") or "")
+        loc = str(m.get("location_id") or "")
         if loc:
             char_state["birth_region"] = loc
             context["start_location"] = loc

@@ -44,7 +44,7 @@
   },
   "hud_defaults": {
     "ap_max": 10.0,
-    "mp_max_fallback": 50.0,
+    "mp_max": 50.0,
     "max_hotbar_slots": 8,
     "light_asset_max_payload_bytes": 4096,
     "snapshot_of": {

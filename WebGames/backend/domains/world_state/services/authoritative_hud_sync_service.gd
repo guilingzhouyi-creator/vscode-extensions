@@ -224,7 +224,7 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 	snapshot.account_id = String(context.get("account_id", ""))
 	snapshot.character_id = String(context.get("character_id", ""))
 	snapshot.character_name = String(context.get("character_name", ""))
-	snapshot.current_location_id = String(context.get("current_location_id", context.get("current_location", "")))
+	snapshot.current_location_id = String(context.get("current_location_id", ""))
 	snapshot.level = maxi(1, int(context.get("level", 1)))
 
 	var raw_race := String(context.get("race_id", ""))

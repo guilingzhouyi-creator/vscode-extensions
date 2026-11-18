@@ -265,24 +265,22 @@ static func _localize_dag_choice(
 	prologue_context: CharacterPrologueContext,
 	adapted_mod_manifest: Dictionary
 ) -> Dictionary:
-	var action_id := str(choice_entry.get("action", choice_entry.get("choice_id", choice_entry.get("id", "")))).strip_edges()
-	var choice_id := str(choice_entry.get("choice_id", action_id)).strip_edges()
-	var raw_text := str(choice_entry.get("text", choice_entry.get("desc", ""))).strip_edges()
-	var label_key := str(choice_entry.get("text_key", choice_entry.get("narrative_key", ""))).strip_edges()
+	var choice_id := str(choice_entry.get("choice_id", "")).strip_edges()
+	var raw_text := str(choice_entry.get("text", "")).strip_edges()
+	var label_key := str(choice_entry.get("narrative_key", "")).strip_edges()
 	var resolved_text := raw_text
 	if not label_key.is_empty():
 		var text_result := ProloguePlaceholderResolver.resolve_narrative_key(
 			label_key,
 			prologue_context.runtime_placeholders,
 			adapted_mod_manifest,
-			raw_text if not raw_text.is_empty() else action_id
+			raw_text if not raw_text.is_empty() else choice_id
 		)
 		resolved_text = str(text_result.get("text", raw_text))
 	if resolved_text.is_empty():
 		resolved_text = choice_id
 	return {
 		"choice_id": choice_id,
-		"action": action_id if not action_id.is_empty() else choice_id,
 		"text": resolved_text,
 		"target_node_id": str(choice_entry.get("target_node_id", ""))
 	}
@@ -295,7 +293,7 @@ static func _apply_mutation_entry(
 ) -> void:
 	if mutation_entry is Dictionary:
 		var mutation_record: Dictionary = (mutation_entry as Dictionary).duplicate(true)
-		var mutation_type: String = str(mutation_record.get("type", mutation_record.get("event", "")))
+		var mutation_type: String = str(mutation_record.get("type", ""))
 		_apply_single_mutation(mutation_type, mutation_record, prologue_context, profile)
 		settled.append(mutation_record)
 	elif mutation_entry is String:
@@ -328,15 +326,15 @@ static func _apply_single_mutation(
 		"PrologueCompleted":
 			prologue_context.is_completed = true
 			prologue_context.is_active = false
-		"GoldGranted", "ModifyGold":
-			var gold_delta: int = int(mutation_payload.get("amount", mutation_payload.get("gold", mutation_payload.get("delta", 0))))
+		"GoldGranted":
+			var gold_delta: int = int(mutation_payload.get("amount", 0))
 			_apply_gold_mutation(gold_delta, prologue_context, profile)
 		"AttributeModified":
-			var attribute_name: String = str(mutation_payload.get("attribute", mutation_payload.get("attr", "")))
-			var delta: int = int(mutation_payload.get("delta", mutation_payload.get("value", 0)))
+			var attribute_name: String = str(mutation_payload.get("attribute", ""))
+			var delta: int = int(mutation_payload.get("delta", 0))
 			_apply_attr_mutation(attribute_name, delta, profile)
 		"LocationAssigned":
-			var location_id: String = str(mutation_payload.get("location_id", mutation_payload.get("location", "")))
+			var location_id: String = str(mutation_payload.get("location_id", ""))
 			if not location_id.is_empty():
 				prologue_context.assigned_start_location_id = location_id
 				prologue_context.runtime_placeholders["START_LOCATION"] = location_id
@@ -381,7 +379,7 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 		}
 
 	var adapted_manifest: Dictionary = adaptation_result.get("adapted_manifest", {})
-	var seed_value: int = int(config.get("seed", config.get("seed_val", 1337)))
+	var seed_value: int = int(config.get("seed", 1337))
 	var character_name: String = str(config.get("character_name", "HeadlessTraveler")).strip_edges()
 	if character_name.is_empty():
 		character_name = "HeadlessTraveler"
@@ -491,7 +489,7 @@ static func complete_prologue_to_handoff(
 	if prologue_context == null or prologue_context.character_id.is_empty():
 		return {"success": false, "error_code": "INVALID_PROLOGUE_CONTEXT", "handoff": null}
 
-	var extra_attributes: Dictionary = options.get("extra_attrs", {}) if options.get("extra_attrs", null) is Dictionary else {}
+	var extra_attributes: Dictionary = options.get("extra_attributes", {}) if options.get("extra_attributes", null) is Dictionary else {}
 	var initial_gold: int = int(options.get("initial_gold", -1))
 	var active_mods: Array = options.get("active_mods", []) if options.get("active_mods", null) is Array else []
 	var empty_step_payload: Dictionary = {}
@@ -543,27 +541,22 @@ static func complete_prologue_to_handoff(
 static func _append_profile_inventory_items(inventory_payload: Dictionary, collected_items: Array) -> void:
 	if inventory_payload.is_empty():
 		return
-	var has_aggregate_buckets: bool = inventory_payload.has("storage_items") or inventory_payload.has("equipped_payloads")
-	if has_aggregate_buckets:
-		var storage_array: Variant = inventory_payload.get("storage_items", [])
-		if storage_array is Array and not (storage_array as Array).is_empty():
-			var cloned_storage: Array = (storage_array as Array).duplicate(true)
-			for entry in cloned_storage:
-				if entry is Dictionary:
-					collected_items.append(entry)
-		var equipped_map: Variant = inventory_payload.get("equipped_payloads", {})
-		if equipped_map is Dictionary:
-			for slot_key in equipped_map.keys():
-				if equipped_map[slot_key] != null:
-					collected_items.append({"item_id": slot_key, "data": equipped_map[slot_key]})
-		return
-	for inventory_key in inventory_payload.keys():
-		collected_items.append({"item_id": inventory_key, "data": inventory_payload[inventory_key]})
+	var storage_array: Variant = inventory_payload.get("storage_items", [])
+	if storage_array is Array and not (storage_array as Array).is_empty():
+		var cloned_storage: Array = (storage_array as Array).duplicate(true)
+		for entry in cloned_storage:
+			if entry is Dictionary:
+				collected_items.append(entry)
+	var equipped_map: Variant = inventory_payload.get("equipped_payloads", {})
+	if equipped_map is Dictionary:
+		for slot_key in equipped_map.keys():
+			if equipped_map[slot_key] != null:
+				collected_items.append({"item_id": slot_key, "data": equipped_map[slot_key]})
 
 static func _pick_default_choice_for_node(node: NarrativeDAGNode) -> String:
 	if node != null and not node.choices.is_empty():
 		var first_choice: Dictionary = node.choices[0]
-		var choice_id := str(first_choice.get("choice_id", first_choice.get("action", first_choice.get("id", "")))).strip_edges()
+		var choice_id := str(first_choice.get("choice_id", "")).strip_edges()
 		if not choice_id.is_empty():
 			return choice_id
 	return "NEXT"

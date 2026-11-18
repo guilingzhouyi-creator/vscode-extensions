@@ -128,7 +128,7 @@ static func _step_headless_node(
 			choice_index = clampi(int(choice_indices[choice_pointer]), 0, node.choices.size() - 1)
 			loop_state["choice_ptr"] = choice_pointer + 1
 		var chosen: Dictionary = node.choices[choice_index]
-		action_payload["selected_choice"] = chosen.get("choice_id", chosen.get("id", str(choice_index)))
+		action_payload["selected_choice"] = chosen.get("choice_id", str(choice_index))
 
 	var step_result: Dictionary = engine.execute_node_action(current_node_id, action_payload)
 	var raw_mutations: Variant = step_result.get("mutations")

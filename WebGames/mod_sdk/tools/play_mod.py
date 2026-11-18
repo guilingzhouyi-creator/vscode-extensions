@@ -285,7 +285,7 @@ def play_mod_suite(
             "ap_max": 10.0,
             "gold": char_sheet.get("initial_gold", 0),
             "potential_stat_points": 0,
-            "current_location": bundle.get("context", {}).get("start_location", "FRONTIER_REALM"),
+            "current_location_id": bundle.get("context", {}).get("start_location", "FRONTIER_REALM"),
             "active_mode": "single_player",
             "active_modals": [],
             "unread_mail_count": 0,

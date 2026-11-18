@@ -247,7 +247,8 @@ static func _kmod_declares_pack_id(kmod_path: String, expected_pack_id: String) 
 			var parsed: Variant = JSON.parse_string(reader.read_file(manifest_name).get_string_from_utf8())
 			if parsed is Dictionary:
 				var manifest := parsed as Dictionary
-				declared_id = String(manifest.get("pack_id", manifest.get("bundle_id", ""))).strip_edges()
+				var id_key := "pack_id" if manifest_name == "pack.json" else "bundle_id"
+				declared_id = String(manifest.get(id_key, "")).strip_edges()
 				break
 	reader.close()
 	return declared_id == expected_pack_id

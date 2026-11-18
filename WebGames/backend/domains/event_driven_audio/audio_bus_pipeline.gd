@@ -45,7 +45,7 @@ static func resolve_mod_audio_uri(sound_id: String, explicit_uri: String = "") -
 		var registry_entry: Variant = sound_registry.get(sound_id, "")
 		if registry_entry is Dictionary:
 			var sound_entry_mapping := registry_entry as Dictionary
-			candidate = str(sound_entry_mapping.get("uri", sound_entry_mapping.get("path", ""))).strip_edges()
+			candidate = str(sound_entry_mapping.get("uri", "")).strip_edges()
 		elif registry_entry is String:
 			candidate = str(registry_entry).strip_edges()
 	return candidate

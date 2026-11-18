@@ -71,19 +71,19 @@ static func _test_pre_deduction_rejection() -> Dictionary:
 	var shop := MerchantShopAggregate.new("SHOP_GUARD", "守卫测试铺")
 	shop.local_position = Vector2.ZERO
 	shop.shelf_inventory.append({
-		"item_template_id": "POTION_HEAL",
+		"template_id": "POTION_HEAL",
 		"stock_count": 0,      # 空库存（等价 null 空货架语义：数量不足）
 		"price_gold": 5,
 		"price_silver": 0
 	})
 	shop.shelf_inventory.append({
-		"item_template_id": "POTION_HEAL",
+		"template_id": "POTION_HEAL",
 		"stock_count": -3,     # 负库存：非法货架数据，扣款前拒绝
 		"price_gold": 5,
 		"price_silver": 0
 	})
 	shop.shelf_inventory.append({
-		"item_template_id": "POTION_HEAL",
+		"template_id": "POTION_HEAL",
 		"stock_count": 5,
 		"price_gold": -5,      # 负价格：非法定价，扣款前拒绝
 		"price_silver": 0

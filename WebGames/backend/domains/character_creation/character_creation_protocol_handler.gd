@@ -130,7 +130,7 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
-			var choice_identifier := str(payload_map.get("choice_id", payload_map.get("action", "NEXT"))).strip_edges()
+			var choice_identifier := str(payload_map.get("choice_id", "NEXT")).strip_edges()
 			var step_result := PrologueExecutionKernel.advance_prologue_step(prologue_context, choice_identifier, payload_map, profile)
 			var is_step_succeeded := bool(step_result.get("success", false))
 			var step_packet: Variant = step_result.get("packet", null)
@@ -166,7 +166,7 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				prologue_context,
 				profile,
 				{
-					"extra_attrs": payload_map.get("extra_attributes", {}) if payload_map.get("extra_attributes") is Dictionary else {},
+					"extra_attributes": payload_map.get("extra_attributes", {}) if payload_map.get("extra_attributes") is Dictionary else {},
 					"initial_gold": int(payload_map.get("initial_gold", -1)),
 					"active_mods": gateway.active_mods if gateway != null else [],
 				}

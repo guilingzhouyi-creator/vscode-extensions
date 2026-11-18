@@ -80,18 +80,10 @@ static func validate_and_execute(
 	return _dispatch_domain_execution(directive_id, action_packet, snapshot)
 
 static func _extract_directive_id(packet: AgentActionPacketDTO) -> String:
-	if not packet.directive_id.is_empty():
-		return packet.directive_id
-	if not packet.action_id.is_empty():
-		return packet.action_id
-	return ""
+	return packet.directive_id
 
 static func _extract_params(packet: AgentActionPacketDTO) -> Dictionary:
-	if not packet.params.is_empty():
-		return packet.params
-	if not packet.parameters.is_empty():
-		return packet.parameters
-	return {}
+	return packet.params
 
 static func _dispatch_domain_execution(
 	directive_id: String,

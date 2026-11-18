@@ -355,7 +355,7 @@ static func revoke_token(token: String) -> bool:
 	session["revoked"] = true
 	session["token_masked"] = PackedByteArray()
 	_sessions[key] = session
-	var user_identifier: String = String(session.get("username", session.get("account_id", "")))
+	var user_identifier: String = String(session.get("username", ""))
 	EventBusCore.get_instance().emit_domain_event(HudEventContract.channel_auth_session_revoked(), {
 		"account_id": session.get("account_id", ""),
 		"username": session.get("username", ""),

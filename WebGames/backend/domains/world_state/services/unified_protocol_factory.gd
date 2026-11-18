@@ -94,8 +94,8 @@ static func wrap_agent_action(
 	var target_directive: String = ""
 	var target_parameters: Dictionary = {}
 	if agent_packet != null:
-		target_directive = agent_packet.directive_id if not agent_packet.directive_id.is_empty() else agent_packet.action_id
-		target_parameters = agent_packet.params if not agent_packet.params.is_empty() else agent_packet.parameters
+		target_directive = agent_packet.directive_id
+		target_parameters = agent_packet.params
 		request.character_id = agent_packet.session_id
 		request.client_timestamp_ms = agent_packet.client_timestamp_ms
 	request.action_type = target_directive

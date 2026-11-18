@@ -97,16 +97,16 @@ static func _instantiate_card_from_pool(rng: DeterministicRNG) -> PhysicalVerbRe
 		var raw_card: Variant = skill_cards[card_pick]
 		if raw_card is Dictionary:
 			var card_spec := raw_card as Dictionary
-			var verb_code := String(card_spec.get("verb", card_spec.get("verb_type", "SLASH"))).strip_edges().to_upper()
+			var verb_code := String(card_spec.get("verb_type", "SLASH")).strip_edges().to_upper()
 			if verb_code.is_empty():
 				verb_code = "SLASH"
 			card.verb_type = verb_code
-			var display_name := String(card_spec.get("name", card_spec.get("card_name", card_spec.get("card_id", "")))).strip_edges()
+			var display_name := String(card_spec.get("name", "")).strip_edges()
 			card.card_name = display_name if not display_name.is_empty() else "招式牌·%s" % card.verb_type
 			var fallback_ap: int = GameConfig.get_int("domains.combat", "verbs/%s/base_ap" % card.verb_type, -2)
 			var fallback_potency: float = GameConfig.get_float("domains.combat", "card_defaults/base_potency", 20.0)
 			card.ap_cost = int(card_spec.get("ap_cost", fallback_ap))
-			card.base_potency = float(card_spec.get("base_potency", card_spec.get("potency", fallback_potency)))
+			card.base_potency = float(card_spec.get("base_potency", fallback_potency))
 			return card
 
 	var verbs_table: Dictionary = GameConfig.get_dict("domains.combat", "verbs", {})

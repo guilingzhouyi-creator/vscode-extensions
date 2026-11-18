@@ -198,7 +198,7 @@ class LocalMockDispatcher:
             "ap_max": 10.0,
             "gold": 200,
             "potential_stat_points": 3,
-            "current_location": "VALAN_SANCTUARY",
+            "current_location_id": "VALAN_SANCTUARY",
             "active_mode": "single_player",
             "active_modals": [],
             "unread_mail_count": 1,
