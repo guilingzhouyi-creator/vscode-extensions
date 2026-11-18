@@ -121,27 +121,28 @@ static func _append_json_file_record(target_records: Array[Dictionary], relative
 
 static func _collect_kmod_content_records(kmod_path: String) -> Array[Dictionary]:
 	var collected: Array[Dictionary] = []
-	var reader := ZIPReader.new()
-	if reader.open(kmod_path) != OK:
+	var mod_data := ModPackageArchiveReader.read_kmod_kdat_dict(kmod_path, ModPackageArchiveReader.KMOD_DATA_FILENAME)
+	if mod_data.is_empty():
 		return collected
-	var entry_names: PackedStringArray = reader.get_files()
-	var sorted_paths: Array[String] = []
-	for entry_name in entry_names:
-		var path_text := String(entry_name)
-		if path_text.ends_with(".json") and not classify_relative_content_path(path_text).is_empty():
-			sorted_paths.append(path_text)
-	sorted_paths.sort()
-	for sorted_path in sorted_paths:
-		var category := classify_relative_content_path(sorted_path)
-		var raw_text := reader.read_file(sorted_path).get_string_from_utf8()
-		var parsed: Variant = JSON.parse_string(raw_text)
-		if parsed is Dictionary:
+	var raw_records: Variant = mod_data.get("content_records", [])
+	if not (raw_records is Array):
+		return collected
+	for entry in (raw_records as Array):
+		if not (entry is Dictionary):
+			continue
+		var record := entry as Dictionary
+		var relative_path := String(record.get("relative_path", ""))
+		var category := String(record.get("category", classify_relative_content_path(relative_path)))
+		var payload_variant: Variant = record.get("payload")
+		if not category.is_empty() and payload_variant is Dictionary:
 			collected.append({
 				"category": category,
-				"relative_path": sorted_path,
-				"payload": parsed
+				"relative_path": relative_path,
+				"payload": payload_variant
 			})
-	reader.close()
+	collected.sort_custom(func(left_record: Dictionary, right_record: Dictionary) -> bool:
+		return String(left_record.get("relative_path", "")) < String(right_record.get("relative_path", ""))
+	)
 	return collected
 
 ## 确保目标工作配置表存在（必要时加载纯净基础表深拷贝）并登记为已修改表

@@ -242,14 +242,11 @@ static func _kmod_declares_pack_id(kmod_path: String, expected_pack_id: String) 
 	if reader.open(kmod_path) != OK:
 		return false
 	var declared_id := ""
-	for manifest_name in ["pack.json", "manifest.json"]:
-		if reader.file_exists(manifest_name):
-			var parsed: Variant = JSON.parse_string(reader.read_file(manifest_name).get_string_from_utf8())
-			if parsed is Dictionary:
-				var manifest := parsed as Dictionary
-				var id_key := "pack_id" if manifest_name == "pack.json" else "bundle_id"
-				declared_id = String(manifest.get(id_key, "")).strip_edges()
-				break
+	if reader.file_exists("manifest.kdat"):
+		var decoded: Variant = BinaryConfigReader.load_kdat_buffer(reader.read_file("manifest.kdat"))
+		if decoded is Dictionary:
+			var manifest := decoded as Dictionary
+			declared_id = String(manifest.get("pack_id", manifest.get("bundle_id", ""))).strip_edges()
 	reader.close()
 	return declared_id == expected_pack_id
 
@@ -262,7 +259,7 @@ static func _has_installed_mod_named(mod_id_candidate: String) -> bool:
 			return true
 		if FileAccess.file_exists(root_folder.path_join(clean_id + ".kmod")):
 			return true
-		if not _find_matching_kmod_in_root(root_folder, clean_id, "pack.json").is_empty():
+		if not _find_matching_kmod_in_root(root_folder, clean_id, "manifest.kdat").is_empty():
 			return true
 	return false
 
