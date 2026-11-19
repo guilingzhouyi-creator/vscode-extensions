@@ -369,27 +369,6 @@ Write-StepVerdict -StepId "DOMAIN-AUDIT-04" -Status $(if ($statusWg -eq "PASS") 
 Write-StepVerdict -StepId "ENGINE-AUDIT-05" -Status $(if ($statusAr -eq "PASS") { "PASS" } else { "BLOCK" })
 Write-StepVerdict -StepId "RUST-AUDIT-06" -Status $(if ($statusFg -eq "PASS") { "PASS" } else { "BLOCK" })
 
-$exitCode = if ($failed) { 1 } else { 0 }
-$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域质量达标" }
-$globalColor = if ($failed) { "Red" } else { "Green" }
-
-function Get-SafeProp {
-    [CmdletBinding()]
-    param(
-        [object]$Target,
-        [string]$Name
-    )
-    if ($null -eq $Target) { return $null }
-    if ($Target -is [System.Collections.IDictionary]) {
-        if ($Target.Contains($Name)) { return $Target[$Name] }
-        return $null
-    }
-    $p = $Target.PSObject.Properties[$Name]
-    if ($null -ne $p) { return $p.Value }
-    return $null
-}
-
-# 读取 auto-refactor 十维工程质量基线（优先读取本轮最新自审基线，补充轻量级 UAR 收据并无条件执行跨项目 CAI 融合）
 
 
 if ($failed) {
