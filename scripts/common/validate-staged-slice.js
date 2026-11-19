@@ -17,7 +17,7 @@ const path = require("path");
 const { execSync, execFileSync } = require("child_process");
 const { getSafeGitEnv, readStagedBuffersBatch, getStagedFiles: queryStagedFiles } = require("./git-env");
 const analyzers = require("./lib/staged-slice-analyzers");
-const { isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName } = analyzers;
+const { isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName, analyzeFunction } = analyzers;
 
 let ts;
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -429,78 +429,6 @@ const NESTING_BLOCK_KINDS = new Set([
   ts.SyntaxKind.TryStatement,
   ts.SyntaxKind.SwitchStatement,
 ]);
-
-/**
- * Evaluates an individual function AST node for CC and nesting depth violations.
- *
- * @param {ts.Node} node - Target function AST node
- * @param {ts.SourceFile} sourceFile - TypeScript source file container
- * @param {Record<string, any>} cfg - Effective complexity threshold configuration
- * @returns {Array<{ rule: string, severity: string, message: string, line: number, suggestedFix: string }>}
- */
-function analyzeFunction(node, sourceFile, cfg) {
-  const findings = [];
-  const pos = sourceFile.getLineAndCharacterOfPosition(
-    node.getStart(sourceFile),
-  );
-  const lineNum = pos.line + 1;
-  const funcName = node.name ? node.name.getText(sourceFile) : "<anonymous>";
-
-  const nameFinding = validateFunctionName(node, sourceFile, cfg, lineNum);
-  if (nameFinding) {
-    findings.push(nameFinding);
-  }
-
-  const complexity = calculateComplexity(node);
-
-  const maxNesting = { val: 0 };
-  checkNesting(node, 0, maxNesting);
-
-  const isExported = isExportedFunction(node);
-  const hasLoops = hasLoopConstruct(node);
-  const isFlatDispatcher =
-    cfg.flatDispatcherBonus &&
-    maxNesting.val <= cfg.flatDispatcherMaxDepth &&
-    !hasLoops;
-  const isLowBlast =
-    !isExported &&
-    cfg.lowBlastRadiusBonus &&
-    !hasLoops &&
-    cfg.flatDispatcherBonus !== false &&
-    maxNesting.val <= cfg.lowBlastRadiusMaxDepth;
-
-  const { effectiveMaxCC, tag } = resolveComplexityCeiling(
-    cfg,
-    isFlatDispatcher,
-    isLowBlast,
-  );
-
-  if (complexity > effectiveMaxCC) {
-    findings.push({
-      rule: "CPX-BUD-001",
-      severity: "error",
-      message: `函数 '${funcName}' 圈复杂度超标 (CC = ${complexity} > ${effectiveMaxCC}, ${tag})`,
-      line: lineNum,
-      actual: `CC = ${complexity}`,
-      expected: `CC <= ${effectiveMaxCC}`,
-      suggestedFix: "拆分多分支判定为策略表或提取独立辅助纯函数",
-    });
-  }
-
-  if (maxNesting.val > cfg.maxNestingDepth) {
-    findings.push({
-      rule: "CPX-NEST-001",
-      severity: "error",
-      message: `函数 '${funcName}' 控制流嵌套过深 (Depth = ${maxNesting.val} > ${cfg.maxNestingDepth})`,
-      line: lineNum,
-      actual: `Depth = ${maxNesting.val}`,
-      expected: `Depth <= ${cfg.maxNestingDepth}`,
-      suggestedFix: "采用卫语句 (Guard Clause) 提前返回以平铺嵌套分支",
-    });
-  }
-
-  return findings;
-}
 
 function readStagedContentSafe(filePath) {
   const rel = path.relative(REPO_ROOT, filePath).replace(/\\/g, "/");
