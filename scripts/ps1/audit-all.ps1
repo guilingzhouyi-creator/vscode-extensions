@@ -30,10 +30,6 @@ $PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
-# 控制台渲染纯函数（宽字符宽度 / 对齐 / 进度条 / 等级标签）外置为共享库，
-# 使审查编排与本文件体积预算解耦，双平台渲染逻辑可独立演进。
-. (Join-Path $PSScriptRoot "lib/console-dashboard.ps1")
-
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 # 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
@@ -59,6 +55,7 @@ if (-not $Json -and -not $Agent) {
 }
 
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
+$startTimeMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString()
 $failed = $false
 
 . "$PSScriptRoot/lib/gate-failure-collector.ps1"
@@ -71,30 +68,9 @@ $logIsoOut = Join-Path $transientDir "audit-check-isoout-$randSuffix.out.log"
 $logGiOut = Join-Path $transientDir "audit-check-giout-$randSuffix.out.log"
 $logDensityOut = Join-Path $transientDir "audit-check-densityout-$randSuffix.out.log"
 $logElocOut = Join-Path $transientDir "audit-check-elocout-$randSuffix.out.log"
-$logFeedbackOut = Join-Path $transientDir "audit-check-feedbackout-$randSuffix.out.log"
-$logOrderingOut = Join-Path $transientDir "audit-check-orderingout-$randSuffix.out.log"
-$logSkillsOut = Join-Path $transientDir "audit-check-skillsout-$randSuffix.out.log"
-$logClosureOut = Join-Path $transientDir "audit-check-closureout-$randSuffix.out.log"
-$logScoringClosureOut = Join-Path $transientDir "audit-check-scoringclosureout-$randSuffix.out.log"
-$logReachOut = Join-Path $transientDir "audit-check-reachout-$randSuffix.out.log"
-$logRuleSourceOut = Join-Path $transientDir "audit-check-rulesource-$randSuffix.out.log"
-$logDocsOut = Join-Path $transientDir "audit-check-docsout-$randSuffix.out.log"
-$logLedgerOut = Join-Path $transientDir "audit-check-ledgerout-$randSuffix.out.log"
-$logSubagentOut = Join-Path $transientDir "audit-check-subagentout-$randSuffix.out.log"
-$logCascadeOut = Join-Path $transientDir "audit-check-cascadeout-$randSuffix.out.log"
-$logDocAnchorsOut = Join-Path $transientDir "audit-check-docanchors-$randSuffix.out.log"
-$logMetricCoverageOut = Join-Path $transientDir "audit-check-metriccoverage-$randSuffix.out.log"
-$logFamilyContractOut = Join-Path $transientDir "audit-check-familycontract-$randSuffix.out.log"
-$logDocReachOut = Join-Path $transientDir "audit-check-docreach-$randSuffix.out.log"
-$logCommitHistoryOut = Join-Path $transientDir "audit-check-commithistory-$randSuffix.out.log"
-$logDestructiveOut = Join-Path $transientDir "audit-check-destructive-$randSuffix.out.log"
-$logChainsOut = Join-Path $transientDir "audit-check-chainsout-$randSuffix.out.log"
-$logCountsOut = Join-Path $transientDir "audit-check-countsout-$randSuffix.out.log"
-$logParityOut = Join-Path $transientDir "audit-check-parityout-$randSuffix.out.log"
-$logGateProofOut = Join-Path $transientDir "audit-check-gateproof-$randSuffix.out.log"
-$logGateProofErr = Join-Path $transientDir "audit-check-gateproof-$randSuffix.err.log"
-$logDocMetricsOut = Join-Path $transientDir "audit-check-docmetrics-$randSuffix.out.log"
-$logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
+$pillar2LogDir = Join-Path $transientDir "audit-pillar2-$randSuffix"
+$guardsJsonOut = Join-Path $transientDir "audit-pillar2-$randSuffix.json"
+$guardsErrOut = Join-Path $transientDir "audit-pillar2-$randSuffix.err.log"
 
 # 1. 物理卫生八维刚性公理与全域巡检
 Write-StepBanner -StepId "WORKSPACE-AUDIT-01"
@@ -129,63 +105,41 @@ if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne
     $statusHygiene = "PASS"
 }
 
-# 2. 单源规则注册表与目录一致性及技能集规范
+# 2. 单源规则注册表与目录一致性及技能集规范 (有界并发调度 Pillar-2 守卫)
 Write-StepBanner -StepId "RULE-AUDIT-02"
-$res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -RedirectStandardOutput $logCatalogOut -NoNewWindow -PassThru -Wait
-$resFeedback = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gate-feedback.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFeedbackOut -NoNewWindow -PassThru -Wait
-$resOrdering = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gate-ordering.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logOrderingOut -NoNewWindow -PassThru -Wait
-$resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logSkillsOut -NoNewWindow -PassThru -Wait
-$resClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-id-closure.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logClosureOut -NoNewWindow -PassThru -Wait
-$resScoringClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-scoring-rule-closure.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logScoringClosureOut -NoNewWindow -PassThru -Wait
-$resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logReachOut -NoNewWindow -PassThru -Wait
-$resRuleSource = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-source-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logRuleSourceOut -NoNewWindow -PassThru -Wait
-$resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocsOut -NoNewWindow -PassThru -Wait
-$resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logLedgerOut -NoNewWindow -PassThru -Wait
-$resSubagent = Start-Process -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js") -WorkingDirectory $repoRoot -RedirectStandardOutput $logSubagentOut -NoNewWindow -PassThru -Wait
-$resCascade = Start-Process -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -RedirectStandardOutput $logCascadeOut -NoNewWindow -PassThru -Wait
-$resDocAnchors = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-anchors.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocAnchorsOut -NoNewWindow -PassThru -Wait
-$resMetricCoverage = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-metric-coverage.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logMetricCoverageOut -NoNewWindow -PassThru -Wait
-$resFamilyContract = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-family-contract.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFamilyContractOut -NoNewWindow -PassThru -Wait
-$resDocReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocReachOut -NoNewWindow -PassThru -Wait
-$resCommitHistory = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-history-baseline.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCommitHistoryOut -NoNewWindow -PassThru -Wait
-# 破坏性删除溯源：与推送门禁同源同规则，避免「推送拦截、审查放行」的双重结论。
-$resDestructive = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-destructive-ops.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDestructiveOut -NoNewWindow -PassThru -Wait
-# 推送门禁已覆盖的三道守卫必须在全量审查中同样执行，否则同一工作树在两个入口得到不同判定。
-$resChains = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-block-chains.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logChainsOut -NoNewWindow -PassThru -Wait
-$resCounts = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-hardcoded-counts.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCountsOut -NoNewWindow -PassThru -Wait
-$resParity = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-shell-parity.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logParityOut -NoNewWindow -PassThru -Wait
-# 守卫自证：全量审查若从不运行反向探针，「36 个守卫全部 PASS」与「36 个守卫全是死代码」不可区分。
-# 探针会主动构造非法权重样本触发 stderr 告警，必须重定向标准错误避免污染审查终端输出。
-$resGateProof = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/test-gate-guards.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logGateProofOut -RedirectStandardError $logGateProofErr -NoNewWindow -PassThru -Wait
-if ($resGateProof.ExitCode -ne 0 -and (Test-Path $logGateProofErr)) {
-    $gateProofErr = Get-Content -Path $logGateProofErr -Raw -ErrorAction SilentlyContinue
-    if ($gateProofErr) { Add-Content -Path $logGateProofOut -Value "`n$gateProofErr" -ErrorAction SilentlyContinue }
+$procGuards = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/run-workspace-guards.js", "--group", "pillar2", "--log-dir", $pillar2LogDir, "--json") -WorkingDirectory $repoRoot -RedirectStandardOutput $guardsJsonOut -RedirectStandardError $guardsErrOut -NoNewWindow -PassThru -Wait
+$ruleStepCodes = @()
+$ruleLogs = @()
+$guardsPayload = $null
+$guardsParsed = $false
+try {
+    if (Test-Path $guardsJsonOut) {
+        $guardsPayload = Get-Content -Path $guardsJsonOut -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($null -ne $guardsPayload -and $null -ne $guardsPayload.codes) {
+            $ruleStepCodes = @($guardsPayload.codes | ForEach-Object { [int]$_ })
+            $ruleLogs = @($guardsPayload.logs | ForEach-Object { [string]$_ })
+            $expectedTotal = if ($null -ne $guardsPayload.total) { [int]$guardsPayload.total } else { 23 }
+            $guardsParsed = ($ruleStepCodes.Count -gt 0 -and $ruleStepCodes.Count -ge $expectedTotal)
+        }
+    }
+} catch {
+    $guardsParsed = $false
 }
-Remove-Item -Path $logGateProofErr -Force -ErrorAction SilentlyContinue
-# 文档数字：审查必须自己校验 METRICS 区域，否则数字漂移只能靠推送门禁兜底。
-$resDocMetrics = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/sync-doc-metrics.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocMetricsOut -NoNewWindow -PassThru -Wait
-$codeCatalog = $res.ExitCode
-$ruleStepCodes = @(
-    $codeCatalog, $resFeedback.ExitCode, $resOrdering.ExitCode, $resSkills.ExitCode,
-    $resClosure.ExitCode, $resScoringClosure.ExitCode, $resReach.ExitCode, $resRuleSource.ExitCode, $resDocs.ExitCode,
-    $resLedger.ExitCode, $resSubagent.ExitCode, $resCascade.ExitCode, $resDocAnchors.ExitCode, $resMetricCoverage.ExitCode,
-    $resFamilyContract.ExitCode, $resDocReach.ExitCode, $resCommitHistory.ExitCode,
-    $resDestructive.ExitCode, $resChains.ExitCode, $resCounts.ExitCode, $resParity.ExitCode,
-    $resGateProof.ExitCode, $resDocMetrics.ExitCode
-)
+if (-not $guardsParsed) {
+    $fallbackExit = if ($procGuards.ExitCode -ne 0) { [int]$procGuards.ExitCode } else { 1 }
+    $ruleStepCodes = @(for ($idx = 0; $idx -lt 23; $idx++) { $fallbackExit })
+    $ruleLogs = @(for ($idx = 0; $idx -lt 23; $idx++) { $guardsErrOut })
+}
+$codeCatalog = $ruleStepCodes[0]
 $failingRuleSteps = @($ruleStepCodes | Where-Object { $_ -ne 0 })
-if ($failingRuleSteps.Count -gt 0) {
+if ($procGuards.ExitCode -ne 0 -or -not $guardsParsed -or $failingRuleSteps.Count -gt 0) {
     $statusRules = "BLOCK"
     $failed = $true
-    $ruleLogs = @(
-        $logCatalogOut, $logFeedbackOut, $logOrderingOut, $logSkillsOut,
-        $logClosureOut, $logScoringClosureOut, $logReachOut, $logRuleSourceOut, $logDocsOut,
-        $logLedgerOut, $logSubagentOut, $logCascadeOut, $logDocAnchorsOut, $logMetricCoverageOut,
-        $logFamilyContractOut, $logDocReachOut, $logCommitHistoryOut,
-        $logDestructiveOut, $logChainsOut, $logCountsOut, $logParityOut,
-        $logGateProofOut, $logDocMetricsOut
-    )
-    Save-AuditPillar2FailuresByCodes -Codes $ruleStepCodes -Logs $ruleLogs
+    if ($guardsParsed -and $null -ne $guardsPayload.results -and @($guardsPayload.results).Count -gt 0) {
+        Save-AuditPillar2FailuresFromResults -Results @($guardsPayload.results) -RepoRoot $repoRoot -NodeCmd $nodeCmd
+    } else {
+        Save-AuditPillar2FailuresByCodes -Codes $ruleStepCodes -Logs $ruleLogs -RepoRoot $repoRoot -NodeCmd $nodeCmd
+    }
 } else {
     $statusRules = "PASS"
 }
@@ -288,50 +242,52 @@ if (-not (Test-Path (Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
 
 if ($statusWt -ne "PASS") {
     $failed = $true
-    if (-not $Json) {
+    if (-not $Json -and -not $Agent) {
         Write-GateHost "✖ BLOCK  workspace-timing 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWtOut, $logWtErr)) {
             if (Test-Path $logFile) {
-                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-GateHost "   $_" -ForegroundColor DarkRed }
             }
         }
     }
 }
 if ($statusWg -ne "PASS") {
     $failed = $true
-    if (-not $Json) {
+    if (-not $Json -and -not $Agent) {
         Write-GateHost "✖ BLOCK  WebGames 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWgOut, $logWgErr)) {
             if (Test-Path $logFile) {
-                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-GateHost "   $_" -ForegroundColor DarkRed }
             }
         }
     }
 }
 if ($statusAr -ne "PASS") {
     $failed = $true
-    if (-not $Json) {
+    if (-not $Json -and -not $Agent) {
         Write-GateHost "✖ BLOCK  auto-refactor 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logArOut, $logArErr, $logArSelfOut, $logArSelfErr)) {
             if (Test-Path $logFile) {
-                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-GateHost "   $_" -ForegroundColor DarkRed }
             }
         }
     }
 }
 if ($statusFg -ne "PASS") {
     $failed = $true
-    if (-not $Json) {
+    if (-not $Json -and -not $Agent) {
         Write-GateHost "✖ BLOCK  fractal-git 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logFgOut, $logFgErr)) {
             if (Test-Path $logFile) {
-                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-GateHost "   $_" -ForegroundColor DarkRed }
             }
         }
     }
 }
 
 if ($failed) {
+    $startTime.Stop()
+    $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
     try {
         if ($statusWt -ne "PASS") {
             $wtLog = if (Test-Path $logWtErr) { $logWtErr } else { $logWtOut }
@@ -349,17 +305,13 @@ if ($failed) {
             $fgLog = if (Test-Path $logFgErr) { $logFgErr } else { $logFgOut }
             Save-AuditStepFailure -PillarId "rust-06" -StepId "fractal-git-taxis" -StepName "fractal-git 内核子系统回归套件" -Command "pwsh fractal-git/scripts/ps1/audit-taxis.ps1" -ExitCode 1 -LogFile $fgLog -AasLayer "L4_QUALITY" -ActionableFix "pwsh fractal-git/scripts/ps1/audit-taxis.ps1" -VerificationCommand "pwsh fractal-git/scripts/ps1/audit-taxis.ps1"
         }
+        Save-AuditFailureSnapshot -ElapsedSec $elapsedSec -GitRevision (git rev-parse --short HEAD 2>$null) -NodeCmd $nodeCmd
         Write-GateHost "💡 失败审查完整日志已保留至: .audit-logs/failures/" -ForegroundColor Yellow
         Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
     } catch {
         # 归档日志失败不阻断异常主流程
     }
 }
-
-Get-ChildItem -Path $transientDir -Filter "audit-*-$randSuffix*" -File | Remove-Item -Force -ErrorAction SilentlyContinue
-
-$startTime.Stop()
-$elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
 
 # 判定输出：干净运行必须与跳过运行可区分，步骤身份来自单源登记表。
 Write-StepVerdict -StepId "WORKSPACE-AUDIT-01" -Status $(if ($statusHygiene -eq "PASS") { "PASS" } else { "BLOCK" })
@@ -369,7 +321,82 @@ Write-StepVerdict -StepId "DOMAIN-AUDIT-04" -Status $(if ($statusWg -eq "PASS") 
 Write-StepVerdict -StepId "ENGINE-AUDIT-05" -Status $(if ($statusAr -eq "PASS") { "PASS" } else { "BLOCK" })
 Write-StepVerdict -StepId "RUST-AUDIT-06" -Status $(if ($statusFg -eq "PASS") { "PASS" } else { "BLOCK" })
 
+# --- 治理快照漂移归口：仅时间戳变化回滚，语义变化留待显式提交 ---
+# 全量扫描必然重写 governance-supervisor.json 的 lastUpdated，若不归口会让工作树永久脏，
+# 进而锁死 release-tag.sh 的干净树门禁。此处只判定与回滚，绝不代替操作者提交。
+$snapshotNote = ""
+$snapshotHelper = Join-Path $repoRoot "auto-refactor/scripts/lib/trajectory-ledger-redact.js"
+if (Test-Path $snapshotHelper) {
+    $prevNativePref = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+    try {
+        $snapshotOutput = & $nodeCmd $snapshotHelper --revert-timestamp 2>&1
+        if ($snapshotOutput) { $snapshotNote = ($snapshotOutput | Out-String).Trim() }
+    } catch {
+        $snapshotNote = ""
+    } finally {
+        $PSNativeCommandUseErrorActionPreference = $prevNativePref
+    }
+}
 
+# 统一合并执行报告、十维质量看板与步骤摘要生成（经结构化 JSON 契约移交，消除位置参数漂移）
+$summaryInputFile = Join-Path $transientDir "audit-summary-$randSuffix.json"
+$summaryPayload = [ordered]@{
+    startTime = [double]$startTimeMs
+    failed = [bool]$failed
+    jsonMode = [bool]$Json
+    agentMode = [bool]$Agent
+    fastMode = [bool]$Fast
+    commitLedger = [bool]$CommitLedger
+    runner = "ps1"
+    rootDir = $repoRoot
+    hygieneReportFile = $logHygieneOut
+    statuses = [ordered]@{
+        hygiene = $statusHygiene
+        rules = $statusRules
+        ar = $statusAr
+        wt = $statusWt
+        wg = $statusWg
+        fg = $statusFg
+    }
+    codes = [ordered]@{
+        hygiene = [int]$codeHygiene
+        iso = [int]$codeIso
+        gi = [int]$codeGi
+        density = [int]$codeDensity
+        eloc = [int]$codeEloc
+        catalog = [int]$codeCatalog
+    }
+    ruleCodes = @($ruleStepCodes)
+    guardResults = if ($guardsParsed -and $null -ne $guardsPayload -and $null -ne $guardsPayload.guards) { $guardsPayload.guards } else { $null }
+}
+
+$reportExit = 0
+$prevNativePref = $PSNativeCommandUseErrorActionPreference
+$PSNativeCommandUseErrorActionPreference = $false
+try {
+    $summaryPayload | ConvertTo-Json -Depth 6 | Set-Content -Path $summaryInputFile -Encoding utf8
+    & $nodeCmd (Join-Path $repoRoot "scripts/common/render-audit-all-summary.js") --input $summaryInputFile
+    $reportExit = $LASTEXITCODE
+} finally {
+    $PSNativeCommandUseErrorActionPreference = $prevNativePref
+    Remove-Item -LiteralPath $summaryInputFile -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $transientDir -Filter "audit-*-$randSuffix*" -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    if ($pillar2LogDir -and (Test-Path -LiteralPath $pillar2LogDir) -and $pillar2LogDir.StartsWith($transientDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Remove-Item -LiteralPath $pillar2LogDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+if ($reportExit -ne 0) {
+    $failed = $true
+}
+
+if ($Json -or $Agent) {
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
+if ($snapshotNote) {
+    Write-GateHost "ℹ️  $snapshotNote" -ForegroundColor DarkGray
+}
 
 if ($failed) {
     Write-GateHost "✖ BLOCK  审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
