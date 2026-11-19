@@ -22,6 +22,7 @@ import argparse
 import hashlib
 import json
 import sys
+
 # 将本脚本所在目录加入 sys.path，以便无缝导入模块
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
@@ -47,6 +48,7 @@ from play_mod_common import (
     SCHEMA_VERSION_OBSERVATION,
     SCHEMA_VERSION_TRANSCRIPT,
     DiagnosticItem,
+    SessionConfig,
     ensure_utf8_stdout,
     extract_rules,
     flatten_i18n_dict,
@@ -66,6 +68,7 @@ from play_mod_common import (
     validate_multi_mods,
 )
 from play_mod_interactive import (
+    InteractivePlayConfig,
     apply_mutations_to_state,
     apply_single_mutation,
     build_observation_payload,
@@ -122,7 +125,11 @@ def _simulate_steps(
     if not entry_id:
         return [], {"reached_terminal": False, "error": "DAG 缺少入口节点"}, False
 
-    choice_tokens = [c.strip() for c in choices_param.split(",") if c.strip()] if choices_param else []
+    choice_tokens = (
+        [c.strip() for c in choices_param.split(",") if c.strip()]
+        if choices_param
+        else []
+    )
     token_idx = 0
     curr = entry_id
     steps: list[dict[str, Any]] = []
@@ -147,29 +154,37 @@ def _simulate_steps(
             next_candidates, choice_tokens, token_idx, choice_strategy, seed, step_num
         )
 
-        steps.append({
-            "step_index": step_num,
-            "branch_index": 1,
-            "node_id": curr,
-            "node_type": ntype,
-            "narrative_key": nkey,
-            "background_asset": bg_asset,
-            "bgm_asset": bgm_asset,
-            "text_source": text_source,
-            "raw_text": raw_text,
-            "hydrated_text": hydrated_text,
-            "available_choices": next_candidates,
-            "selected_next_node": chosen_next,
-            "mutations_on_complete": mutations,
-        })
+        steps.append(
+            {
+                "step_index": step_num,
+                "branch_index": 1,
+                "node_id": curr,
+                "node_type": ntype,
+                "narrative_key": nkey,
+                "background_asset": bg_asset,
+                "bgm_asset": bgm_asset,
+                "text_source": text_source,
+                "raw_text": raw_text,
+                "hydrated_text": hydrated_text,
+                "available_choices": next_candidates,
+                "selected_next_node": chosen_next,
+                "mutations_on_complete": mutations,
+            }
+        )
 
         if curr in terminals or ntype == "TERMINAL_EXIT":
             break
         curr = chosen_next
         step_num += 1
 
-    reached_term = len(visited) > 0 and (visited[-1] in terminals or nodes.get(visited[-1], {}).get("node_type") == "TERMINAL_EXIT")
-    prologue_completed = any(m.get("type") == "PrologueCompleted" for m in applied_mutations) or reached_term
+    reached_term = len(visited) > 0 and (
+        visited[-1] in terminals
+        or nodes.get(visited[-1], {}).get("node_type") == "TERMINAL_EXIT"
+    )
+    prologue_completed = (
+        any(m.get("type") == "PrologueCompleted" for m in applied_mutations)
+        or reached_term
+    )
 
     final_state = {
         "prologue_completed": prologue_completed,
@@ -201,24 +216,20 @@ class PlaySuiteContext:
     with_hud: bool = False
 
 
-def play_mod_suite(
-    ctx: PlaySuiteContext | None = None,
-    **kwargs: Any,
-) -> tuple[dict[str, Any], bool]:
-    """执行完整的预检、面板解算、路由装配与批处理推演流程（保持向后兼容）。"""
-    if ctx is None:
-        ctx = PlaySuiteContext(**kwargs)
-
+def play_mod_suite(ctx: PlaySuiteContext) -> tuple[dict[str, Any], bool]:
+    """执行完整的预检、面板解算、路由装配与批处理推演流程。"""
     bundle, fail_transcript = prepare_session(
-        mod_paths=ctx.mod_paths,
-        player_name=ctx.player_name,
-        race_id=ctx.race_id,
-        gender=ctx.gender,
-        origin_id_param=ctx.origin_id_param,
-        trait_pair_param=ctx.trait_pair_param,
-        reroll_nonce=ctx.reroll_nonce,
-        seed=ctx.seed,
-        choice_strategy=ctx.choice_strategy,
+        SessionConfig(
+            mod_paths=ctx.mod_paths,
+            player_name=ctx.player_name,
+            race_id=ctx.race_id,
+            gender=ctx.gender,
+            origin_id_param=ctx.origin_id_param,
+            trait_pair_param=ctx.trait_pair_param,
+            reroll_nonce=ctx.reroll_nonce,
+            seed=ctx.seed,
+            choice_strategy=ctx.choice_strategy,
+        )
     )
     if bundle is None:
         return fail_transcript, False
@@ -254,7 +265,9 @@ def play_mod_suite(
             "ap_max": 10.0,
             "gold": char_sheet.get("initial_gold", 0),
             "potential_stat_points": 0,
-            "current_location_id": bundle.get("context", {}).get("start_location", "FRONTIER_REALM"),
+            "current_location_id": bundle.get("context", {}).get(
+                "start_location", "FRONTIER_REALM"
+            ),
             "active_mode": "single_player",
             "active_modals": [],
             "unread_mail_count": 0,
@@ -271,29 +284,57 @@ def print_transcript_text(transcript: dict[str, Any]) -> None:
     final_st = transcript.get("final_state") or {}
     steps = transcript.get("transcript_steps") or []
 
-    print("==============================================================================")
+    print(
+        "=============================================================================="
+    )
     print("🎮 纯净世界引擎 MOD Agent 试玩推演战报 (Playthrough Transcript)")
-    print("------------------------------------------------------------------------------")
-    print(f"  • 预检结论   : {'PASS (100% 合规)' if precheck.get('valid') else 'FAIL (存在违规)'}")
-    print(f"  • 推演结论   : {'🏆 SUCCESS (通关终态)' if transcript.get('is_success') else '⚠️ FAILED (推演未达成)'}")
-    print(f"  • 角色标识   : {char.get('name')} (种族: {char.get('race')}, 身世: {char.get('origin_name')})")
+    print(
+        "------------------------------------------------------------------------------"
+    )
+    print(
+        f"  • 预检结论   : {'PASS (100% 合规)' if precheck.get('valid') else 'FAIL (存在违规)'}"
+    )
+    print(
+        f"  • 推演结论   : {'🏆 SUCCESS (通关终态)' if transcript.get('is_success') else '⚠️ FAILED (推演未达成)'}"
+    )
+    print(
+        f"  • 角色标识   : {char.get('name')} (种族: {char.get('race')}, 身世: {char.get('origin_name')})"
+    )
     print(f"  • 六维面板   : {char.get('attributes')} (基底: 21 点)")
-    print(f"  • 生存属性   : HP {char.get('hp')}/{char.get('max_hp')} | MP {char.get('mp')}/{char.get('max_mp')} | 负重 {char.get('carry_weight')}")
-    print(f"  • 天赋行囊   : [{char.get('trait_summary')}] | {char.get('starter_kit_name')} (金币: {char.get('initial_gold')})")
-    print(f"  • 激活图元   : {routing.get('target_dag_id')} (来源: {routing.get('routing_source')})")
-    print("------------------------------------------------------------------------------")
+    print(
+        f"  • 生存属性   : HP {char.get('hp')}/{char.get('max_hp')} | MP {char.get('mp')}/{char.get('max_mp')} | 负重 {char.get('carry_weight')}"
+    )
+    print(
+        f"  • 天赋行囊   : [{char.get('trait_summary')}] | {char.get('starter_kit_name')} (金币: {char.get('initial_gold')})"
+    )
+    print(
+        f"  • 激活图元   : {routing.get('target_dag_id')} (来源: {routing.get('routing_source')})"
+    )
+    print(
+        "------------------------------------------------------------------------------"
+    )
     for s in steps:
-        print(f"  [{s.get('step_index')}] {s.get('node_id')} ({s.get('node_type')}) [来源: {s.get('text_source')}]")
+        print(
+            f"  [{s.get('step_index')}] {s.get('node_id')} ({s.get('node_type')}) [来源: {s.get('text_source')}]"
+        )
         if s.get("background_asset") or s.get("bgm_asset"):
             bg_info = s.get("background_asset") or "无"
             bgm_info = s.get("bgm_asset") or "无"
             print(f"      视听绑定: 背景: {bg_info} | BGM: {bgm_info}")
-        print(f"      填充台词: \"{s.get('hydrated_text')}\"")
+        print(f'      填充台词: "{s.get("hydrated_text")}"')
         if s.get("mutations_on_complete"):
-            print(f"      状态突变: {json.dumps(s.get('mutations_on_complete'), ensure_ascii=False)}")
-    print("------------------------------------------------------------------------------")
-    print(f"  🏁 终态节点 : {final_st.get('terminal_node_id')} | 序章完结: {final_st.get('prologue_completed')}")
-    print("==============================================================================")
+            print(
+                f"      状态突变: {json.dumps(s.get('mutations_on_complete'), ensure_ascii=False)}"
+            )
+    print(
+        "------------------------------------------------------------------------------"
+    )
+    print(
+        f"  🏁 终态节点 : {final_st.get('terminal_node_id')} | 序章完结: {final_st.get('prologue_completed')}"
+    )
+    print(
+        "=============================================================================="
+    )
 
 
 def main() -> None:
@@ -303,15 +344,49 @@ def main() -> None:
         description="纯净世界引擎 MOD 全自动端到端试玩推演与战报发生器 (Agent Playtester)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("mod_dirs", nargs="+", help="参与试玩演习的一个或多个 MOD 根目录路径")
-    parser.add_argument("--name", default="阿尔温", dest="player_name", help="模拟角色自定义名称 (默认: 阿尔温)")
-    parser.add_argument("--race", default="HUMAN", dest="race_id", help="模拟角色种族 (默认: HUMAN)")
-    parser.add_argument("--gender", default="FEMALE", dest="gender", help="模拟角色性别 (默认: FEMALE)")
-    parser.add_argument("--origin", default=None, dest="origin_id", help="指定演习创角身世 ID")
-    parser.add_argument("--trait-pair", default=None, dest="trait_pair", help="指定演习因果天赋配对预设 ID")
-    parser.add_argument("--reroll-nonce", type=int, default=0, dest="reroll_nonce", help="六维属性重掷随机数 (默认: 0)")
-    parser.add_argument("--seed", default="PURE_WORLD_SEED_DEFAULT", dest="seed", help="确定性创角与推演种子 (默认: PURE_WORLD_SEED_DEFAULT)")
-    parser.add_argument("--choices", default=None, dest="choices", help="交互分支决策序列 (逗号分隔，如 0,1 或 NODE_ID)")
+    parser.add_argument(
+        "mod_dirs", nargs="+", help="参与试玩演习的一个或多个 MOD 根目录路径"
+    )
+    parser.add_argument(
+        "--name",
+        default="阿尔温",
+        dest="player_name",
+        help="模拟角色自定义名称 (默认: 阿尔温)",
+    )
+    parser.add_argument(
+        "--race", default="HUMAN", dest="race_id", help="模拟角色种族 (默认: HUMAN)"
+    )
+    parser.add_argument(
+        "--gender", default="FEMALE", dest="gender", help="模拟角色性别 (默认: FEMALE)"
+    )
+    parser.add_argument(
+        "--origin", default=None, dest="origin_id", help="指定演习创角身世 ID"
+    )
+    parser.add_argument(
+        "--trait-pair",
+        default=None,
+        dest="trait_pair",
+        help="指定演习因果天赋配对预设 ID",
+    )
+    parser.add_argument(
+        "--reroll-nonce",
+        type=int,
+        default=0,
+        dest="reroll_nonce",
+        help="六维属性重掷随机数 (默认: 0)",
+    )
+    parser.add_argument(
+        "--seed",
+        default="PURE_WORLD_SEED_DEFAULT",
+        dest="seed",
+        help="确定性创角与推演种子 (默认: PURE_WORLD_SEED_DEFAULT)",
+    )
+    parser.add_argument(
+        "--choices",
+        default=None,
+        dest="choices",
+        help="交互分支决策序列 (逗号分隔，如 0,1 或 NODE_ID)",
+    )
     parser.add_argument(
         "--choice-strategy",
         choices=["first", "random", "all-branches"],
@@ -319,15 +394,24 @@ def main() -> None:
         dest="choice_strategy",
         help="交互分支遍历决策策略 (默认: first)",
     )
-    parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 战报")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="输出机器可读的结构化 JSON 战报",
+    )
     parser.add_argument(
         "--interactive",
         action="store_true",
         dest="interactive",
         help="启动长程交互式单步推演会话 (Agent stdio 流式推演)",
     )
-    parser.add_argument("--simulate", action="store_true", dest="simulate", help="启动推演模式（保留与 preview_mod 的参数对称性）")
-    parser.add_argument("--with-hud", action="store_true", dest="with_hud", help="在推演战报中附带初始主页 HUD 快照切片")
+    parser.add_argument(
+        "--with-hud",
+        action="store_true",
+        dest="with_hud",
+        help="在推演战报中附带初始主页 HUD 快照切片",
+    )
 
     args = parser.parse_args()
     paths = [Path(p).resolve() for p in args.mod_dirs]
@@ -343,14 +427,16 @@ def main() -> None:
 
     if args.interactive:
         transcript, is_success = play_mod_interactive(
-            mod_paths=paths,
-            player_name=args.player_name,
-            race_id=args.race_id,
-            gender=args.gender,
-            origin_id_param=args.origin_id,
-            trait_pair_param=args.trait_pair,
-            reroll_nonce=args.reroll_nonce,
-            seed=args.seed,
+            InteractivePlayConfig(
+                mod_paths=paths,
+                player_name=args.player_name,
+                race_id=args.race_id,
+                gender=args.gender,
+                origin_id_param=args.origin_id,
+                trait_pair_param=args.trait_pair,
+                reroll_nonce=args.reroll_nonce,
+                seed=args.seed,
+            )
         )
         if args.as_json:
             print(json.dumps(transcript, ensure_ascii=False))
@@ -358,17 +444,19 @@ def main() -> None:
             print_transcript_text(transcript)
     else:
         transcript, is_success = play_mod_suite(
-            mod_paths=paths,
-            player_name=args.player_name,
-            race_id=args.race_id,
-            gender=args.gender,
-            origin_id_param=args.origin_id,
-            trait_pair_param=args.trait_pair,
-            reroll_nonce=args.reroll_nonce,
-            seed=args.seed,
-            choices_param=args.choices,
-            choice_strategy=args.choice_strategy,
-            with_hud=args.with_hud,
+            PlaySuiteContext(
+                mod_paths=paths,
+                player_name=args.player_name,
+                race_id=args.race_id,
+                gender=args.gender,
+                origin_id_param=args.origin_id,
+                trait_pair_param=args.trait_pair,
+                reroll_nonce=args.reroll_nonce,
+                seed=args.seed,
+                choices_param=args.choices,
+                choice_strategy=args.choice_strategy,
+                with_hud=args.with_hud,
+            )
         )
         if args.as_json:
             print(json.dumps(transcript, ensure_ascii=False, indent=2))
