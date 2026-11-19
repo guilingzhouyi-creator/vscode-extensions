@@ -550,72 +550,34 @@ if ($hasFgCompile) {
 $touchedCode = @($stagedFiles | Where-Object { ($_ -match '\.(ts|js|rs|py|gd)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') })
 $touchedAuditable = @($stagedFiles | Where-Object { ($_ -match '\.(ts|js|py|gd|rs|go|sh|ps1)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') })
 
-$streamRes = Invoke-ChildProcess -FilePath $nodeCmd `
-    -ArgumentList @((Join-Path $repoRoot "scripts/common/gate-differential-bounds.js"), "--stream") `
-    -WorkingDirectory $repoRoot -TimeoutSeconds 180
-
 $streamData = $null
-if ($streamRes.Output) {
-    try {
-        $rawJson = ($streamRes.Output | Where-Object { $_ -match '^\{.*"steps":' }) -join ""
-        if ($rawJson) {
-            $streamData = $rawJson | ConvertFrom-Json
+if ($touchedCode.Count -gt 0 -or $touchedAuditable.Count -gt 0) {
+    $streamTimeout = Get-GateStepTimeout -StepId "STAGED-DIFF-14" -DefaultSeconds 180
+    $streamRes = Invoke-ChildProcess -FilePath $nodeCmd `
+        -ArgumentList @((Join-Path $repoRoot "scripts/common/gate-differential-bounds.js"), "--stream") `
+        -WorkingDirectory $repoRoot -TimeoutSeconds $streamTimeout
+    if ($streamRes.Output) {
+        try {
+            $rawJson = ($streamRes.Output | Where-Object { $_ -match '^\{.*"steps":' }) -join ""
+            if ($rawJson) { $streamData = $rawJson | ConvertFrom-Json }
+        } catch {}
+    }
+    if (-not $streamData -or ($streamRes.ExitCode -ne 0 -and $streamData.passed)) {
+        if ($isMachineMode) {
+            $failSummary = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DIFF-14'])) {
+                $streamData.steps.'STAGED-DIFF-14'.detail
+            } else {
+                "Differential stream gate execution failed with exit code $($streamRes.ExitCode)"
+            }
+            $json = Write-PreCommitFailure -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" `
+                -Summary $failSummary -ActionableFix "Run 'node scripts/common/gate-differential-bounds.js --stream' to inspect output" `
+                -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $touchedAuditable
+            Write-Output $json
+            exit 1
         }
-    } catch {}
-}
-
-if (-not $streamData -or ($streamRes.ExitCode -ne 0 -and $streamData.passed)) {
-    if ($Agent) {
-        $failSummary = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DIFF-14'])) {
-            $streamData.steps.'STAGED-DIFF-14'.detail
-        } else {
-            "Differential stream gate execution failed with exit code $($streamRes.ExitCode)"
-        }
-        $json = Write-PreCommitFailure -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" `
-            -Summary $failSummary -ActionableFix "Run 'node scripts/common/gate-differential-bounds.js --stream' to inspect output" `
-            -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $touchedAuditable
-        Write-Output $json
-        exit 1
+        Write-GateHost "✖ BLOCK  流式质量安全门禁异常退出 (ExitCode: $($streamRes.ExitCode))" -ForegroundColor Red
+        $failed = $true
     }
-    Write-GateHost "✖ BLOCK  流式质量安全门禁异常退出 (ExitCode: $($streamRes.ExitCode))" -ForegroundColor Red
-    $failed = $true
-}
-
-function Write-StreamingFailurePayload {
-    [CmdletBinding()]
-    param(
-        [string]$StepId,
-        [string]$RuleId,
-        [object]$StepData,
-        [string[]]$TargetFiles
-    )
-    $failDetail = if ($StepData -and $StepData.detail) { $StepData.detail } else { "$StepId 审查未通过或未产出数据 (Fail-Closed)" }
-    $failSummary = if ($StepData -and $StepData.summary) { $StepData.summary } else { $failDetail }
-    $json = Write-PreCommitFailure -StepId $StepId -RuleId $RuleId `
-        -Summary $failSummary -ActionableFix $failDetail `
-        -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $TargetFiles
-    Write-Output $json
-    exit 1
-}
-
-function Invoke-StreamingStepReport {
-    [CmdletBinding()]
-    param(
-        [string]$StepId,
-        [string]$RuleId,
-        [object]$StepData,
-        [string[]]$TargetFiles,
-        [string]$DefaultPass
-    )
-    if ($Agent -and (-not $StepData -or $StepData.status -ne "PASS")) {
-        Write-StreamingFailurePayload -StepId $StepId -RuleId $RuleId -StepData $StepData -TargetFiles $TargetFiles
-    }
-    if (-not $StepData -or $StepData.status -ne "PASS") {
-        $failDetail = if ($StepData -and $StepData.detail) { $StepData.detail } else { "$StepId 审查未通过或未产出数据 (Fail-Closed)" }
-        return @{ Status = "BLOCK"; Detail = $failDetail }
-    }
-    $detail = if ($StepData.detail) { $StepData.detail } else { $DefaultPass }
-    return @{ Status = "PASS"; Detail = $detail }
 }
 
 $s11 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-SLICE-11'])) { $streamData.steps.'STAGED-SLICE-11' } else { $null }
@@ -624,62 +586,58 @@ $s13 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.P
 $s14 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DIFF-14'])) { $streamData.steps.'STAGED-DIFF-14' } else { $null }
 
 if ($touchedCode.Count -gt 0) {
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-SLICE-11" }
+    Write-StepBanner -StepId "STAGED-SLICE-11"
     $r11 = Invoke-StreamingStepReport -StepId "STAGED-SLICE-11" -RuleId "GUARD-AST-001" -StepData $s11 -TargetFiles $touchedCode -DefaultPass "暂存区 AST 切片复杂度合规"
-    if ($r11.Status -ne "PASS") { $failed = $true; Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "BLOCK" -Detail $r11.Detail } elseif (-not $Agent) { Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "PASS" -Detail $r11.Detail }
-} elseif (-not $Agent) {
+    if ($r11.Status -ne "PASS") { $failed = $true }
+    Write-StepVerdict -StepId "STAGED-SLICE-11" -Status $(if ($r11.Status -eq "PASS") { "PASS" } else { "BLOCK" }) -Detail $r11.Detail
+} elseif (-not $isMachineMode) {
     Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "SKIP" -Detail "无暂存代码"
 }
 
 if ($touchedAuditable.Count -gt 0) {
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-DENSITY-12" }
+    Write-StepBanner -StepId "STAGED-DENSITY-12"
     $r12 = Invoke-StreamingStepReport -StepId "STAGED-DENSITY-12" -RuleId "VOL-DIL-001" -StepData $s12 -TargetFiles $touchedAuditable -DefaultPass "暂存区代码密度与接线载荷合规"
-    if ($r12.Status -ne "PASS") { $failed = $true; Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "BLOCK" -Detail $r12.Detail } elseif (-not $Agent) { Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "PASS" -Detail $r12.Detail }
+    if ($r12.Status -ne "PASS") { $failed = $true }
+    Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status $(if ($r12.Status -eq "PASS") { "PASS" } else { "BLOCK" }) -Detail $r12.Detail
 
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-VOLUME-13" }
+    Write-StepBanner -StepId "STAGED-VOLUME-13"
     $r13 = Invoke-StreamingStepReport -StepId "STAGED-VOLUME-13" -RuleId "VOL-ELOC-001" -StepData $s13 -TargetFiles $touchedAuditable -DefaultPass "暂存区双轨体积与动态包络合规"
-    if ($r13.Status -ne "PASS") { $failed = $true; Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "BLOCK" -Detail $r13.Detail } elseif (-not $Agent) { Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "PASS" -Detail $r13.Detail }
+    if ($r13.Status -ne "PASS") { $failed = $true }
+    Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status $(if ($r13.Status -eq "PASS") { "PASS" } else { "BLOCK" }) -Detail $r13.Detail
 
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-DIFF-14" }
+    Write-StepBanner -StepId "STAGED-DIFF-14"
     $r14 = Invoke-StreamingStepReport -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" -StepData $s14 -TargetFiles $touchedAuditable -DefaultPass "暂存区五维微分边界与准入周转合规"
-    if ($r14.Status -ne "PASS") { $failed = $true; Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "BLOCK" -Detail $r14.Detail } elseif (-not $Agent) { Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "PASS" -Detail $r14.Detail }
-} elseif (-not $Agent) {
+    if ($r14.Status -ne "PASS") { $failed = $true }
+    Write-StepVerdict -StepId "STAGED-DIFF-14" -Status $(if ($r14.Status -eq "PASS") { "PASS" } else { "BLOCK" }) -Detail $r14.Detail
+} elseif (-not $isMachineMode) {
     Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "SKIP" -Detail "无暂存可审计代码"
     Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "SKIP" -Detail "无暂存可审计代码"
     Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "SKIP" -Detail "无暂存可审计代码"
 }
 
-if ($Agent) {
+$failLog = Join-Path $repoRoot ".audit-logs/last-pre-commit.log"
+$rawLog = if ($failed -and (Test-Path $failLog)) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
+Complete-GateTelemetry -Gate "pre-commit" -Status $(if ($failed) { "BLOCK" } else { "PASS" }) -FilesCount $stagedFiles.Count -RawLogOutput $rawLog
+
+if ($isMachineMode) {
     if ($failed) {
-        $failLog = Join-Path $repoRoot ".audit-logs/last-pre-commit.log"
-        $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
-        Complete-GateTelemetry -Gate "pre-commit" -Status "BLOCK" -FilesCount $stagedFiles.Count -RawLogOutput $rawLog
         $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
-        if (Test-Path $lastFailurePath) {
-            Get-Content $lastFailurePath -Raw
-        }
+        if (Test-Path $lastFailurePath) { Get-Content $lastFailurePath -Raw }
         exit 1
     }
-    Complete-GateTelemetry -Gate "pre-commit" -Status "PASS" -FilesCount $stagedFiles.Count
     Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"All pre-commit hygiene and quality gates passed."}'
     exit 0
 }
 
 Write-GateHost "=================================================================" -ForegroundColor Cyan
 if ($failed) {
-    $failLog = Join-Path $repoRoot ".audit-logs/last-pre-commit.log"
-    $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
-    Complete-GateTelemetry -Gate "pre-commit" -Status "BLOCK" -FilesCount $stagedFiles.Count -RawLogOutput $rawLog
-
     Write-GateHost "✖ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
     Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log" -ForegroundColor Yellow
     Write-GateHost "   (可运行 pwsh -File scripts/ps1/pre-commit-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
     Write-GateHost "   (Agent 消费模式: pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent)" -ForegroundColor Yellow
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
-} else {
-    Complete-GateTelemetry -Gate "pre-commit" -Status "PASS" -FilesCount $stagedFiles.Count
-    Write-GateHost "✔ Pre-Commit 检查通过" -ForegroundColor Green
-    Write-GateHost "=================================================================" -ForegroundColor Cyan
-    exit 0
 }
+Write-GateHost "✔ Pre-Commit 检查通过" -ForegroundColor Green
+Write-GateHost "=================================================================" -ForegroundColor Cyan
+exit 0
