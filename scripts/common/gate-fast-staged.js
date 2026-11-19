@@ -35,7 +35,7 @@ const {
   checkHeadReceipt,
 } = require('./git-env');
 const checks = require('./lib/fast-staged-checks');
-const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent } = checks;
+const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent, validateCommentOnly, collectIndentWidthWarnings } = checks;
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -210,65 +210,6 @@ function getStagedDiff(repoRoot, range = '') {
     stdio: STDIO_PIPE,
     maxBuffer: MAX_DIFF_BUFFER_BYTES,
   });
-}
-
-/**
- * Detects comment-only hollow files after stripping language comment syntax.
- *
- * @param {string} file - Relative file path.
- * @param {string} content - Decoded staged content.
- * @param {Array} violations - Collector array.
- * @returns {void}
- */
-function validateCommentOnly(file, content, violations) {
-  const ext = path.extname(file).toLowerCase();
-  if (!COMMENT_CHECK_EXTENSIONS.has(ext)) return;
-  let text = content;
-  if (ext === '.ps1') text = text.replace(/<#[\s\S]*?#>/g, '');
-  if (HASH_COMMENT_EXTENSIONS.has(ext) || ext === '.ps1') {
-    text = text.replace(/"""[\s\S]*?"""/g, '').replace(/'''[\s\S]*?'''/g, '');
-    text = text.replace(/(^|\n)[ \t]*#.*?(?=\n|$)/g, '\n');
-  } else {
-    text = text.replace(/\/\*[\s\S]*?\*\//g, '');
-    text = text.replace(/(^|\n)[ \t]*\/\/.*?(?=\n|$)/g, '\n');
-  }
-  if (text.trim().length > 0) return;
-  violations.push(
-    createViolation({
-      ruleId: 'HYG-EMP-002',
-      file,
-      message: `发现纯注释空壳文件（剥离注释后无有效代码）: ${file}`,
-      actual: 'comment-only payload',
-      expected: 'executable or type declarations',
-      actionableFix: '补充实质代码或删除该空壳文件',
-    }),
-  );
-}
-
-/**
- * Collects advisory indent-width warnings for TS/JS files (non-blocking).
- *
- * @param {string} file - Relative file path.
- * @param {string} content - Decoded staged content.
- * @param {Array} warnings - Collector array.
- * @returns {void}
- */
-function collectIndentWidthWarnings(file, content, warnings) {
-  const ext = path.extname(file).toLowerCase();
-  const width = INDENT_WIDTH_BY_EXT[ext];
-  if (!width) return;
-  const lines = content.split(/\r?\n/);
-  let reported = 0;
-  for (let index = 0; index < lines.length && reported < MAX_INDENT_WARNINGS_PER_FILE; index += 1) {
-    if (/^\s*(?:\*|\/\/|#)/.test(lines[index])) continue;
-    const previous = index > 0 ? lines[index - 1].trimEnd() : '';
-    if (/[+,[(=?:&|]$/.test(previous)) continue;
-    const match = lines[index].match(/^( +)\S/);
-    if (!match) continue;
-    if (match[1].length % width === 0) continue;
-    warnings.push({ file, line: index + 1, actual: `${match[1].length} spaces`, expected: `multiple of ${width}` });
-    reported += 1;
-  }
 }
 
 function isPlumbingExemptFast(file) {
