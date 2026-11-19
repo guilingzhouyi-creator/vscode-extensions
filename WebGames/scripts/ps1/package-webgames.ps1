@@ -159,9 +159,21 @@ if ($code -eq 0 -and (Test-Path $artifactPath)) {
         exit 1
       }
     }
-    if (Test-Path $sdkOutDir) { Remove-Item -Recurse -Force $sdkOutDir }
-    Copy-Item -Path $sdkSrcDir -Destination $sdkOutDir -Recurse -Force
-    Get-ChildItem -Path $sdkOutDir -Recurse -Directory -Filter "__pycache__" | ForEach-Object { Remove-Item -Recurse -Force $_.FullName }
+    $resolvedOutDir = [System.IO.Path]::GetFullPath($OutDir).TrimEnd('\', '/')
+    $resolvedSdkOutDir = [System.IO.Path]::GetFullPath($sdkOutDir)
+    $expectedSdkOutDir = Join-Path $resolvedOutDir "mod_sdk"
+    if ([string]::IsNullOrWhiteSpace($resolvedSdkOutDir) -or ($resolvedSdkOutDir -ne $expectedSdkOutDir)) {
+      Write-Host "【package-webgames】安全门禁拦截：非法的 mod_sdk 输出路径 ($sdkOutDir)！"
+      exit 1
+    }
+    if (Test-Path -LiteralPath $resolvedSdkOutDir) { Remove-Item -LiteralPath $resolvedSdkOutDir -Recurse -Force }
+    Copy-Item -LiteralPath $sdkSrcDir -Destination $resolvedSdkOutDir -Recurse -Force
+    Get-ChildItem -LiteralPath $resolvedSdkOutDir -Recurse -Directory -Filter "__pycache__" | ForEach-Object {
+      $cacheDir = [System.IO.Path]::GetFullPath($_.FullName)
+      if (-not [string]::IsNullOrWhiteSpace($cacheDir) -and $cacheDir.StartsWith($resolvedSdkOutDir + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -and ((Split-Path -Leaf $cacheDir) -eq "__pycache__")) {
+        Remove-Item -LiteralPath $cacheDir -Recurse -Force
+      }
+    }
     $sdkBundled = $true
   }
 
