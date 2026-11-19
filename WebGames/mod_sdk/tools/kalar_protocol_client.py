@@ -18,6 +18,8 @@ import json
 import sys
 import time
 import uuid
+
+
 @dataclass(slots=True)
 class ProtocolRequestContext:
     """强类型客户端请求信封载荷参数对象 (GOV-DAT-001)。"""
@@ -27,6 +29,7 @@ class ProtocolRequestContext:
     action_type: str = "QUERY"
     payload: Optional[dict[str, Any]] = None
     request_id: str | None = None
+
 
 TOOLS_DIR = Path(__file__).resolve().parent
 MOD_SDK_DIR = TOOLS_DIR.parent
@@ -62,36 +65,63 @@ def validate_client_request_envelope(data: dict[str, Any]) -> tuple[bool, list[s
     if not isinstance(data, dict):
         return False, ["请求信封根节点必须为字典对象"]
 
-    required_keys = ["request_id", "actor_type", "domain", "action_type", "payload", "client_timestamp_ms"]
+    required_keys = [
+        "request_id",
+        "actor_type",
+        "domain",
+        "action_type",
+        "payload",
+        "client_timestamp_ms",
+    ]
     for req in required_keys:
         if req not in data:
             errors.append(f"缺失必需字段: {req}")
 
-    if "request_id" in data and (not isinstance(data["request_id"], str) or len(data["request_id"]) < 1):
+    if "request_id" in data and (
+        not isinstance(data["request_id"], str) or len(data["request_id"]) < 1
+    ):
         errors.append("request_id 必须为非空字符串")
 
     if "actor_type" in data and data["actor_type"] not in ["HUMAN_UI", "AGENT"]:
-        errors.append(f"actor_type 必须为 HUMAN_UI 或 AGENT，实际为: {data['actor_type']}")
+        errors.append(
+            f"actor_type 必须为 HUMAN_UI 或 AGENT，实际为: {data['actor_type']}"
+        )
 
-    if "domain" in data and (not isinstance(data["domain"], str) or len(data["domain"]) < 1):
+    if "domain" in data and (
+        not isinstance(data["domain"], str) or len(data["domain"]) < 1
+    ):
         errors.append("domain 必须为非空字符串")
 
-    if "action_type" in data and (not isinstance(data["action_type"], str) or len(data["action_type"]) < 1):
+    if "action_type" in data and (
+        not isinstance(data["action_type"], str) or len(data["action_type"]) < 1
+    ):
         errors.append("action_type 必须为非空字符串")
 
     if "payload" in data and not isinstance(data["payload"], dict):
         errors.append("payload 必须为字典对象")
 
-    if "lease_nonce" in data and (not isinstance(data["lease_nonce"], int) or data["lease_nonce"] < 0):
+    if "lease_nonce" in data and (
+        not isinstance(data["lease_nonce"], int) or data["lease_nonce"] < 0
+    ):
         errors.append("lease_nonce 必须为非负整数")
 
-    if "client_timestamp_ms" in data and (not isinstance(data["client_timestamp_ms"], int) or data["client_timestamp_ms"] < 0):
+    if "client_timestamp_ms" in data and (
+        not isinstance(data["client_timestamp_ms"], int)
+        or data["client_timestamp_ms"] < 0
+    ):
         errors.append("client_timestamp_ms 必须为非负物理毫秒时间戳")
 
     allowed_keys = {
-        "request_id", "session_token", "account_id", "character_id",
-        "actor_type", "domain", "action_type", "payload",
-        "lease_nonce", "client_timestamp_ms",
+        "request_id",
+        "session_token",
+        "account_id",
+        "character_id",
+        "actor_type",
+        "domain",
+        "action_type",
+        "payload",
+        "lease_nonce",
+        "client_timestamp_ms",
     }
     for k in data.keys():
         if k not in allowed_keys:
@@ -106,7 +136,7 @@ def validate_unified_response_envelope(data: dict[str, Any]) -> tuple[bool, list
     if not isinstance(data, dict):
         return False, ["响应信封根节点必须为字典对象"]
 
-    required_keys = ["request_id", "is_success", "payload", "server_timestamp_ms"]
+    required_keys = ["request_id", "success", "data", "server_timestamp_ms"]
     for req in required_keys:
         if req not in data:
             errors.append(f"缺失必需字段: {req}")
@@ -114,18 +144,26 @@ def validate_unified_response_envelope(data: dict[str, Any]) -> tuple[bool, list
     if "request_id" in data and not isinstance(data["request_id"], str):
         errors.append("request_id 必须为字符串")
 
-    if "is_success" in data and not isinstance(data["is_success"], bool):
-        errors.append("is_success 必须为布尔值")
+    if "success" in data and not isinstance(data["success"], bool):
+        errors.append("success 必须为布尔值")
 
-    if "payload" in data and not isinstance(data["payload"], dict):
-        errors.append("payload 必须为字典对象")
+    if "data" in data and not isinstance(data["data"], dict):
+        errors.append("data 必须为字典对象")
 
-    if "server_timestamp_ms" in data and (not isinstance(data["server_timestamp_ms"], int) or data["server_timestamp_ms"] < 0):
+    if "server_timestamp_ms" in data and (
+        not isinstance(data["server_timestamp_ms"], int)
+        or data["server_timestamp_ms"] < 0
+    ):
         errors.append("server_timestamp_ms 必须为非负物理毫秒时间戳")
 
     allowed_keys = {
-        "request_id", "is_success", "success", "payload", "data",
-        "error_code", "message", "error_message", "causal_delta", "server_timestamp_ms"
+        "request_id",
+        "success",
+        "data",
+        "error_code",
+        "error_message",
+        "causal_delta",
+        "server_timestamp_ms",
     }
     for k in data.keys():
         if k not in allowed_keys:
@@ -182,7 +220,9 @@ class LocalMockDispatcher:
     ) -> None:
         self.capabilities = capabilities or safe_load_json(CAPABILITIES_PATH)
         proto_cfg = self.capabilities.get("unified_protocol_capabilities", {})
-        self.lease_window_ms = int(proto_cfg.get("human_preemption_lease_ms", lease_window_ms))
+        self.lease_window_ms = int(
+            proto_cfg.get("human_preemption_lease_ms", lease_window_ms)
+        )
         self.lease_holder: str = ""
         self.active_lease_nonce: int = 0
         self.human_lease_expiry_ms: int = -100000
@@ -238,10 +278,10 @@ class LocalMockDispatcher:
         if not valid:
             return {
                 "request_id": req_id,
-                "is_success": False,
-                "payload": {},
+                "success": False,
+                "data": {},
                 "error_code": "ERR_INVALID_ENVELOPE",
-                "message": f"请求信封格式不合法: {'; '.join(errors)}",
+                "error_message": f"请求信封格式不合法: {'; '.join(errors)}",
                 "server_timestamp_ms": now,
             }
 
@@ -257,13 +297,13 @@ class LocalMockDispatcher:
             if self.is_lease_active():
                 return {
                     "request_id": req_id,
-                    "is_success": False,
-                    "payload": {
+                    "success": False,
+                    "data": {
                         "lease_holder": self.lease_holder,
                         "remaining_lease_ms": max(0, self.human_lease_expiry_ms - now),
                     },
                     "error_code": "ERR_PREEMPTED_BY_HUMAN",
-                    "message": "Agent 动作被人类前台独占租约拦截",
+                    "error_message": "Agent 动作被人类前台独占租约拦截",
                     "server_timestamp_ms": now,
                 }
         elif actor_type == "HUMAN_UI":
@@ -282,23 +322,23 @@ class LocalMockDispatcher:
         if domain in ["PROLOGUE", "CHARACTER_CREATION", "lifecycle"]:
             return {
                 "request_id": req_id,
-                "is_success": True,
-                "payload": {
+                "success": True,
+                "data": {
                     "domain": domain,
                     "action_type": action_type,
                     "status": "ACCEPTED",
                 },
                 "error_code": "",
-                "message": "OK",
+                "error_message": "OK",
                 "server_timestamp_ms": now,
             }
 
         return {
             "request_id": req_id,
-            "is_success": False,
-            "payload": {},
+            "success": False,
+            "data": {},
             "error_code": "ERR_INVALID_ENVELOPE",
-            "message": f"不支持的目标业务领域: {domain}",
+            "error_message": f"不支持的目标业务领域: {domain}",
             "server_timestamp_ms": now,
         }
 
@@ -323,10 +363,10 @@ class LocalMockDispatcher:
         if action_type not in valid_esc_actions:
             return {
                 "request_id": req_id,
-                "is_success": False,
-                "payload": {},
+                "success": False,
+                "data": {},
                 "error_code": "ERR_INVALID_ESC_ACTION",
-                "message": f"未知的 ESC 系统动作: {action_type}",
+                "error_message": f"未知的 ESC 系统动作: {action_type}",
                 "server_timestamp_ms": now,
             }
 
@@ -334,26 +374,31 @@ class LocalMockDispatcher:
         if payload.get("block_save", False):
             return {
                 "request_id": req_id,
-                "is_success": False,
-                "payload": {"reason": "CombatInProgress"},
+                "success": False,
+                "data": {"reason": "CombatInProgress"},
                 "error_code": "ERR_SAVE_GUARD_BLOCKED",
-                "message": "战斗或关键过渡中禁止保存游戏",
+                "error_message": "战斗或关键过渡中禁止保存游戏",
                 "server_timestamp_ms": now,
             }
 
-        if action_type in ["ESC_SAVE_GAME", "SAVE_AND_QUIT_TO_ARCHIVE", "SAVE_AND_QUIT_TO_GATEWAY", "SAVE_AND_QUIT_DESKTOP"]:
+        if action_type in [
+            "ESC_SAVE_GAME",
+            "SAVE_AND_QUIT_TO_ARCHIVE",
+            "SAVE_AND_QUIT_TO_GATEWAY",
+            "SAVE_AND_QUIT_DESKTOP",
+        ]:
             slot_id = payload.get("slot_id", "SLOT_01")
             return {
                 "request_id": req_id,
-                "is_success": True,
-                "payload": {
+                "success": True,
+                "data": {
                     "save_status": "SUCCESS",
                     "slot_id": slot_id,
                     "saved_bytes": 1024,
                     "saved_at_ms": now,
                 },
                 "error_code": "",
-                "message": "存档成功写入物理快照",
+                "error_message": "存档成功写入物理快照",
                 "server_timestamp_ms": now,
             }
 
@@ -361,25 +406,25 @@ class LocalMockDispatcher:
             self.release_lease()
             return {
                 "request_id": req_id,
-                "is_success": True,
-                "payload": {
+                "success": True,
+                "data": {
                     "nav_target": "GATEWAY_SELECT",
                     "lease_cleared": True,
                 },
                 "error_code": "",
-                "message": "已成功退出到世界档案网关",
+                "error_message": "已成功退出到世界档案网关",
                 "server_timestamp_ms": now,
             }
 
         return {
             "request_id": req_id,
-            "is_success": True,
-            "payload": {
+            "success": True,
+            "data": {
                 "action": action_type,
                 "status": "COMPLETED",
             },
             "error_code": "",
-            "message": "ESC 指令已执行",
+            "error_message": "ESC 指令已执行",
             "server_timestamp_ms": now,
         }
 
@@ -400,26 +445,28 @@ class LocalMockDispatcher:
         if action_type not in supported_directives:
             return {
                 "request_id": req_id,
-                "is_success": False,
-                "payload": {},
+                "success": False,
+                "data": {},
                 "error_code": "ERR_INVALID_ENVELOPE",
-                "message": f"未知的 HUD 指令动作: {action_type}",
+                "error_message": f"未知的 HUD 指令动作: {action_type}",
                 "server_timestamp_ms": now,
             }
 
         # 状态突变逻辑模拟
         if action_type == "ALLOCATE_POTENTIAL_STAT":
-            stat_name = payload.get("stat_name", "STR")
+            _stat_target = str(payload.get("stat_target", "STR"))
             cost = payload.get("points", 1)
             if self.hud_state["potential_stat_points"] >= cost:
                 self.hud_state["potential_stat_points"] -= cost
             else:
                 return {
                     "request_id": req_id,
-                    "is_success": False,
-                    "payload": {"remaining_points": self.hud_state["potential_stat_points"]},
+                    "success": False,
+                    "data": {
+                        "remaining_points": self.hud_state["potential_stat_points"]
+                    },
                     "error_code": "ERR_DESTINY_STAT_BUDGET_EXCEEDED",
-                    "message": "潜能点数不足",
+                    "error_message": "潜能点数不足",
                     "server_timestamp_ms": now,
                 }
 
@@ -434,18 +481,20 @@ class LocalMockDispatcher:
 
         elif action_type == "TOGGLE_MODE_ADAPTATION":
             curr_mode = self.hud_state["active_mode"]
-            self.hud_state["active_mode"] = "multiplayer" if curr_mode == "single_player" else "single_player"
+            self.hud_state["active_mode"] = (
+                "multiplayer" if curr_mode == "single_player" else "single_player"
+            )
 
         return {
             "request_id": req_id,
-            "is_success": True,
-            "payload": {
+            "success": True,
+            "data": {
                 "action": action_type,
                 "applied_at_ms": now,
                 "snapshot": dict(self.hud_state),
             },
             "error_code": "",
-            "message": "HUD 指令已应用",
+            "error_message": "HUD 指令已应用",
             "server_timestamp_ms": now,
         }
 
@@ -468,25 +517,13 @@ class KalarProtocolClient:
         self.session_token: str = f"tok_{uuid.uuid4().hex[:12]}"
         self._lease_counter: int = 1
 
-    def build_request(
-        self,
-        ctx_or_actor: ProtocolRequestContext | str = "HUMAN_UI",
-        *args: Any,
-        **kwargs: Any,
-    ) -> dict[str, Any]:
+    def build_request(self, ctx: ProtocolRequestContext) -> dict[str, Any]:
         """构建强类型客户端请求信封字典。"""
-        if isinstance(ctx_or_actor, ProtocolRequestContext):
-            actor_type = ctx_or_actor.actor_type
-            domain = ctx_or_actor.domain
-            action_type = ctx_or_actor.action_type
-            payload = ctx_or_actor.payload
-            request_id = ctx_or_actor.request_id
-        else:
-            actor_type = ctx_or_actor
-            domain = args[0] if len(args) > 0 else kwargs.get("domain", "")
-            action_type = args[1] if len(args) > 1 else kwargs.get("action_type", "")
-            payload = args[2] if len(args) > 2 else kwargs.get("payload")
-            request_id = args[3] if len(args) > 3 else kwargs.get("request_id")
+        actor_type = ctx.actor_type
+        domain = ctx.domain
+        action_type = ctx.action_type
+        payload = ctx.payload
+        request_id = ctx.request_id
 
         now = self.dispatcher.get_current_time_ms()
         req_id = request_id or f"req_{int(now)}_{uuid.uuid4().hex[:8]}"
@@ -520,31 +557,61 @@ class KalarProtocolClient:
         self, action_type: str, payload: Optional[dict[str, Any]] = None
     ) -> dict[str, Any]:
         """便捷方法：以人类 UI 身份发射 ESC 系统菜单指令。"""
-        req = self.build_request("HUMAN_UI", "ESC_MENU", action_type, payload)
+        req = self.build_request(
+            ProtocolRequestContext(
+                actor_type="HUMAN_UI",
+                domain="ESC_MENU",
+                action_type=action_type,
+                payload=payload,
+            )
+        )
         return self.send(req)
 
     def send_agent_hud_action(
         self, action_type: str, payload: Optional[dict[str, Any]] = None
     ) -> dict[str, Any]:
         """便捷方法：以自主 Agent 身份发射主页 HUD 指令。"""
-        req = self.build_request("AGENT", "HOME_HUD", action_type, payload)
+        req = self.build_request(
+            ProtocolRequestContext(
+                actor_type="AGENT",
+                domain="HOME_HUD",
+                action_type=action_type,
+                payload=payload,
+            )
+        )
         return self.send(req)
 
     def send_human_hud_action(
         self, action_type: str, payload: Optional[dict[str, Any]] = None
     ) -> dict[str, Any]:
         """便捷方法：以人类 UI 身份发射主页 HUD 指令（触发租约续订）。"""
-        req = self.build_request("HUMAN_UI", "HOME_HUD", action_type, payload)
+        req = self.build_request(
+            ProtocolRequestContext(
+                actor_type="HUMAN_UI",
+                domain="HOME_HUD",
+                action_type=action_type,
+                payload=payload,
+            )
+        )
         return self.send(req)
 
 
 def main() -> int:
     """CLI 入口。"""
     ensure_utf8_stdout()
-    parser = argparse.ArgumentParser(description="纯净世界引擎统一协议客户端与离线模拟派发 CLI")
-    parser.add_argument("--actor", choices=["HUMAN_UI", "AGENT"], default="HUMAN_UI", help="操作发起方主体类型")
+    parser = argparse.ArgumentParser(
+        description="纯净世界引擎统一协议客户端与离线模拟派发 CLI"
+    )
+    parser.add_argument(
+        "--actor",
+        choices=["HUMAN_UI", "AGENT"],
+        default="HUMAN_UI",
+        help="操作发起方主体类型",
+    )
     parser.add_argument("--domain", default="ESC_MENU", help="目标业务领域名称")
-    parser.add_argument("--action", default="ESC_QUERY_READINESS", help="具体指令动作类型")
+    parser.add_argument(
+        "--action", default="ESC_QUERY_READINESS", help="具体指令动作类型"
+    )
     parser.add_argument("--payload", default="{}", help="业务载荷 JSON 字符串")
     parser.add_argument("--json", action="store_true", help="以格式化 JSON 输出响应")
     args = parser.parse_args()
@@ -557,22 +624,26 @@ def main() -> int:
 
     client = KalarProtocolClient()
     req = client.build_request(
-        actor_type=args.actor,
-        domain=args.domain,
-        action_type=args.action,
-        payload=payload_dict,
+        ProtocolRequestContext(
+            actor_type=args.actor,
+            domain=args.domain,
+            action_type=args.action,
+            payload=payload_dict,
+        )
     )
     resp = client.send(req)
 
     if args.json:
         print(json.dumps(resp, indent=2, ensure_ascii=False))
     else:
-        status_label = "SUCCESS" if resp.get("is_success") else "FAILED"
-        print(f"[{status_label}] ReqID={resp.get('request_id')} Msg={resp.get('message')} Code={resp.get('error_code', 'NONE')}")
-        if resp.get("payload"):
-            print(f"Payload: {json.dumps(resp['payload'], ensure_ascii=False)}")
+        status_label = "SUCCESS" if resp.get("success") else "FAILED"
+        print(
+            f"[{status_label}] ReqID={resp.get('request_id')} Msg={resp.get('error_message')} Code={resp.get('error_code', 'NONE')}"
+        )
+        if resp.get("data"):
+            print(f"Data: {json.dumps(resp['data'], ensure_ascii=False)}")
 
-    return 0 if resp.get("is_success") else 1
+    return 0 if resp.get("success") else 1
 
 
 if __name__ == "__main__":

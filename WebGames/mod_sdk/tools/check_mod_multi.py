@@ -19,6 +19,8 @@ from check_mod_common import (
     DiagnosticItem,
     normalize_named_items as _normalize_named_items,
 )
+
+
 @dataclass(slots=True)
 class EntityRegistryContext:
     """实体 ID 冲突预检登记上下文 (GOV-DAT-001)。"""
@@ -42,12 +44,14 @@ def check_multi_incompatible_packs(
         pid = rec["pack_id"]
         dir_name = rec["dir_name"]
         if pid in active_ids:
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_DUPLICATE_ID_CONFLICT",
-                file_path=f"{dir_name}/pack.json",
-                detail=f"多包联合加载存在重复的 pack_id '{pid}' ({active_ids[pid]} vs {dir_name})",
-                fix_suggestion="请确保每个启用 MOD 的 pack.json 具有全局唯一的 pack_id",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_MOD_DUPLICATE_ID_CONFLICT",
+                    file_path=f"{dir_name}/pack.json",
+                    detail=f"多包联合加载存在重复的 pack_id '{pid}' ({active_ids[pid]} vs {dir_name})",
+                    fix_suggestion="请确保每个启用 MOD 的 pack.json 具有全局唯一的 pack_id",
+                )
+            )
         else:
             active_ids[pid] = dir_name
 
@@ -65,36 +69,25 @@ def check_multi_incompatible_packs(
             if pair_key in seen_pairs:
                 continue
             seen_pairs.add(pair_key)
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_INCOMPATIBLE_CONFLICT",
-                file_path=f"{dir_name}/pack.json",
-                detail=f"MOD '{pid}' 与已启用的 MOD '{target_id}' 存在 incompatible_packs 互斥冲突",
-                fix_suggestion=f"请禁用互斥包 '{pid}' 或 '{target_id}' 之一，或解除 incompatible_packs 声明",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_MOD_INCOMPATIBLE_CONFLICT",
+                    file_path=f"{dir_name}/pack.json",
+                    detail=f"MOD '{pid}' 与已启用的 MOD '{target_id}' 存在 incompatible_packs 互斥冲突",
+                    fix_suggestion=f"请禁用互斥包 '{pid}' 或 '{target_id}' 之一，或解除 incompatible_packs 声明",
+                )
+            )
 
 
-def register_entity_ids(
-    ctx_or_items: EntityRegistryContext | list[dict[str, Any]],
-    *args: Any,
-    **kwargs: Any,
-) -> None:
+def register_entity_ids(ctx: EntityRegistryContext) -> None:
     """登记自定义实体 ID 并拦截跨包同名撞车。"""
-    if isinstance(ctx_or_items, EntityRegistryContext):
-        items = ctx_or_items.items
-        id_field = ctx_or_items.id_field
-        category_label = ctx_or_items.category_label
-        pack_id = ctx_or_items.pack_id
-        rel_file = ctx_or_items.rel_file
-        seen_registry = ctx_or_items.seen_registry
-        diags = ctx_or_items.diags
-    else:
-        items = ctx_or_items
-        id_field = args[0] if len(args) > 0 else kwargs.get("id_field", "")
-        category_label = args[1] if len(args) > 1 else kwargs.get("category_label", "")
-        pack_id = args[2] if len(args) > 2 else kwargs.get("pack_id", "")
-        rel_file = args[3] if len(args) > 3 else kwargs.get("rel_file", "")
-        seen_registry = args[4] if len(args) > 4 else kwargs.get("seen_registry", {})
-        diags = args[5] if len(args) > 5 else kwargs.get("diags", [])
+    items = ctx.items
+    id_field = ctx.id_field
+    category_label = ctx.category_label
+    pack_id = ctx.pack_id
+    rel_file = ctx.rel_file
+    seen_registry = ctx.seen_registry
+    diags = ctx.diags
 
     for item in items:
         entity_id = item.get(id_field) or item.get("id")
@@ -102,15 +95,17 @@ def register_entity_ids(
             continue
         if entity_id in seen_registry:
             prev_pack, prev_file = seen_registry[entity_id]
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_DUPLICATE_ID_CONFLICT",
-                file_path=rel_file,
-                detail=(
-                    f"跨包同名 {category_label} ID 撞车: '{entity_id}' 同时存在于 "
-                    f"MOD '{prev_pack}' ({prev_file}) 与 MOD '{pack_id}' ({rel_file})"
-                ),
-                fix_suggestion=f"请为 '{entity_id}' 添加模组专属前缀（如 {pack_id.upper()}_{entity_id}）以消除命名冲突",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_MOD_DUPLICATE_ID_CONFLICT",
+                    file_path=rel_file,
+                    detail=(
+                        f"跨包同名 {category_label} ID 撞车: '{entity_id}' 同时存在于 "
+                        f"MOD '{prev_pack}' ({prev_file}) 与 MOD '{pack_id}' ({rel_file})"
+                    ),
+                    fix_suggestion=f"请为 '{entity_id}' 添加模组专属前缀（如 {pack_id.upper()}_{entity_id}）以消除命名冲突",
+                )
+            )
         else:
             seen_registry[entity_id] = (pack_id, rel_file)
 
@@ -132,37 +127,43 @@ def check_multi_duplicate_ids(
         rel_file = f"{rec['dir_name']}/destinies.json"
 
         origins = _normalize_named_items(destiny.get("custom_origins"), "origin_id")
-        register_entity_ids(EntityRegistryContext(
-            items=origins,
-            id_field="origin_id",
-            category_label="origin_id",
-            pack_id=pid,
-            rel_file=rel_file,
-            seen_registry=seen_origins,
-            diags=diags,
-        ))
+        register_entity_ids(
+            EntityRegistryContext(
+                items=origins,
+                id_field="origin_id",
+                category_label="origin_id",
+                pack_id=pid,
+                rel_file=rel_file,
+                seen_registry=seen_origins,
+                diags=diags,
+            )
+        )
 
         traits = _normalize_named_items(destiny.get("custom_traits"), "trait_id")
-        register_entity_ids(EntityRegistryContext(
-            items=traits,
-            id_field="trait_id",
-            category_label="trait_id",
-            pack_id=pid,
-            rel_file=rel_file,
-            seen_registry=seen_traits,
-            diags=diags,
-        ))
+        register_entity_ids(
+            EntityRegistryContext(
+                items=traits,
+                id_field="trait_id",
+                category_label="trait_id",
+                pack_id=pid,
+                rel_file=rel_file,
+                seen_registry=seen_traits,
+                diags=diags,
+            )
+        )
 
         kits = _normalize_named_items(destiny.get("custom_starter_kits"), "kit_id")
-        register_entity_ids(EntityRegistryContext(
-            items=kits,
-            id_field="kit_id",
-            category_label="kit_id",
-            pack_id=pid,
-            rel_file=rel_file,
-            seen_registry=seen_kits,
-            diags=diags,
-        ))
+        register_entity_ids(
+            EntityRegistryContext(
+                items=kits,
+                id_field="kit_id",
+                category_label="kit_id",
+                pack_id=pid,
+                rel_file=rel_file,
+                seen_registry=seen_kits,
+                diags=diags,
+            )
+        )
 
 
 def check_multi_ui_policy_conflicts(
@@ -180,21 +181,26 @@ def check_multi_ui_policy_conflicts(
             if not isinstance(ui_cap, dict):
                 continue
             mode_val = ui_cap.get(mode_key)
-            if isinstance(mode_val, str) and mode_val in ("ALLOW_MANUAL", "FORCE_RANDOM"):
+            if isinstance(mode_val, str) and mode_val in (
+                "ALLOW_MANUAL",
+                "FORCE_RANDOM",
+            ):
                 mode_sources.setdefault(mode_val, []).append(rec["pack_id"])
 
         if "ALLOW_MANUAL" in mode_sources and "FORCE_RANDOM" in mode_sources:
             manual_packs = ", ".join(mode_sources["ALLOW_MANUAL"])
             random_packs = ", ".join(mode_sources["FORCE_RANDOM"])
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_UI_POLICY_CONFLICT",
-                file_path="destinies.json",
-                detail=(
-                    f"多包 UI 策略冲突 ({mode_key}): MOD [{manual_packs}] 要求 ALLOW_MANUAL，"
-                    f"而 MOD [{random_packs}] 要求 FORCE_RANDOM"
-                ),
-                fix_suggestion=f"请将其中一个 MOD 的 ui_capabilities.{mode_key} 调整为 'INHERIT' 或统一策略模式",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_MOD_UI_POLICY_CONFLICT",
+                    file_path="destinies.json",
+                    detail=(
+                        f"多包 UI 策略冲突 ({mode_key}): MOD [{manual_packs}] 要求 ALLOW_MANUAL，"
+                        f"而 MOD [{random_packs}] 要求 FORCE_RANDOM"
+                    ),
+                    fix_suggestion=f"请将其中一个 MOD 的 ui_capabilities.{mode_key} 调整为 'INHERIT' 或统一策略模式",
+                )
+            )
 
 
 def _load_mod_json_for_multi(
@@ -211,18 +217,21 @@ def _load_mod_json_for_multi(
         return loaded if isinstance(loaded, dict) else None
     except (json.JSONDecodeError, OSError) as exc:
         if prefixed_name not in reported_files:
-            all_diags.append(DiagnosticItem(
-                code="ERR_JSON_INVALID",
-                file_path=prefixed_name,
-                detail=f"多包联合预检读取 JSON 失败: {exc}",
-                fix_suggestion=f"请检查 {prefixed_name} 的 UTF-8 编码与 JSON 语法完整性",
-            ))
+            all_diags.append(
+                DiagnosticItem(
+                    code="ERR_JSON_INVALID",
+                    file_path=prefixed_name,
+                    detail=f"多包联合预检读取 JSON 失败: {exc}",
+                    fix_suggestion=f"请检查 {prefixed_name} 的 UTF-8 编码与 JSON 语法完整性",
+                )
+            )
         return None
 
 
 def validate_multi_mods(mod_dirs: list[Path]) -> tuple[bool, list[DiagnosticItem]]:
     """执行多包单包合规检查与跨包联合冲突预检。"""
     from check_mod import validate_mod
+
     all_diags: list[DiagnosticItem] = []
     pack_records: list[dict[str, Any]] = []
 
@@ -230,27 +239,44 @@ def validate_multi_mods(mod_dirs: list[Path]) -> tuple[bool, list[DiagnosticItem
         _, single_diags = validate_mod(mod_dir)
         reported_files: set[str] = set()
         for d in single_diags:
-            prefixed_file = f"{mod_dir.name}/{d.file}" if not d.file.startswith(str(mod_dir)) else d.file
+            prefixed_file = (
+                f"{mod_dir.name}/{d.file}"
+                if not d.file.startswith(str(mod_dir))
+                else d.file
+            )
             reported_files.add(prefixed_file)
-            all_diags.append(DiagnosticItem(d.code, prefixed_file, d.detail, d.fix_suggestion))
+            all_diags.append(
+                DiagnosticItem(d.code, prefixed_file, d.detail, d.fix_suggestion)
+            )
 
         if not mod_dir.is_dir():
             continue
 
-        manifest = _load_mod_json_for_multi(
-            mod_dir / "pack.json", f"{mod_dir.name}/pack.json", reported_files, all_diags
-        ) or {}
+        manifest = (
+            _load_mod_json_for_multi(
+                mod_dir / "pack.json",
+                f"{mod_dir.name}/pack.json",
+                reported_files,
+                all_diags,
+            )
+            or {}
+        )
         destiny = _load_mod_json_for_multi(
-            mod_dir / "destinies.json", f"{mod_dir.name}/destinies.json", reported_files, all_diags
+            mod_dir / "destinies.json",
+            f"{mod_dir.name}/destinies.json",
+            reported_files,
+            all_diags,
         )
 
         pack_id = str(manifest.get("pack_id") or mod_dir.name)
-        pack_records.append({
-            "pack_id": pack_id,
-            "dir_name": mod_dir.name,
-            "manifest": manifest,
-            "destiny": destiny,
-        })
+        pack_records.append(
+            {
+                "pack_id": pack_id,
+                "dir_name": mod_dir.name,
+                "manifest": manifest,
+                "destiny": destiny,
+            }
+        )
 
     if len(pack_records) >= 2:
         check_multi_incompatible_packs(pack_records, all_diags)
