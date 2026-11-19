@@ -40,6 +40,24 @@
     "enable_profiling_hooks": true,
     "high_frequency_warning_threshold_ops": 10000
   },
+  "channel_namespace_aliases": {
+    "config": "infrastructure",
+    "contract_registry": "infrastructure",
+    "cutscene": "infrastructure",
+    "engine": "infrastructure",
+    "event_bus": "infrastructure",
+    "lifecycle": "infrastructure",
+    "version_governance": "infrastructure",
+    "persistence": "persistence_protocol",
+    "character": "account",
+    "opening_narrative": "character_creation",
+    "prologue": "character_creation",
+    "monster": "physics_thermodynamics",
+    "narrative": "narrative_orchestration",
+    "potential": "potential_growth",
+    "quest": "quest_causality",
+    "world": "world_state"
+  },
   "channel_registry": [
     {
       "id": 769,
@@ -92,45 +110,532 @@
     {
       "id": 1283,
       "name": "LOG_RECORD_POSTED",
-      "channel_name": "EventBus.log_record_emitted",
-      "category": "SYSTEM_TELEMETRY"
+      "channel_name": "event_bus.log_record_posted",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
     },
     {
       "id": 1537,
       "name": "NARRATIVE_EVENT_TEXT",
-      "channel_name": "EventBus.narrative_event_emitted",
+      "channel_name": "event_bus.narrative_event_emitted",
       "category": "NARRATIVE_TEXT"
     },
     {
       "id": 1538,
       "name": "DOMAIN_EVENT_GENERIC",
-      "channel_name": "EventBus.domain_event",
-      "category": "NARRATIVE_TEXT"
+      "channel_name": "event_bus.domain_event",
+      "category": "NARRATIVE_TEXT",
+      "narrative": false
     },
     {
       "id": 1539,
       "name": "WORLD_CLOCK_ADVANCED",
-      "channel_name": "EventBus.world_clock_advanced",
-      "category": "NARRATIVE_TEXT",
+      "channel_name": "world_state.clock_phase_ticked",
+      "category": "CORE_STATE",
       "throttle_ms": 50,
       "priority": "NORMAL"
     },
     {
       "id": 1540,
       "name": "PROFESSION_PROMOTED",
-      "channel_name": "EventBus.profession_promoted",
-      "category": "CORE_STATE"
+      "channel_name": "event_bus.profession_promoted",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 257,
+      "name": "COMBAT_HIT_RESOLVED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 258,
+      "name": "COMBAT_ROUND_ADVANCED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 259,
+      "name": "COMBAT_ENTITY_DIED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 513,
+      "name": "SPATIAL_POSITION_CHANGED",
+      "channel_name": "",
+      "category": "SPATIAL_VFX",
+      "narrative": false
+    },
+    {
+      "id": 514,
+      "name": "SPATIAL_COLLISION_CONTACT",
+      "channel_name": "",
+      "category": "SPATIAL_VFX",
+      "narrative": false
+    },
+    {
+      "id": 515,
+      "name": "SPATIAL_TRIGGER_ENTERED",
+      "channel_name": "",
+      "category": "SPATIAL_VFX",
+      "narrative": false
+    },
+    {
+      "id": 517,
+      "name": "SPATIAL_AUDIO_PLAY",
+      "channel_name": "",
+      "category": "SPATIAL_AUDIO",
+      "narrative": false
+    },
+    {
+      "id": 1282,
+      "name": "SYSTEM_TELEMETRY_METRIC",
+      "channel_name": "",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1296,
+      "name": "VERSION_ANNOUNCED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1297,
+      "name": "UPDATE_AUTHORIZED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1298,
+      "name": "UPDATE_PROGRESS_REPORT",
+      "channel_name": "",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1299,
+      "name": "VERSION_ACTIVATED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1300,
+      "name": "VERSION_ROLLBACK_ISSUED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1301,
+      "name": "VERSION_REVOKED",
+      "channel_name": "",
+      "category": "CORE_STATE",
+      "narrative": false
     },
     {
       "id": 1027,
       "name": "LIFECYCLE_SHUTDOWN_STARTED",
       "channel_name": "lifecycle.shutdown_started",
-      "category": "CORE_STATE"
+      "category": "CORE_STATE",
+      "narrative": false
     },
     {
       "id": 1028,
       "name": "LIFECYCLE_TEARDOWN_COMPLETED",
       "channel_name": "lifecycle.teardown_completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1601,
+      "name": "ACCOUNT_SLOT_BOUND",
+      "channel_name": "account.slot_bound",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1602,
+      "name": "ACCOUNT_SLOT_CLEARED",
+      "channel_name": "account.slot_cleared",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1603,
+      "name": "CHARACTER_CREATION_FORGED_FIELDS_DROPPED",
+      "channel_name": "character_creation.forged_fields_dropped",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1604,
+      "name": "CHARACTER_CREATION_COMPLETED",
+      "channel_name": "character_creation.completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1605,
+      "name": "CHARACTER_CREATION_AUTHORITATIVE_COMPLETED",
+      "channel_name": "character_creation.authoritative_completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1606,
+      "name": "GACHA_WISH_PULL_RESOLVED",
+      "channel_name": "gacha_wish.pull_resolved",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1607,
+      "name": "GAME_SETTINGS_UPDATED",
+      "channel_name": "game_settings.updated",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1608,
+      "name": "CONFIG_SECURITY_RELOADED",
+      "channel_name": "config.security_reloaded",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1609,
+      "name": "CONFIG_MOD_OVERLAY_APPLIED",
+      "channel_name": "config.mod_overlay_applied",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1610,
+      "name": "CONFIG_MOD_OVERLAY_CLEARED",
+      "channel_name": "config.mod_overlay_cleared",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1611,
+      "name": "CONFIG_SUBTABLE_RELOADED",
+      "channel_name": "config.subtable_reloaded",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1612,
+      "name": "PROLOGUE_COMPLETED",
+      "channel_name": "prologue.completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1613,
+      "name": "CONTRACT_REGISTRY_BREAKING_CHANGE_PENDING",
+      "channel_name": "contract_registry.breaking_change_pending",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1614,
+      "name": "CONTRACT_REGISTRY_RELOADED",
+      "channel_name": "contract_registry.reloaded",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1615,
+      "name": "LIFECYCLE_PHASE_CHANGED",
+      "channel_name": "lifecycle.phase_changed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1616,
+      "name": "LIFECYCLE_SAVE_COMPLETED",
+      "channel_name": "lifecycle.save_completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1617,
+      "name": "LIFECYCLE_SESSION_REVOKED",
+      "channel_name": "lifecycle.session_revoked",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1618,
+      "name": "LIFECYCLE_SHUTDOWN_COMPLETED",
+      "channel_name": "lifecycle.shutdown_completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1619,
+      "name": "LIFECYCLE_INPUTS_FROZEN",
+      "channel_name": "lifecycle.inputs_frozen",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1620,
+      "name": "LIFECYCLE_LOGOUT_TO_MENU_COMPLETED",
+      "channel_name": "lifecycle.logout_to_menu_completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1621,
+      "name": "MONSTER_KILLED",
+      "channel_name": "monster.killed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1622,
+      "name": "ACCOUNT_SESSION_REVOKED",
+      "channel_name": "account.session_revoked",
+      "category": "CORE_STATE",
+      "narrative": true
+    },
+    {
+      "id": 1623,
+      "name": "WORLD_STATE_MODE_FEATURES_ADAPTED",
+      "channel_name": "world_state.mode_features_adapted",
+      "category": "CORE_STATE",
+      "narrative": true
+    },
+    {
+      "id": 1624,
+      "name": "CONFIG_ALL_TABLES_READY",
+      "channel_name": "config.all_tables_ready",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1625,
+      "name": "POTENTIAL_DYNAMIC_ADJUSTED",
+      "channel_name": "potential.dynamic_adjusted",
+      "category": "CORE_STATE",
+      "narrative": true
+    },
+    {
+      "id": 1626,
+      "name": "LOCALIZATION_I18N_UPDATED",
+      "channel_name": "localization_i18n.updated",
+      "category": "CORE_STATE",
+      "narrative": true
+    },
+    {
+      "id": 1627,
+      "name": "CHARACTER_DEATH",
+      "channel_name": "character.death",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1628,
+      "name": "OPENING_NARRATIVE_TRIGGERED",
+      "channel_name": "opening_narrative.triggered",
+      "category": "NARRATIVE_TEXT",
+      "narrative": false
+    },
+    {
+      "id": 1629,
+      "name": "PROLOGUE_STEP_ADVANCED",
+      "channel_name": "prologue.step_advanced",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1630,
+      "name": "QUEST_REWARD_DISPATCHED",
+      "channel_name": "quest.reward_dispatched",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1631,
+      "name": "WORLD_TIME_ADVANCED",
+      "channel_name": "world.time_advanced",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1632,
+      "name": "WORLD_ENTERED",
+      "channel_name": "world.entered",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1633,
+      "name": "PERSISTENCE_DOMAIN_HOT_RELOADED",
+      "channel_name": "persistence.domain_hot_reloaded",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1634,
+      "name": "CONTRACT_REGISTRY_COMPLETENESS_REPORT",
+      "channel_name": "contract_registry.completeness_report",
+      "category": "SYSTEM_TELEMETRY",
+      "narrative": false
+    },
+    {
+      "id": 1635,
+      "name": "ENGINE_STATE_PUSHED",
+      "channel_name": "engine.state_pushed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1636,
+      "name": "ENGINE_STATE_POPPED",
+      "channel_name": "engine.state_popped",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1637,
+      "name": "ENGINE_STATE_SWITCHED",
+      "channel_name": "engine.state_switched",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1638,
+      "name": "WORLD_BOSS_PHASE_TRANSITION",
+      "channel_name": "world_boss.phase_transition",
+      "category": "CORE_STATE",
+      "narrative": true
+    },
+    {
+      "id": 1639,
+      "name": "CUTSCENE_STARTED",
+      "channel_name": "cutscene.started",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1640,
+      "name": "CUTSCENE_PLAYBACK_PROGRESS",
+      "channel_name": "cutscene.playback_progress",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1641,
+      "name": "CUTSCENE_FINISHED",
+      "channel_name": "cutscene.finished",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1642,
+      "name": "CUTSCENE_SKIPPED",
+      "channel_name": "cutscene.skipped",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1643,
+      "name": "NARRATIVE_DAG_NODE_ACTIVATED",
+      "channel_name": "narrative.dag.node_activated",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1644,
+      "name": "NARRATIVE_DAG_NODE_COMPLETED",
+      "channel_name": "narrative.dag.node_completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1645,
+      "name": "NARRATIVE_DAG_COMPLETED",
+      "channel_name": "narrative.dag.completed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1646,
+      "name": "WORLD_GATEWAY_MODS_PRECHECKED",
+      "channel_name": "world_gateway.mods_prechecked",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1647,
+      "name": "WORLD_GATEWAY_MODS_PURGED",
+      "channel_name": "world_gateway.mods_purged",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1648,
+      "name": "WORLD_GATEWAY_ENTERED",
+      "channel_name": "world_gateway.entered",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1649,
+      "name": "WORLD_GATEWAY_MODE_SELECTED",
+      "channel_name": "world_gateway.mode_selected",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1650,
+      "name": "WORLD_GATEWAY_READY_FOR_ENTRY",
+      "channel_name": "world_gateway.ready_for_entry",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1651,
+      "name": "WORLD_GATEWAY_WORLD_ENTERED",
+      "channel_name": "world_gateway.world_entered",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1652,
+      "name": "WORLD_GATEWAY_PROLOGUE_HANDED_OFF",
+      "channel_name": "world_gateway.prologue_handed_off",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1653,
+      "name": "WORLD_GATEWAY_MEMORY_SCRUBBED",
+      "channel_name": "world_gateway.memory_scrubbed",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1654,
+      "name": "WORLD_GATEWAY_ACCOUNT_LOGGED_OUT",
+      "channel_name": "world_gateway.account_logged_out",
+      "category": "CORE_STATE",
+      "narrative": false
+    },
+    {
+      "id": 1655,
+      "name": "WORLD_GATEWAY_MODE_SWITCHED",
+      "channel_name": "world_gateway.mode_switched",
       "category": "CORE_STATE",
       "narrative": false
     }

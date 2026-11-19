@@ -81,7 +81,7 @@
         "world_state.snapshot_published",
         "world_state.stat_mutated",
         "world_state.wallet_mutated",
-        "EventBus.world_clock_advanced"
+        "world_state.clock_phase_ticked"
       ]
     },
     "link_06_esc_menu_services": {

@@ -5,13 +5,13 @@
   },
   "subscribed_channels": [
     {
-      "channel": "world_state.hud_snapshot_published",
+      "channel": "world_state.snapshot_published",
       "handler": "on_authoritative_snapshot_received",
       "priority": 100,
       "payload_schema": "authoritative_hud_snapshot"
     },
     {
-      "channel": "currency.wallet.mutated",
+      "channel": "world_state.wallet_mutated",
       "handler": "on_wallet_mutated",
       "priority": 90,
       "payload_schema": "wallet_mutation"
