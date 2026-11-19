@@ -9,14 +9,14 @@
  *   - NOMENCLATURE: Zero slang & temporary nomenclature
  *   - VOLUME-BUDGET: Dual-scale volume & dynamic envelope budget (ELOC <= 900, LOC <= 1400)
  *   - SECRET-LEAK: Secret keys & sensitive token leak prevention
- * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path, child_process);
- *   invoked by pre-commit-gate (ps1/sh), pre-push-gate, and CI hygiene workflows.
+ * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path, child_process)
+ *   and lib/fast-staged-checks.js; invoked by pre-commit-gate (ps1/sh), pre-push-gate, and CI.
  * Responsibilities:
  *   1. Rapidly validate staged file physical cleanliness and line ending conventions;
  *   2. Guard against secret token leaks, absolute path disclosures, and non-standard nomenclature;
  *   3. Enforce dual-scale ELOC/LOC volume budgets across staged source files;
  *   4. Emit structured diagnostic console logs and fail-closed exit codes.
- * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on any violation.
+ * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on any violation, 2 on invalid args.
  *   Employs single-pass in-memory stream parsing: the judgement itself measures ~1 ms, while the
  *   end-to-end command costs ~160 ms because a Node process needs ~80 ms to start. Quoting only the
  *   smaller figure would describe a budget the caller never experiences, so both are stated.
@@ -35,33 +35,31 @@ const {
   checkHeadReceipt,
 } = require('./git-env');
 const checks = require('./lib/fast-staged-checks');
-const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent, validateCommentOnly, collectIndentWidthWarnings, validateFileVolume, VIOLATION_TPLS } = checks;
+
 const {
-  evaluateCodeMetrics,
-  classifyCStyleLine,
-  classifyHashStyleLine,
-  classifyPowerShellLine,
-  getLanguageVerbosityFactor,
-} = require('./evaluate-eloc-budget');
+  RULES,
+  SEVERITY_BLOCK,
+  MAX_ELOC_BUDGET,
+  MAX_LOC_BUDGET,
+  DENSITY_RATIO_LIMIT,
+  PLUMBING_RATIO_LIMIT,
+  VIOLATION_TPLS,
+  createViolation,
+  calculateEloc,
+  validateFilenameSlang,
+  isMorphemeValid,
+  validateFilenameSegments,
+  validateFilenameLength,
+  validateFileEol,
+  validateFileBom,
+  validateFileTerminalNewline,
+  validateFileIndent,
+  validateCommentOnly,
+  collectIndentWidthWarnings,
+  validateFileVolume,
+  checkClutterAndRootScript,
+} = checks;
 
-/** Hash-comment languages; mirrors the SSOT classifier's extension set. */
-const HASH_STYLE_EXTS = new Set(['.gd', '.py', '.sh', '.bash']);
-
-const RULE_HYG_NAM_001 = 'HYG-NAM-001';
-const RULE_HYG_EOL_001 = 'HYG-EOL-001';
-const RULE_HYG_EMP_001 = 'HYG-EMP-001';
-const RULE_HYG_CLT_001 = 'HYG-CLT-001';
-const RULE_EXT_DIR_001 = 'EXT-DIR-001';
-const RULE_VOL_ELOC_001 = 'VOL-ELOC-001';
-const RULE_VOL_LOC_001 = 'VOL-LOC-001';
-const RULE_VOL_RATIO_001 = 'VOL-RATIO-001';
-const RULE_ARCH_FAC_001 = 'ARCH-FAC-001';
-const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
-const RULE_SEC_VUL_001 = 'SEC-VUL-001';
-
-const SEVERITY_BLOCK = 'BLOCK';
-const EOL_CRLF = 'CRLF';
-const EOL_LF = 'LF';
 const FAST_STAGED_GATE = 'pre-commit:fast-staged';
 const STATUS_PASS = 'PASS';
 const PROTOCOL_VERSION = '1.0.0';
@@ -74,42 +72,14 @@ const STEP_NAME = 'STAGED-HYGIENE-01';
 const FLAG_AGENT = '--agent';
 const FLAG_JSON = '--json';
 const FLAG_SHORT_A = '-a';
-const RE_EXEMPT_SLANG = /WebGames\/docs\/(?:路线图|归档库)\//;
 
-const MAX_ELOC_BUDGET = 900;
-const MAX_LOC_BUDGET = 1400;
-/**
- * Shared with evaluate-eloc-budget DEFAULT_TARGET_DENSITY_RATIO and
- * validate-code-density DEFAULT_POR_LIMIT. Keeping the numbers identical here
- * prevents a file from passing this fast pre-screen and then failing the
- * downstream volume gates for the same measurement.
- *
- * Operator-facing text below interpolates these constants rather than repeating the
- * figures. A literal in the message would silently disagree with the enforced value the
- * next time either number changes, and the person reading the failure would fix the
- * wrong thing.
- */
-const DENSITY_RATIO_LIMIT = 3.0;
-const PLUMBING_RATIO_LIMIT = 0.6;
 const DENSITY_RATIO_LABEL = DENSITY_RATIO_LIMIT.toFixed(1);
 const PLUMBING_RATIO_LABEL = `${(PLUMBING_RATIO_LIMIT * 100).toFixed(0)}%`;
 
-const MIN_FILENAME_STEM_LENGTH = 3;
-const MAX_FILENAME_STEM_LENGTH = 55;
-const MAX_PATH_LEAK_DISPLAY = 5;
-const MAX_SECRET_LEAK_DISPLAY = 3;
-const BYTE_CR = 0x0d;
-const BYTE_BOM = Object.freeze([0xef, 0xbb, 0xbf]);
-const HASH_COMMENT_EXTENSIONS = new Set(['.gd', '.py', '.sh', '.bash']);
-const COMMENT_CHECK_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.gd', '.py', '.rs', '.sh', '.ps1']);
-const INDENT_WIDTH_BY_EXT = Object.freeze({ '.ts': 4, '.tsx': 4, '.js': 2, '.jsx': 2, '.mjs': 2, '.cjs': 2 });
-const MAX_INDENT_WARNINGS_PER_FILE = 3;
 const BINARY_EXTENSIONS = new Set([
   '.node', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.pdf',
-  '.wasm', '.exe', '.dll', '.so', '.dylib', '.bin', '.zip', '.tar', '.gz', '.7z'
+  '.wasm', '.exe', '.dll', '.so', '.dylib', '.bin', '.zip', '.tar', '.gz', '.7z',
 ]);
-const MAX_FILENAME_SEGMENTS_SRC = 5;
-const MAX_FILENAME_SEGMENTS_TEST = 8;
 
 const SECRET_PATTERN =
   /(?:AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----)/;
@@ -118,14 +88,6 @@ const SECRET_WHITELIST_PATTERN =
 
 const ABS_PATH_PATTERN = /(?:\b[A-Za-z]:[\\/][a-zA-Z0-9_-]+|file:\/\/\/)/;
 const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini)/;
-
-const SLANG_FILENAME_PATTERN = /(?:^|[-_.])(?:temp|wip|new|st\d+|p\d+)(?:[-_.]|$)/i;
-
-const ROOT_DISALLOWED_SCRIPT_EXTS = new Set([
-  '.js', '.ts', '.py', '.sh', '.ps1', '.bat', '.cmd',
-]);
-const CLUTTER_FILE_PATTERN =
-  /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp|.*\.actual\.json|.*\.log)$/i;
 
 const RAW_GATE_SPECS = `EMPTY-FILE|暂存区零空文件与零纯注释空壳检查通过||
 LINE-ENDING|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
@@ -143,15 +105,8 @@ const GATE_SPECS = Object.freeze(
       limit: parts[2] ? parseInt(parts[2], 10) : undefined,
       header: parts[3] || undefined,
     };
-  })
+  }),
 );
-
-
-function getStagedFiles(repoRoot, explicitFiles = []) {
-  // Strict on the index read only: when the caller supplied explicit files there is nothing to
-  // enumerate, and queryStagedFiles returns them before touching Git.
-  return queryStagedFiles(repoRoot, explicitFiles, { strict: true });
-}
 
 function getStagedDiff(repoRoot, range = '') {
   const args = range ? ['diff', '-U0', '--no-color', range] : GIT_DIFF_ARGS;
@@ -162,10 +117,6 @@ function getStagedDiff(repoRoot, range = '') {
     stdio: STDIO_PIPE,
     maxBuffer: MAX_DIFF_BUFFER_BYTES,
   });
-}
-
-function hasViolationForFile(violations, file, ruleId) {
-  return violations.some((v) => v.file === file && v.ruleId === ruleId);
 }
 
 /**
@@ -184,35 +135,33 @@ function validateRootDirectoryHygiene(repoRoot, collectors) {
   for (const ent of entries) {
     if (!ent.isFile()) continue;
     const name = ent.name;
-    if (CLUTTER_FILE_PATTERN.test(name)) {
-      if (!hasViolationForFile(collectors.gate1, name, RULE_HYG_CLT_001)) {
-        const tpl = VIOLATION_TPLS.ROOT_CLUTTER;
-        collectors.gate1.push(
-          createViolation({
-            ruleId: RULE_HYG_CLT_001,
-            file: name,
-            message: `工作区根目录存在未清理的临时日志/脏文件: ${name}`,
-            actual: name,
-            expected: tpl.expected,
-            actionableFix: tpl.actionableFix,
-          }),
-        );
-      }
-    } else if (!name.startsWith('.') && ROOT_DISALLOWED_SCRIPT_EXTS.has(path.extname(name).toLowerCase())) {
-      if (!hasViolationForFile(collectors.gate4, name, RULE_EXT_DIR_001)) {
-        const tpl = VIOLATION_TPLS.ROOT_SCRIPT;
-        collectors.gate4.push(
-          createViolation({
-            ruleId: RULE_EXT_DIR_001,
-            file: name,
-            message: `工作区根目录检测到散落代码脚本: ${name}，违反扩展名即领域架构契约 (EXT-DIR-001)`,
-            actual: name,
-            expected: tpl.expected,
-            actionableFix: tpl.actionableFix,
-          }),
-        );
-      }
-    }
+    checkClutterAndRootScript(
+      name,
+      name,
+      true,
+      collectors,
+      `工作区根目录存在未清理的临时日志/脏文件: ${name}`,
+      `工作区根目录检测到散落代码脚本: ${name}，违反扩展名即领域架构契约 (EXT-DIR-001)`,
+    );
+  }
+}
+
+/**
+ * Reads the target file bytes either from working tree, prefetched batch, or Git index.
+ *
+ * @param {string} repoRoot - Absolute repository root.
+ * @param {string} file - Relative file path.
+ * @param {boolean} useIndex - Whether to read from Git index.
+ * @param {Map<string, Buffer>|null} prefetched - Optional prefetched blob map.
+ * @returns {Buffer|null} File buffer or null when unreadable.
+ */
+function loadTargetBuffer(repoRoot, file, useIndex, prefetched) {
+  try {
+    if (!useIndex) return fs.readFileSync(path.resolve(repoRoot, file));
+    if (prefetched && prefetched.has(file)) return prefetched.get(file);
+    return readStagedBufferSafe(repoRoot, file);
+  } catch {
+    return null;
   }
 }
 
@@ -222,7 +171,12 @@ function validateRootDirectoryHygiene(repoRoot, collectors) {
  * @param {string} repoRoot - Absolute repository root.
  * @param {string} file - Relative file path.
  * @param {object} collectors - Bucket collectors for gate violations.
+ * @param {boolean} useIndex - Whether to read blobs from Git index.
+ * @param {Map<string, Buffer>|null} [prefetched] - Optional preloaded staged buffers.
  */
+const CLUTTER_FILE_PATTERN = /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp|.*\.actual\.json|.*\.log)$/i;
+const getStagedFiles = (repoRoot, explicitFiles = []) => queryStagedFiles(repoRoot, explicitFiles, { strict: true });
+
 function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = null) {
   const normFile = file.replace(/\\/g, '/');
   const baseName = path.basename(normFile);
