@@ -174,69 +174,35 @@ function loadTargetBuffer(repoRoot, file, useIndex, prefetched) {
  * @param {boolean} useIndex - Whether to read blobs from Git index.
  * @param {Map<string, Buffer>|null} [prefetched] - Optional preloaded staged buffers.
  */
-const CLUTTER_FILE_PATTERN = /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp|.*\.actual\.json|.*\.log)$/i;
-const getStagedFiles = (repoRoot, explicitFiles = []) => queryStagedFiles(repoRoot, explicitFiles, { strict: true });
-
 function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = null) {
   const normFile = file.replace(/\\/g, '/');
   const baseName = path.basename(normFile);
   const isRootFile = !normFile.includes('/');
 
-  if (CLUTTER_FILE_PATTERN.test(baseName)) {
-    if (!hasViolationForFile(collectors.gate1, file, RULE_HYG_CLT_001)) {
-      const tpl = VIOLATION_TPLS.ROOT_CLUTTER;
-      collectors.gate1.push(
-        createViolation({
-          ruleId: RULE_HYG_CLT_001,
-          file,
-          message: `暂存区包含临时脏文件/日志: ${file}`,
-          actual: baseName,
-          expected: tpl.expected,
-          actionableFix: tpl.actionableFix,
-        }),
-      );
-    }
+  if (
+    checkClutterAndRootScript(
+      file,
+      baseName,
+      isRootFile,
+      collectors,
+      `暂存区包含临时脏文件/日志: ${file}`,
+      `根目录严禁平铺散落代码脚本 (${file})，违反扩展名即领域架构契约 (EXT-DIR-001)`,
+    )
+  ) {
     return;
-  }
-
-  if (isRootFile && !baseName.startsWith('.') && ROOT_DISALLOWED_SCRIPT_EXTS.has(path.extname(baseName).toLowerCase())) {
-    if (!hasViolationForFile(collectors.gate4, file, RULE_EXT_DIR_001)) {
-      const tpl = VIOLATION_TPLS.ROOT_SCRIPT;
-      collectors.gate4.push(
-        createViolation({
-          ruleId: RULE_EXT_DIR_001,
-          file,
-          message: `根目录严禁平铺散落代码脚本 (${file})，违反扩展名即领域架构契约 (EXT-DIR-001)`,
-          actual: file,
-          expected: tpl.expected,
-          actionableFix: tpl.actionableFix,
-        }),
-      );
-    }
   }
 
   validateFilenameSlang(file, collectors.gate4);
   validateFilenameLength(file, collectors.gate4);
 
-  let buffer;
-  try {
-    if (!useIndex) {
-      buffer = fs.readFileSync(path.resolve(repoRoot, file));
-    } else if (prefetched && prefetched.has(file)) {
-      buffer = prefetched.get(file);
-    } else {
-      buffer = readStagedBufferSafe(repoRoot, file);
-    }
-  } catch {
-    return;
-  }
+  const buffer = loadTargetBuffer(repoRoot, file, useIndex, prefetched);
   if (!buffer) return;
 
   if (buffer.length === 0) {
     const tpl = VIOLATION_TPLS.EMPTY_FILE;
     collectors.gate1.push(
       createViolation({
-        ruleId: RULE_HYG_EMP_001,
+        ruleId: RULES.HYG_EMP_001,
         file,
         message: `发现 0 字节物理空文件: ${file}`,
         actual: tpl.actual,
@@ -248,16 +214,14 @@ function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = nu
   }
 
   const ext = path.extname(file).toLowerCase();
-  if (BINARY_EXTENSIONS.has(ext)) {
-    return;
-  }
+  if (BINARY_EXTENSIONS.has(ext)) return;
 
   const content = buffer.toString(ENCODING_UTF8);
   if (content.trim().length === 0) {
     const tpl = VIOLATION_TPLS.EMPTY_WS;
     collectors.gate1.push(
       createViolation({
-        ruleId: RULE_HYG_EMP_001,
+        ruleId: RULES.HYG_EMP_001,
         file,
         message: `发现仅含空白字符的虚空文件: ${file}`,
         actual: tpl.actual,
@@ -282,23 +246,14 @@ function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = nu
  *
  * @param {string} repoRoot - Absolute repository root.
  * @param {string[]} stagedFiles - List of staged file paths.
+ * @param {boolean} [useIndex=true] - Whether to read blobs from Git index.
  * @returns {object} Aggregated violation buckets.
  */
 function checkFileStream(repoRoot, stagedFiles, useIndex = true) {
-  const collectors = {
-    gate1: [],
-    gate2: [],
-    gate4: [],
-    gate5: [],
-    warnings: [],
-  };
-
+  const collectors = { gate1: [], gate2: [], gate4: [], gate5: [], warnings: [] };
   validateRootDirectoryHygiene(repoRoot, collectors);
 
-  // One `git cat-file --batch` covers every staged blob; the per-file fallback
-  // inside inspectStagedFile then only runs for paths missing from the index.
   const prefetched = useIndex ? readStagedBuffersBatch(repoRoot, stagedFiles) : new Map();
-
   for (const file of stagedFiles) {
     inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched);
   }
@@ -325,9 +280,8 @@ function checkDiffStream(diffText) {
 
   let currentFile = '';
   let currentLine = 0;
-  const lines = diffText.split('\n');
 
-  for (const line of lines) {
+  for (const line of diffText.split('\n')) {
     if (line.startsWith('diff --git ')) {
       const match = line.match(/b\/(.+)$/);
       currentFile = match ? match[1].trim() : '';
@@ -345,15 +299,11 @@ function checkDiffStream(diffText) {
 
     currentLine++;
     const addedContent = line.slice(1);
-
-    if (
-      ABS_PATH_PATTERN.test(addedContent) &&
-      !ABS_PATH_WHITELIST_PATTERN.test(addedContent)
-    ) {
+    if (ABS_PATH_PATTERN.test(addedContent) && !ABS_PATH_WHITELIST_PATTERN.test(addedContent)) {
       const tpl = VIOLATION_TPLS.PATH_LEAK;
       gate3Violations.push(
         createViolation({
-          ruleId: RULE_SEC_LEAK_001,
+          ruleId: RULES.SEC_LEAK_001,
           file: currentFile,
           message: `新增代码包含绝对路径或盘符泄漏: ${addedContent.trim()}`,
           actual: addedContent.trim(),
@@ -364,14 +314,11 @@ function checkDiffStream(diffText) {
       );
     }
 
-    if (
-      SECRET_PATTERN.test(addedContent) &&
-      !SECRET_WHITELIST_PATTERN.test(addedContent)
-    ) {
+    if (SECRET_PATTERN.test(addedContent) && !SECRET_WHITELIST_PATTERN.test(addedContent)) {
       const tpl = VIOLATION_TPLS.SECRET_LEAK;
       gate6Violations.push(
         createViolation({
-          ruleId: RULE_SEC_VUL_001,
+          ruleId: RULES.SEC_VUL_001,
           file: currentFile,
           message: tpl.message,
           actual: tpl.actual,
@@ -391,9 +338,7 @@ function logSingleGateResult(spec, items) {
     console.log(`  ✔  ${spec.id}  ${spec.name}`);
     return;
   }
-  if (spec.header) {
-    console.error(spec.header);
-  }
+  if (spec.header) console.error(spec.header);
   const slice = spec.limit && spec.limit > 0 ? items.slice(0, spec.limit) : items;
   for (const v of slice) {
     const loc = v.file ? `${v.file}${v.line ? ':' + v.line : ''} - ` : '';
@@ -434,16 +379,15 @@ function parseRunArgs(args) {
 /**
  * Collects lease-frozen violations for the staged file set.
  *
- * @param repoRoot - Repository root (unused by the resolver but kept for symmetry).
- * @param stagedFiles - Staged file paths relative to the repository root.
- * @returns Violation records for every staged file owned by a frozen project.
+ * @param {string} repoRoot - Repository root.
+ * @param {string[]} stagedFiles - Staged file paths relative to the repository root.
+ * @returns {Array<object>} Violation records for every staged file owned by a frozen project.
  */
 function collectProjectViolations(repoRoot, stagedFiles) {
   const violations = [];
   try {
     const resolver = require('./project-registry-resolver');
-    const leases = resolver.resolveProjectLeases();
-    for (const lease of leases) {
+    for (const lease of resolver.resolveProjectLeases()) {
       if (lease.status !== 'Frozen') continue;
       const root = (lease.root_path || '').replace(/\\/g, '/').replace(/^\.\/?/, '');
       const hit = root === ''
@@ -467,11 +411,15 @@ function collectProjectViolations(repoRoot, stagedFiles) {
 
 function collectBranchViolations(repoRoot) {
   let gov;
-  try { gov = require('./validate-branch-governance'); } catch (err) {
+  try {
+    gov = require('./validate-branch-governance');
+  } catch (err) {
     if (err && err.code === 'MODULE_NOT_FOUND') return [];
     return [{ ruleId: 'FGT-TOP-001', severity: SEVERITY_BLOCK, file: '.git/HEAD', message: `分支治理模块加载失败（Fail-Closed）: ${err.message}` }];
   }
-  try { return gov.collectCurrentBranchViolation(repoRoot, SEVERITY_BLOCK); } catch (err) {
+  try {
+    return gov.collectCurrentBranchViolation(repoRoot, SEVERITY_BLOCK);
+  } catch (err) {
     return [{ ruleId: 'FGT-TOP-001', severity: SEVERITY_BLOCK, file: '.git/HEAD', message: `分支治理校验失败（Fail-Closed）: ${err.message}` }];
   }
 }
@@ -479,15 +427,22 @@ function collectBranchViolations(repoRoot) {
 /**
  * Reports the empty-staging pass in either agent or human form.
  *
- * @param isAgentMode - Whether the caller wants the structured protocol envelope.
+ * @param {boolean} isAgentMode - Whether the caller wants the structured protocol envelope.
  */
 function reportEmptyStaging(isAgentMode) {
   if (isAgentMode) {
-    const payload = {
-      protocolVersion: PROTOCOL_VERSION, status: STATUS_PASS, gate: FAST_STAGED_GATE,
-      summary: 'Staged area is empty, fast-staged review skipped.',
-    };
-    console.log(JSON.stringify(payload, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          status: STATUS_PASS,
+          gate: FAST_STAGED_GATE,
+          summary: 'Staged area is empty, fast-staged review skipped.',
+        },
+        null,
+        2,
+      ),
+    );
   } else {
     console.log('ℹ️  暂存区无文件变更，跳过 fast-staged 检查。');
   }
@@ -497,16 +452,24 @@ function reportEmptyStaging(isAgentMode) {
 /**
  * Emits the pass verdict in either agent or human form.
  *
- * @param isAgentMode - Whether the caller wants the structured protocol envelope.
- * @param warnings - Indentation warnings collected during the file stream pass.
+ * @param {boolean} isAgentMode - Whether the caller wants the structured protocol envelope.
+ * @param {Array<object>} warnings - Indentation warnings collected during the file stream pass.
  */
 function reportPassingVerdict(isAgentMode, warnings) {
   if (isAgentMode) {
-    const payload = {
-      protocolVersion: PROTOCOL_VERSION, status: STATUS_PASS, gate: FAST_STAGED_GATE,
-      summary: 'All fast-staged hygiene and security checks passed.', warnings: warnings.slice(0, 20),
-    };
-    console.log(JSON.stringify(payload, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          status: STATUS_PASS,
+          gate: FAST_STAGED_GATE,
+          summary: 'All fast-staged hygiene and security checks passed.',
+          warnings: warnings.slice(0, 20),
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
   for (const spec of GATE_SPECS) console.log(`  ✔  ${spec.id}  ${spec.name}`);
@@ -521,17 +484,21 @@ function reportPassingVerdict(isAgentMode, warnings) {
 /**
  * Emits the blocking verdict: snapshot for the workbench, envelope for agents.
  *
- * @param isAgentMode - Whether the caller wants the structured protocol envelope.
- * @param buckets - Violation buckets grouped by the check that produced them.
- * @param warnings - Indentation warnings collected during the file stream pass.
+ * @param {boolean} isAgentMode - Whether the caller wants the structured protocol envelope.
+ * @param {Array<Array<object>>} buckets - Violation buckets grouped by check.
+ * @param {Array<object>} warnings - Indentation warnings collected during the file stream pass.
  */
 function reportBlockingVerdict(isAgentMode, buckets, warnings) {
   const allViolations = buckets.flat();
   const { writeFailureSnapshot } = require('./log-rotator');
   const envelope = {
-    gate: FAST_STAGED_GATE, step: STEP_NAME, failedCommand: SCRIPT_NAME, exitCode: 1,
+    gate: FAST_STAGED_GATE,
+    step: STEP_NAME,
+    failedCommand: SCRIPT_NAME,
+    exitCode: 1,
     summary: `Fast staged check blocked commit due to ${allViolations.length} physical hygiene or security violations.`,
-    violations: allViolations, warnings: warnings.slice(0, 20),
+    violations: allViolations,
+    warnings: warnings.slice(0, 20),
     targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
     verificationCommand: SCRIPT_NAME,
   };
@@ -544,15 +511,17 @@ function reportBlockingVerdict(isAgentMode, buckets, warnings) {
   process.exit(1);
 }
 
+/**
+ * CLI entry point executing the fast staged six-gate stream review.
+ */
 function runFastStaged() {
   const { isAgentMode, range, explicitFiles, useIndex } = parseRunArgs(process.argv.slice(2));
   const repoRoot = path.resolve(__dirname, '../..');
 
   let stagedFiles;
   try {
-    stagedFiles = getStagedFiles(repoRoot, explicitFiles);
+    stagedFiles = queryStagedFiles(repoRoot, explicitFiles, { strict: true });
   } catch (err) {
-    // Fail closed: an unreadable index examined nothing, so the empty-staging PASS below would lie.
     console.error(`✖ BLOCK  STAGED-HYGIENE-01  ${err.message}`);
     process.exit(1);
   }
