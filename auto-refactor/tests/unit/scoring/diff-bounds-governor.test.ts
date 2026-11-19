@@ -27,7 +27,6 @@ import {
     VERDICT_ADMITTED,
     VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
     VERDICT_BLOCK_GAMING_INFLATION,
-    VERDICT_BLOCK_CAPABILITY_EROSION,
     VERDICT_BLOCK_FILE_ADD_OVERFLOW,
     VERDICT_BLOCK_FILE_DEL_OVERFLOW,
     VERDICT_BLOCK_BATCH_ADD_OVERFLOW,
@@ -39,10 +38,19 @@ import {
     MAX_COMMIT_FILE_ADD_NEW_5D_ELOC,
     MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
     MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC,
+    MAX_COMMIT_TEST_FILE_ADD_NEW_ELOC,
+    MAX_COMMIT_TEST_FILE_ADD_EXISTING_ELOC,
+    MAX_COMMIT_TEST_FILE_ADD_REFACTOR_ELOC,
     MAX_COMMIT_FILE_DEL_5D_ELOC,
     MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC,
     MAX_COMMIT_BATCH_ADD_5D_ELOC,
+    MAX_COMMIT_BATCH_REFACTOR_ADD_5D_ELOC,
     MAX_COMMIT_BATCH_DEL_5D_ELOC,
+    TEST_BATCH_WEIGHT,
+    CROSS_FILE_REFACTOR_MIN_DEL_ELOC,
+    CROSS_FILE_REFACTOR_DEL_RATIO,
+    isDiffTestFilePath,
+    hasCrossFileRefactorWitness,
     CACHE_DIRECTORY_NAME,
     ADMISSION_LEDGER_FILENAME,
     type TrajectoryRunPoint,
@@ -66,13 +74,13 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
     /**
      * Test Suite: computeEnvelopeBounds & Line Metrics
      * Invariants Verified:
-     * - Brand new files clamped to MAX_COMMIT_FILE_ADD_NEW_5D_ELOC (180 lines) rather than raw static budget;
+     * - Brand new files clamped to MAX_COMMIT_FILE_ADD_NEW_5D_ELOC (240 lines) rather than raw static budget;
      * - Small baseline files receive MIN_EXPANSION_ALLOWANCE_LOC (60 lines) buffer;
-     * - Large baseline files clamped to MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC (120) and MAX_COMMIT_FILE_DEL_5D_ELOC (100);
+     * - Large baseline files clamped to MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC (180) and MAX_COMMIT_FILE_DEL_5D_ELOC (120);
      * - Substantive line count accurately excludes cosmetic comments and pass/return boilerplate.
      */
     describe('computeEnvelopeBounds & Line Metrics', () => {
-        it('clamps brand new file addition to atomic commit ceiling (180 5D ELOC)', () => {
+        it('clamps brand new file addition to atomic commit ceiling (240 weighted ELOC)', () => {
             const bounds = computeEnvelopeBounds({
                 filePath: 'src/new-feature.ts',
                 oldContent: '',
@@ -104,7 +112,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(bounds.semanticDensity).toBe(1.0);
         });
 
-        it('bounds large files capped at single-file commit ceilings (120 added, 100 deleted)', () => {
+        it('bounds large files capped at single-file commit ceilings (180 added, 120 deleted)', () => {
             const largeLines = Array.from({ length: 600 }, (_, i) => `const x${i} = ${i};`);
             const oldContent = largeLines.join('\n');
             const bounds = computeEnvelopeBounds({
@@ -116,9 +124,9 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 fileLocBudget: 900,
             });
 
-            // 35% of 600 = 210, but clamped to MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC = 120
+            // 35% of 600 = 210, clamped to MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC = 180
             expect(bounds.addMax).toBe(MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC);
-            // 40% of 600 = 240, but clamped to MAX_COMMIT_FILE_DEL_5D_ELOC = 100
+            // 40% of 600 = 240, clamped to MAX_COMMIT_FILE_DEL_5D_ELOC = 120
             expect(bounds.delMax).toBe(MAX_COMMIT_FILE_DEL_5D_ELOC);
         });
 
@@ -145,13 +153,13 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
     /**
      * Test Suite: compute5dElocDelta
      * Invariants Verified:
-     * - Decomposes changes into pure 5D ELOC additions and deletions;
+     * - Decomposes changes into pure weighted ELOC additions and deletions;
      * - Multiplies substantive added lines by token semantic payload ratio (TSPR);
      * - Accurately strips deleted comments and boilerplate passes from deletion metrics;
-     * - Produces net turnover equal to sum of 5D addition and deletion ELOC.
+     * - Produces net turnover equal to sum of weighted addition and deletion ELOC.
      */
     describe('compute5dElocDelta', () => {
-        it('decomposes additions and deletions into pure 5D ELOC metrics', () => {
+        it('decomposes additions and deletions into pure weighted ELOC metrics', () => {
             const addedLines = [
                 '// Comment header',
                 'export function processItem(item: string): number {',
@@ -160,10 +168,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 '}',
                 'pass',
             ];
-            const deletedLines = [
-                '// Old comment',
-                'const oldLegacy = 42;',
-            ];
+            const deletedLines = ['// Old comment', 'const oldLegacy = 42;'];
 
             const delta = compute5dElocDelta({
                 filePath: 'src/service.ts',
@@ -189,13 +194,15 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
      * Invariants Verified:
      * - Allows balanced substantive additions and deletions within single-file envelopes;
      * - Intercepts gaming attempts via low TSPR or low substantive line density;
-     * - Intercepts addition volume exceeding single-file envelopes (180 for new, 120 for existing);
-     * - Intercepts deletion volume exceeding single-file erosion ceilings (100 lines);
+     * - Intercepts addition volume exceeding single-file envelopes (240 for new, 180 for existing);
+     * - Intercepts deletion volume exceeding single-file erosion ceilings (120 lines);
      * - Exempts verified refactorings with equivalent extraction or formal module retirement.
      */
     describe('evaluateDifferentialBounds', () => {
         it('allows well-balanced substantive additions and deletions', () => {
-            const oldContent = Array.from({ length: 100 }, (_, i) => `const val${i} = ${i};`).join('\n');
+            const oldContent = Array.from({ length: 100 }, (_, i) => `const val${i} = ${i};`).join(
+                '\n',
+            );
             const addedLines = [
                 'export function computeAggregate(data: number[]): number {',
                 '    let total = 0;',
@@ -258,7 +265,9 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
 
         it('intercepts addition volume exceeding maximum expansion envelope', () => {
-            const oldContent = Array.from({ length: 850 }, (_, i) => `const x${i} = ${i};`).join('\n');
+            const oldContent = Array.from({ length: 850 }, (_, i) => `const x${i} = ${i};`).join(
+                '\n',
+            );
             // Adding 100 lines to a file with only 50 lines remaining budget (850 / 900)
             const addedLines = Array.from(
                 { length: 100 },
@@ -279,9 +288,9 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(verdict.reason).toContain('exceeds the single-file expansion envelope');
         });
 
-        it('intercepts brand new file exceeding atomic addition ceiling (180 lines)', () => {
+        it('intercepts brand new file exceeding atomic addition ceiling (240 lines)', () => {
             const addedLines = Array.from(
-                { length: 200 },
+                { length: 260 },
                 (_, i) => `export const newEntity${i} = ${i};`,
             );
 
@@ -300,7 +309,10 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
 
         it('intercepts capability erosion when excessive deletions lack compensation', () => {
-            const oldLines = Array.from({ length: 100 }, (_, i) => `const defensiveline${i} = ${i};`);
+            const oldLines = Array.from(
+                { length: 100 },
+                (_, i) => `const defensiveline${i} = ${i};`,
+            );
             const oldContent = oldLines.join('\n');
             // Deleting 60 lines out of 100 (> 40% erosion limit)
             const deletedLines = oldLines.slice(0, 60);
@@ -319,7 +331,10 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
 
         it('exempts large deletions when equivalent extraction or retirement is verified', () => {
-            const oldLines = Array.from({ length: 100 }, (_, i) => `const defensiveline${i} = ${i};`);
+            const oldLines = Array.from(
+                { length: 100 },
+                (_, i) => `const defensiveline${i} = ${i};`,
+            );
             const oldContent = oldLines.join('\n');
             const deletedLines = oldLines.slice(0, 60);
 
@@ -340,9 +355,9 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
     /**
      * Test Suite: evaluateCommitBatchBounds
      * Invariants Verified:
-     * - Admits atomic commit batches within total 5D addition (<= 360) and deletion (<= 280) ceilings;
-     * - Intercepts commit batches exceeding total aggregate 5D addition ceiling (BLOCK_BATCH_ADD_OVERFLOW);
-     * - Intercepts commit batches exceeding total aggregate 5D deletion ceiling (BLOCK_BATCH_DEL_OVERFLOW);
+     * - Admits atomic commit batches within total weighted addition (<= 540) and deletion (<= 360) ceilings;
+     * - Intercepts commit batches exceeding total aggregate weighted addition ceiling (BLOCK_BATCH_ADD_OVERFLOW);
+     * - Intercepts commit batches exceeding total aggregate weighted deletion ceiling (BLOCK_BATCH_DEL_OVERFLOW);
      * - Rejects hollow or cosmetic-only commits failing empirical admission turnover (BLOCKED_INSUFFICIENT_TURNOVER).
      */
     describe('evaluateCommitBatchBounds', () => {
@@ -351,7 +366,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             { timestamp: 2000, netSemanticTurnover: 20.0, gatePassed: true },
         ];
 
-        it('admits commit batch within 5D addition, deletion, and turnover limits', () => {
+        it('admits commit batch within weighted addition, deletion, and turnover limits', () => {
             const validStagedFiles = [
                 {
                     filePath: 'src/mod1.ts',
@@ -390,24 +405,24 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(batchVerdict.total5dTurnover).toBe(48);
         });
 
-        it('intercepts commit batch exceeding aggregate 5D addition ceiling (360 lines)', () => {
+        it('intercepts commit batch exceeding aggregate weighted addition ceiling (540 lines)', () => {
             const oversizedBatch = [
                 {
                     filePath: 'src/part1.ts',
-                    eloc5dAdd: 170,
+                    eloc5dAdd: 220,
                     eloc5dDel: 0,
-                    net5dTurnover: 170,
-                    rawAdd: 175,
+                    net5dTurnover: 220,
+                    rawAdd: 225,
                     rawDel: 0,
                     boundsVerdict: {
                         isAllowed: true,
                         verdictCode: VERDICT_ADMITTED,
                         bounds: {
                             addMin: 0,
-                            addMax: 180,
+                            addMax: 240,
                             delMin: 0,
-                            delMax: 100,
-                            usefulAddedLines: 170,
+                            delMax: 120,
+                            usefulAddedLines: 220,
                             tsprAdded: 0.95,
                             semanticDensity: 0.98,
                         },
@@ -415,6 +430,27 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 },
                 {
                     filePath: 'src/part2.ts',
+                    eloc5dAdd: 200,
+                    eloc5dDel: 0,
+                    net5dTurnover: 200,
+                    rawAdd: 205,
+                    rawDel: 0,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 240,
+                            delMin: 0,
+                            delMax: 120,
+                            usefulAddedLines: 200,
+                            tsprAdded: 0.95,
+                            semanticDensity: 0.98,
+                        },
+                    },
+                },
+                {
+                    filePath: 'src/part3.ts',
                     eloc5dAdd: 150,
                     eloc5dDel: 0,
                     net5dTurnover: 150,
@@ -425,31 +461,10 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                         verdictCode: VERDICT_ADMITTED,
                         bounds: {
                             addMin: 0,
-                            addMax: 180,
+                            addMax: 240,
                             delMin: 0,
-                            delMax: 100,
+                            delMax: 120,
                             usefulAddedLines: 150,
-                            tsprAdded: 0.95,
-                            semanticDensity: 0.98,
-                        },
-                    },
-                },
-                {
-                    filePath: 'src/part3.ts',
-                    eloc5dAdd: 80,
-                    eloc5dDel: 0,
-                    net5dTurnover: 80,
-                    rawAdd: 85,
-                    rawDel: 0,
-                    boundsVerdict: {
-                        isAllowed: true,
-                        verdictCode: VERDICT_ADMITTED,
-                        bounds: {
-                            addMin: 0,
-                            addMax: 180,
-                            delMin: 0,
-                            delMax: 100,
-                            usefulAddedLines: 80,
                             tsprAdded: 0.95,
                             semanticDensity: 0.98,
                         },
@@ -466,26 +481,26 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
 
             expect(batchVerdict.passed).toBe(false);
             expect(batchVerdict.verdictCode).toBe(VERDICT_BLOCK_BATCH_ADD_OVERFLOW);
-            expect(batchVerdict.reason).toContain('exceeds atomic batch ceiling (360)');
+            expect(batchVerdict.reason).toContain('exceeds atomic batch ceiling (540)');
         });
 
-        it('intercepts commit batch exceeding aggregate 5D deletion ceiling (280 lines)', () => {
+        it('intercepts commit batch exceeding aggregate weighted deletion ceiling (360 lines)', () => {
             const destructiveBatch = [
                 {
                     filePath: 'src/del1.ts',
                     eloc5dAdd: 0,
-                    eloc5dDel: 100,
-                    net5dTurnover: 100,
+                    eloc5dDel: 120,
+                    net5dTurnover: 120,
                     rawAdd: 0,
-                    rawDel: 100,
+                    rawDel: 120,
                     boundsVerdict: {
                         isAllowed: true,
                         verdictCode: VERDICT_ADMITTED,
                         bounds: {
                             addMin: 0,
-                            addMax: 180,
+                            addMax: 240,
                             delMin: 0,
-                            delMax: 100,
+                            delMax: 120,
                             usefulAddedLines: 0,
                             tsprAdded: 1.0,
                             semanticDensity: 1.0,
@@ -495,18 +510,18 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 {
                     filePath: 'src/del2.ts',
                     eloc5dAdd: 0,
-                    eloc5dDel: 100,
-                    net5dTurnover: 100,
+                    eloc5dDel: 120,
+                    net5dTurnover: 120,
                     rawAdd: 0,
-                    rawDel: 100,
+                    rawDel: 120,
                     boundsVerdict: {
                         isAllowed: true,
                         verdictCode: VERDICT_ADMITTED,
                         bounds: {
                             addMin: 0,
-                            addMax: 180,
+                            addMax: 240,
                             delMin: 0,
-                            delMax: 100,
+                            delMax: 120,
                             usefulAddedLines: 0,
                             tsprAdded: 1.0,
                             semanticDensity: 1.0,
@@ -516,18 +531,18 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 {
                     filePath: 'src/del3.ts',
                     eloc5dAdd: 0,
-                    eloc5dDel: 90,
-                    net5dTurnover: 90,
+                    eloc5dDel: 130,
+                    net5dTurnover: 130,
                     rawAdd: 0,
-                    rawDel: 90,
+                    rawDel: 130,
                     boundsVerdict: {
                         isAllowed: true,
                         verdictCode: VERDICT_ADMITTED,
                         bounds: {
                             addMin: 0,
-                            addMax: 180,
+                            addMax: 240,
                             delMin: 0,
-                            delMax: 100,
+                            delMax: 360,
                             usefulAddedLines: 0,
                             tsprAdded: 1.0,
                             semanticDensity: 1.0,
@@ -545,7 +560,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
 
             expect(batchVerdict.passed).toBe(false);
             expect(batchVerdict.verdictCode).toBe(VERDICT_BLOCK_BATCH_DEL_OVERFLOW);
-            expect(batchVerdict.reason).toContain('exceeds safe deletion ceiling (280)');
+            expect(batchVerdict.reason).toContain('exceeds safe deletion ceiling (360)');
         });
 
         it('rejects hollow commit batch failing empirical admission turnover', () => {
@@ -734,27 +749,150 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         it('matches unified JSON contract thresholds across Rust/JS/TS bounds', () => {
             expect(INFLATION_SAMPLE_LINE_THRESHOLD).toBe(10);
             expect(DELETION_TURNOVER_WEIGHT).toBe(0.8);
+            expect(TEST_BATCH_WEIGHT).toBe(0.5);
+            expect(CROSS_FILE_REFACTOR_MIN_DEL_ELOC).toBe(30);
+            expect(CROSS_FILE_REFACTOR_DEL_RATIO).toBe(0.6);
             expect(ADMISSION_TURNOVER_FLOOR).toBe(3.0);
             expect(ADMISSION_TURNOVER_CAP).toBe(25.0);
-            expect(MAX_COMMIT_FILE_ADD_NEW_5D_ELOC).toBe(180);
-            expect(MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC).toBe(120);
-            expect(MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC).toBe(180);
-            expect(MAX_COMMIT_FILE_DEL_5D_ELOC).toBe(100);
-            expect(MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC).toBe(280);
+            expect(MAX_COMMIT_FILE_ADD_NEW_5D_ELOC).toBe(240);
+            expect(MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC).toBe(180);
+            expect(MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC).toBe(260);
+            expect(MAX_COMMIT_TEST_FILE_ADD_NEW_ELOC).toBe(360);
+            expect(MAX_COMMIT_TEST_FILE_ADD_EXISTING_ELOC).toBe(260);
+            expect(MAX_COMMIT_TEST_FILE_ADD_REFACTOR_ELOC).toBe(380);
+            expect(MAX_COMMIT_FILE_DEL_5D_ELOC).toBe(120);
+            expect(MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC).toBe(360);
+            expect(MAX_COMMIT_BATCH_ADD_5D_ELOC).toBe(540);
+            expect(MAX_COMMIT_BATCH_REFACTOR_ADD_5D_ELOC).toBe(720);
+            expect(MAX_COMMIT_BATCH_DEL_5D_ELOC).toBe(360);
+            expect(DIFF_BOUNDS_CONTRACT.ledgers.taxisRelative).toBe(
+                '.taxis/telemetry/admission_ledger.ndjson',
+            );
             expect(DIFF_BOUNDS_CONTRACT.schema).toBe('diff-bounds-contract/v1');
         });
 
-        it('widens existing-file addition ceiling to 180 when refactoring deletes > 10 ELOC', () => {
-            const oldLines = Array.from({ length: 400 }, (_, i) => `const existing${i} = ${i};`);
+        it('exports batch bound constants matching scripts/common/diff-bounds-contract.json directly', () => {
+            const contractPath = path.resolve(
+                __dirname,
+                '../../../../scripts/common/diff-bounds-contract.json',
+            );
+            const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+            expect(MAX_COMMIT_BATCH_ADD_5D_ELOC).toBe(contract.batchBands.add.ceiling);
+            expect(MAX_COMMIT_BATCH_REFACTOR_ADD_5D_ELOC).toBe(
+                contract.batchBands.refactorWitnessAddCeiling,
+            );
+            expect(MAX_COMMIT_BATCH_DEL_5D_ELOC).toBe(contract.batchBands.del.ceiling);
+        });
+
+        it('widens existing-file addition ceiling to 260 when refactoring deletes > 10 ELOC', () => {
+            const oldLines = Array.from({ length: 800 }, (_, i) => `const existing${i} = ${i};`);
             const bounds = computeEnvelopeBounds({
                 filePath: 'src/refactor-target.ts',
                 oldContent: oldLines.join('\n'),
                 newContent: oldLines.slice(20).join('\n'),
-                addedLines: Array.from({ length: 130 }, (_, i) => `const next${i} = ${i};`),
+                addedLines: Array.from({ length: 190 }, (_, i) => `const next${i} = ${i};`),
                 deletedLines: oldLines.slice(0, 15),
+                fileLocBudget: 1200,
+            });
+            expect(bounds.addMax).toBe(260);
+        });
+
+        it('classifies test files across canonical JS/TS/Rust patterns and applies testFileAddBands', () => {
+            expect(isDiffTestFilePath('auto-refactor/tests/unit/foo.test.ts')).toBe(true);
+            expect(isDiffTestFilePath('src/__tests__/bar.spec.mts')).toBe(true);
+            expect(isDiffTestFilePath('fractal-git/tests/rust/test_gate.rs')).toBe(true);
+            expect(isDiffTestFilePath('scripts/common/test-gate-guards.js')).toBe(true);
+            expect(isDiffTestFilePath('auto-refactor/scripts/validate-diff.js')).toBe(true);
+            expect(
+                isDiffTestFilePath('auto-refactor/src/core/scoring/diff-bounds-governor.ts'),
+            ).toBe(false);
+
+            const testNewBounds = computeEnvelopeBounds({
+                filePath: 'tests/unit/new-suite.test.ts',
+                oldContent: '',
+                newContent: 'export const x = 1;',
+                addedLines: ['export const x = 1;'],
+                deletedLines: [],
                 fileLocBudget: 900,
             });
-            expect(bounds.addMax).toBe(180);
+            expect(testNewBounds.addMax).toBe(360);
+
+            const junkTestVerdict = evaluateDifferentialBounds({
+                filePath: 'tests/unit/junk.test.ts',
+                oldContent: '',
+                newContent: '// comment\npass\n',
+                addedLines: Array.from({ length: 16 }, () => '// filler comment'),
+                deletedLines: [],
+            });
+            expect(junkTestVerdict.isAllowed).toBe(false);
+            expect(junkTestVerdict.verdictCode).toBe(VERDICT_BLOCK_GAMING_INFLATION);
+        });
+
+        it('weights test-file additions by 0.5 and unlocks 720 batch ceiling on cross-file refactor witness', () => {
+            expect(hasCrossFileRefactorWitness(500, 300)).toBe(true);
+            expect(hasCrossFileRefactorWitness(500, 29)).toBe(false);
+            expect(hasCrossFileRefactorWitness(500, 200)).toBe(false);
+
+            const makeAllowedItem = (filePath: string, eloc5dAdd: number, eloc5dDel: number) => ({
+                filePath,
+                eloc5dAdd,
+                eloc5dDel,
+                net5dTurnover: eloc5dAdd + eloc5dDel * 0.8,
+                rawAdd: eloc5dAdd,
+                rawDel: eloc5dDel,
+                boundsVerdict: {
+                    isAllowed: true,
+                    verdictCode: VERDICT_ADMITTED,
+                    bounds: {
+                        addMin: 0,
+                        addMax: 360,
+                        delMin: 0,
+                        delMax: 360,
+                        usefulAddedLines: eloc5dAdd,
+                        eloc5dAdd,
+                        eloc5dDel,
+                        tsprAdded: 0.95,
+                        semanticDensity: 0.98,
+                    },
+                },
+            });
+
+            // 360 prod + 300 test -> weighted = 360 + 150 = 510 <= 540
+            const weightedPass = evaluateCommitBatchBounds({
+                stagedFiles: [
+                    makeAllowedItem('src/core.ts', 180, 0),
+                    makeAllowedItem('src/helper.ts', 180, 0),
+                    makeAllowedItem('tests/unit/core.test.ts', 300, 0),
+                ],
+                recentRuns: [],
+                currentComplexity: 5,
+                currentEloc: 100,
+            });
+            expect(weightedPass.passed).toBe(true);
+
+            // Cross-file refactor: del=360 >= 30 and 360 >= 600*0.6 -> 720 batch ceiling unlocked
+            const refactorPass = evaluateCommitBatchBounds({
+                stagedFiles: [
+                    makeAllowedItem('src/extracted-a.ts', 250, 0),
+                    makeAllowedItem('src/extracted-b.ts', 250, 0),
+                    makeAllowedItem('src/legacy.ts', 100, 360),
+                ],
+                recentRuns: [],
+                currentComplexity: 5,
+                currentEloc: 100,
+            });
+            expect(refactorPass.passed).toBe(true);
+
+            // Split new file receives refactorWitness ceiling (260) when batch refactor witness applies
+            const splitFileBounds = computeEnvelopeBounds({
+                filePath: 'src/split-part.ts',
+                oldContent: '',
+                newContent: 'export const split = 1;',
+                addedLines: ['export const split = 1;'],
+                deletedLines: [],
+                hasBatchRefactorWitness: true,
+            });
+            expect(splitFileBounds.addMax).toBe(260);
         });
 
         it('enforces sample width 10 and caps empirical admission threshold at 25.0', () => {
@@ -778,22 +916,29 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(twoSamples.threshold).toBe(3.0);
         });
 
-        it('loads trajectory samples from both auto-refactor and taxis telemetry ledgers', () => {
-            const [arLedger, taxisLedger] = resolveAdmissionLedgerPaths(tempDir);
+        it('loads trajectory samples from auto-refactor, .taxis, and legacy .git telemetry ledgers', () => {
+            const [arLedger, taxisLedger, legacyTaxisLedger] = resolveAdmissionLedgerPaths(tempDir);
             fs.mkdirSync(path.dirname(arLedger), { recursive: true });
             fs.mkdirSync(path.dirname(taxisLedger), { recursive: true });
+            fs.mkdirSync(path.dirname(legacyTaxisLedger), { recursive: true });
             fs.writeFileSync(
                 arLedger,
                 `${JSON.stringify({ timestamp: 1, netSemanticTurnover: 9.5, verdict: 'ADMITTED' })}\n`,
             );
             fs.writeFileSync(taxisLedger, `${JSON.stringify({ turnover: 14.0, passed: true })}\n`);
+            fs.writeFileSync(
+                legacyTaxisLedger,
+                `${JSON.stringify({ turnover: 18.0, passed: true })}\n`,
+            );
 
             const loaded = loadAdmissionTrajectoryPoints(tempDir);
-            expect(loaded).toHaveLength(2);
+            expect(loaded).toHaveLength(3);
             expect(loaded[0].netSemanticTurnover).toBe(9.5);
             expect(loaded[0].gatePassed).toBe(true);
             expect(loaded[1].netSemanticTurnover).toBe(14.0);
             expect(loaded[1].gatePassed).toBe(true);
+            expect(loaded[2].netSemanticTurnover).toBe(18.0);
+            expect(loaded[2].gatePassed).toBe(true);
         });
     });
 });
@@ -827,9 +972,9 @@ describe('DiffBoundsGovernor contract loading failures', () => {
 
     it('propagates malformed JSON rather than activating fallback parameters', async () => {
         mockContractRead(() => '{');
-        await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toBeInstanceOf(
-            SyntaxError,
-        );
+        await expect(
+            import('../../../src/core/scoring/diff-bounds-governor'),
+        ).rejects.toBeInstanceOf(SyntaxError);
     });
 
     it('propagates a read failure for a discovered contract', async () => {

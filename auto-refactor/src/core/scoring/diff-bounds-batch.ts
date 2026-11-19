@@ -4,19 +4,25 @@
  * Architecture Role: Evaluates macro-level aggregate bounding envelopes across all staged files
  *   in a single commit batch ([Sigma L_add_max, Sigma L_del_max]), preventing multi-file monolithic
  *   dumps and enforcing atomic decomposition under batch-commit 6-layer topology.
- * Dependencies & Triggers: Consumes diff-bounds-governor; invoked by gate-self-slice and runners.
+ * Dependencies & Triggers: Consumes diff-bounds-contract and diff-bounds-governor;
+ *   invoked by gate-self-slice and runners.
  * Responsibilities:
- *   1. Enforce batch-wide 5D ELOC addition ceiling (Sigma L_add <= 360 lines);
- *   2. Enforce batch-wide 5D ELOC deletion ceiling (Sigma L_del <= 280 lines);
- *   3. Enforce empirical net turnover admission floor (Sigma Delta_5D >= Theta_admission).
+ *   1. Enforce batch-wide weighted ELOC addition ceiling (540 pure growth / 720 cross-file
+ *      refactor, with test files weighted at 0.5);
+ *   2. Enforce batch-wide weighted ELOC deletion ceiling (Sigma L_del <= 360 lines);
+ *   3. Enforce empirical net turnover admission floor (Sigma Delta_net >= Theta_admission).
  * Exit Semantics & Design Rationale: CC <= 15; deterministic math; zero transient allocations;
  *   strict fail-closed verification.
  */
 
+import { DIFF_BOUNDS_CONTRACT } from './diff-bounds-contract';
 import {
     calculateEmpiricalAdmissionThreshold,
     DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
     DELETION_TURNOVER_WEIGHT,
+    hasCrossFileRefactorWitness,
+    isDiffTestFilePath,
+    TEST_BATCH_WEIGHT,
     VERDICT_ADMITTED,
     VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
     type DifferentialVerdictCode,
@@ -24,11 +30,15 @@ import {
     type TrajectoryRunPoint,
 } from './diff-bounds-governor';
 
-/** Maximum aggregated added 5D ELOC allowed across all staged files in a single commit batch. */
-export const MAX_COMMIT_BATCH_ADD_5D_ELOC = 360;
+/** Maximum aggregated added weighted ELOC allowed in a pure-growth commit batch. */
+export const MAX_COMMIT_BATCH_ADD_5D_ELOC = DIFF_BOUNDS_CONTRACT.batchBands.add.ceiling;
 
-/** Maximum aggregated deleted 5D ELOC allowed across all staged files in a single commit batch. */
-export const MAX_COMMIT_BATCH_DEL_5D_ELOC = 280;
+/** Maximum aggregated added weighted ELOC allowed in a refactor-witnessed commit batch. */
+export const MAX_COMMIT_BATCH_REFACTOR_ADD_5D_ELOC =
+    DIFF_BOUNDS_CONTRACT.batchBands.refactorWitnessAddCeiling;
+
+/** Maximum aggregated deleted weighted ELOC allowed across staged files in a commit batch. */
+export const MAX_COMMIT_BATCH_DEL_5D_ELOC = DIFF_BOUNDS_CONTRACT.batchBands.del.ceiling;
 
 /** Verdict code when aggregated commit batch additions exceed the atomic batch ceiling. */
 export const VERDICT_BLOCK_BATCH_ADD_OVERFLOW = 'BLOCK_BATCH_ADD_OVERFLOW';
@@ -78,9 +88,9 @@ export interface CommitBatchVerdict {
  *
  * Enforces:
  * 1. Single-file differential bounds envelopes for all files;
- * 2. Total aggregated 5D added ELOC <= MAX_COMMIT_BATCH_ADD_5D_ELOC (360);
- * 3. Total aggregated 5D deleted ELOC <= MAX_COMMIT_BATCH_DEL_5D_ELOC (280);
- * 4. Total net 5D ELOC turnover >= Theta_admission (empirical threshold).
+ * 2. Total test-weighted added ELOC <= MAX_COMMIT_BATCH_ADD_5D_ELOC (540) or 720 on refactor;
+ * 3. Total aggregated deleted weighted ELOC <= MAX_COMMIT_BATCH_DEL_5D_ELOC (360);
+ * 4. Total net weighted ELOC turnover >= Theta_admission (empirical threshold).
  *
  * @param params - Commit batch inputs.
  * @returns Unified CommitBatchVerdict.
@@ -102,15 +112,21 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
     }
 
     let accumulated5dAdd = 0;
+    let accumulatedWeightedAdd = 0;
     let accumulated5dDel = 0;
     for (let fileIndex = 0; fileIndex < params.stagedFiles.length; fileIndex++) {
         const item = params.stagedFiles[fileIndex];
+        const addWeight = isDiffTestFilePath(item.filePath) ? TEST_BATCH_WEIGHT : 1.0;
         accumulated5dAdd += item.eloc5dAdd;
+        accumulatedWeightedAdd += item.eloc5dAdd * addWeight;
         accumulated5dDel += item.eloc5dDel;
     }
 
     const total5dAdd =
         Math.round(accumulated5dAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+    const weighted5dAdd =
+        Math.round(accumulatedWeightedAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
         DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
     const total5dDel =
         Math.round(accumulated5dDel * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
@@ -121,7 +137,12 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
                 DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
         ) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
-    if (total5dAdd > MAX_COMMIT_BATCH_ADD_5D_ELOC) {
+    const addCeiling = hasCrossFileRefactorWitness(total5dAdd, total5dDel)
+        ? DIFF_BOUNDS_CONTRACT.batchBands.refactorWitnessAddCeiling
+        : DIFF_BOUNDS_CONTRACT.batchBands.add.ceiling;
+    const delCeiling = DIFF_BOUNDS_CONTRACT.batchBands.del.ceiling;
+
+    if (weighted5dAdd > addCeiling) {
         return {
             passed: false,
             verdictCode: VERDICT_BLOCK_BATCH_ADD_OVERFLOW,
@@ -130,12 +151,12 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
             total5dTurnover,
             admissionThreshold: 0,
             reason:
-                `Commit batch total 5D added ELOC (${total5dAdd.toFixed(1)}) exceeds atomic batch ceiling ` +
-                `(${MAX_COMMIT_BATCH_ADD_5D_ELOC}). Decompose using batch-commit 6-layer topology before committing.`,
+                `Commit batch total weighted added ELOC (${weighted5dAdd.toFixed(1)}) exceeds atomic batch ceiling ` +
+                `(${addCeiling}). Decompose using batch-commit 6-layer topology before committing.`,
         };
     }
 
-    if (total5dDel > MAX_COMMIT_BATCH_DEL_5D_ELOC) {
+    if (total5dDel > delCeiling) {
         return {
             passed: false,
             verdictCode: VERDICT_BLOCK_BATCH_DEL_OVERFLOW,
@@ -144,8 +165,8 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
             total5dTurnover,
             admissionThreshold: 0,
             reason:
-                `Commit batch total 5D deleted ELOC (${total5dDel.toFixed(1)}) exceeds safe deletion ceiling ` +
-                `(${MAX_COMMIT_BATCH_DEL_5D_ELOC}). Decompose large refactorings into smaller incremental steps.`,
+                `Commit batch total weighted deleted ELOC (${total5dDel.toFixed(1)}) exceeds safe deletion ceiling ` +
+                `(${delCeiling}). Decompose large refactorings into smaller incremental steps.`,
         };
     }
 
@@ -165,7 +186,7 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
             total5dTurnover,
             admissionThreshold: admission.threshold,
             reason:
-                `Commit batch net 5D ELOC turnover (${total5dTurnover.toFixed(1)}) is below empirical admission threshold ` +
+                `Commit batch net weighted ELOC turnover (${total5dTurnover.toFixed(1)}) is below empirical admission threshold ` +
                 `(${admission.threshold.toFixed(1)}). Hollow or cosmetic-only commits are rejected.`,
         };
     }

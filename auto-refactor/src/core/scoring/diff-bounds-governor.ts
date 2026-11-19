@@ -22,135 +22,11 @@ import { calculateWeightedTokenPayload } from '../intelligence/payload-density';
 import { tokenizeCode } from '../intelligence/token-entropy';
 import { computeStatisticalMoments, type StatisticalMoments } from '../math/descriptive-statistics';
 import { clampRange, safeDivide } from '../math/numerical-corridor';
+import { DIFF_BOUNDS_CONTRACT, type DiffBoundsContractShape } from './diff-bounds-contract';
 
-interface DiffBoundsContractShape {
-    readonly fileAddBands: {
-        readonly newFile: { readonly ceiling: number };
-        readonly existingFile: { readonly ceiling: number };
-        readonly refactorWitness: { readonly ceiling: number };
-    };
-    readonly fileDelBands: {
-        readonly plain: { readonly ceiling: number };
-        readonly witnessed: { readonly ceiling: number };
-    };
-    readonly expansionPolicy: {
-        readonly defaultFileLocBudget: number;
-        readonly minExpansionAllowanceLoc: number;
-        readonly maxExpansionLocRatio: number;
-        readonly minDeletionAllowanceLoc: number;
-        readonly maxDeletionFractionErosion: number;
-        readonly refactorWitnessMinDelEloc: number;
-        readonly witnessCoverageRatio: number;
-    };
-    readonly densityBands: {
-        readonly minPhysAddSampleWidth: number;
-        readonly substantiveRatio: { readonly floor: number; readonly target: number };
-        readonly tspr: { readonly target: number };
-        readonly tsprVouchForDensity: number;
-    };
-    readonly batchBands: {
-        readonly deletionTurnoverWeight: number;
-    };
-    readonly empiricalAdmission: {
-        readonly turnoverFloor: number;
-        readonly turnoverCap: number;
-        readonly minTrajectorySamples: number;
-        readonly trajectoryWindowSize: number;
-        readonly jeffreysPriorAlpha: number;
-        readonly jeffreysPriorBeta: number;
-        readonly jeffreysDefaultPosterior: number;
-        readonly stdDevDiscountFactor: number;
-        readonly maxNoiseCeiling: number;
-    };
-    readonly ledgers: {
-        readonly taxisRelative: string;
-        readonly autoRefactorRelative: string;
-    };
-}
-
-const DEFAULT_DIFF_BOUNDS_CONTRACT: DiffBoundsContractShape = {
-    fileAddBands: {
-        newFile: { ceiling: 180 },
-        existingFile: { ceiling: 120 },
-        refactorWitness: { ceiling: 180 },
-    },
-    fileDelBands: {
-        plain: { ceiling: 100 },
-        witnessed: { ceiling: 280 },
-    },
-    expansionPolicy: {
-        defaultFileLocBudget: 900,
-        minExpansionAllowanceLoc: 60,
-        maxExpansionLocRatio: 0.35,
-        minDeletionAllowanceLoc: 10,
-        maxDeletionFractionErosion: 0.4,
-        refactorWitnessMinDelEloc: 10,
-        witnessCoverageRatio: 0.7,
-    },
-    densityBands: {
-        minPhysAddSampleWidth: 10,
-        substantiveRatio: { floor: 0.45, target: 0.6 },
-        tspr: { target: 0.4 },
-        tsprVouchForDensity: 0.85,
-    },
-    batchBands: {
-        deletionTurnoverWeight: 0.8,
-    },
-    empiricalAdmission: {
-        turnoverFloor: 3.0,
-        turnoverCap: 25.0,
-        minTrajectorySamples: 3,
-        trajectoryWindowSize: 20,
-        jeffreysPriorAlpha: 0.5,
-        jeffreysPriorBeta: 0.5,
-        jeffreysDefaultPosterior: 0.5,
-        stdDevDiscountFactor: 0.5,
-        maxNoiseCeiling: 4.0,
-    },
-    ledgers: {
-        taxisRelative: '.git/telemetry/admission_ledger.ndjson',
-        autoRefactorRelative: '.auto-refactor-cache/admission-turnover-ledger.ndjson',
-    },
-};
-
-/** Validates every required contract leaf before exposing numeric parameters to governance. */
-function matchesContractShape(value: unknown, expected: unknown): boolean {
-    if (typeof expected === 'number') {
-        return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-    }
-    if (typeof expected === 'string') {
-        return typeof value === 'string' && value.trim().length > 0;
-    }
-    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-    const fields = value as Record<string, unknown>;
-    for (const [key, expectedField] of Object.entries(expected as Record<string, unknown>)) {
-        if (!matchesContractShape(fields[key], expectedField)) return false;
-    }
-    return true;
-}
+export { DIFF_BOUNDS_CONTRACT, type DiffBoundsContractShape };
 
 const readUtf8Sync = fs['readFileSync'];
-
-function loadDiffBoundsContract(): DiffBoundsContractShape {
-    const candidatePaths = [
-        path.resolve(__dirname, '../../../../scripts/common/diff-bounds-contract.json'),
-        path.resolve(__dirname, '../../../../../scripts/common/diff-bounds-contract.json'),
-        path.resolve(process.cwd(), 'scripts/common/diff-bounds-contract.json'),
-        path.resolve(process.cwd(), '../scripts/common/diff-bounds-contract.json'),
-    ];
-    const resolvedPath = candidatePaths.find((candidatePath) => fs.existsSync(candidatePath));
-    if (!resolvedPath) return DEFAULT_DIFF_BOUNDS_CONTRACT;
-
-    const raw = readUtf8Sync(resolvedPath, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    if (!matchesContractShape(parsed, DEFAULT_DIFF_BOUNDS_CONTRACT)) {
-        throw new Error('Differential bounds contract has invalid or missing fields.');
-    }
-    return parsed as DiffBoundsContractShape;
-}
-
-/** Loaded differential bounds contract governing commit and diff density budgets. */
-export const DIFF_BOUNDS_CONTRACT: DiffBoundsContractShape = loadDiffBoundsContract();
 
 /** Minimum token semantic payload ratio required for substantive code additions. */
 export const MIN_TSPR_ADDED_THRESHOLD = DIFF_BOUNDS_CONTRACT.densityBands.tspr.target;
@@ -168,8 +44,11 @@ export const TSPR_VOUCH_FOR_DENSITY = DIFF_BOUNDS_CONTRACT.densityBands.tsprVouc
 export const INFLATION_SAMPLE_LINE_THRESHOLD =
     DIFF_BOUNDS_CONTRACT.densityBands.minPhysAddSampleWidth;
 
-/** Weight applied to deleted 5D ELOC in net commit batch turnover. */
+/** Weight applied to deleted weighted ELOC in net commit batch turnover. */
 export const DELETION_TURNOVER_WEIGHT = DIFF_BOUNDS_CONTRACT.batchBands.deletionTurnoverWeight;
+
+/** Weight applied to test-file additions when checking macro batch addition ceiling. */
+export const TEST_BATCH_WEIGHT = DIFF_BOUNDS_CONTRACT.batchBands.testBatchWeight;
 
 /** Max fraction of an existing file's LOC deletable without equivalent compensation. */
 export const MAX_DELETION_FRACTION_EROSION =
@@ -179,9 +58,17 @@ export const MAX_DELETION_FRACTION_EROSION =
 export const MIN_DELETION_ALLOWANCE_LOC =
     DIFF_BOUNDS_CONTRACT.expansionPolicy.minDeletionAllowanceLoc;
 
-/** Deleted 5D ELOC threshold above which existing files receive refactor addition headroom. */
+/** Deleted weighted ELOC threshold above which existing files get refactor headroom. */
 export const REFACTOR_WITNESS_MIN_DEL_ELOC =
     DIFF_BOUNDS_CONTRACT.expansionPolicy.refactorWitnessMinDelEloc;
+
+/** Minimum batch deleted weighted ELOC required for cross-file refactor conservation witness. */
+export const CROSS_FILE_REFACTOR_MIN_DEL_ELOC =
+    DIFF_BOUNDS_CONTRACT.expansionPolicy.crossFileRefactorMinDelEloc;
+
+/** Minimum deletion-to-addition ratio required for cross-file refactor conservation witness. */
+export const CROSS_FILE_REFACTOR_DEL_RATIO =
+    DIFF_BOUNDS_CONTRACT.expansionPolicy.crossFileRefactorDelRatio;
 
 /** Minimum coverage fraction required from replacement additions to witness large deletions. */
 export const WITNESS_COVERAGE_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.witnessCoverageRatio;
@@ -196,25 +83,37 @@ export const MIN_EXPANSION_ALLOWANCE_LOC =
 /** Maximum expansion fraction of current LOC allowed in a single un-decoupled atomic change. */
 export const MAX_EXPANSION_LOC_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.maxExpansionLocRatio;
 
-/** Maximum single-file added 5D ELOC allowed in a single commit for a brand new file. */
+/** Maximum single-file added weighted ELOC allowed in a single commit for a brand new file. */
 export const MAX_COMMIT_FILE_ADD_NEW_5D_ELOC = DIFF_BOUNDS_CONTRACT.fileAddBands.newFile.ceiling;
 
-/** Maximum single-file added 5D ELOC allowed in a single commit for an existing file. */
+/** Maximum single-file added weighted ELOC allowed in a single commit for an existing file. */
 export const MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC =
     DIFF_BOUNDS_CONTRACT.fileAddBands.existingFile.ceiling;
 
-/** Maximum single-file added 5D ELOC allowed when refactoring witness headroom applies. */
+/** Maximum single-file added weighted ELOC allowed when refactoring witness headroom applies. */
 export const MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC =
     DIFF_BOUNDS_CONTRACT.fileAddBands.refactorWitness.ceiling;
 
-/** Maximum single-file deleted 5D ELOC allowed in a single commit without formal retirement. */
+/** Maximum single-file added weighted ELOC allowed for a brand new test file. */
+export const MAX_COMMIT_TEST_FILE_ADD_NEW_ELOC =
+    DIFF_BOUNDS_CONTRACT.testFileAddBands.newFile.ceiling;
+
+/** Maximum single-file added weighted ELOC allowed for an existing test file. */
+export const MAX_COMMIT_TEST_FILE_ADD_EXISTING_ELOC =
+    DIFF_BOUNDS_CONTRACT.testFileAddBands.existingFile.ceiling;
+
+/** Maximum single-file added weighted ELOC allowed for a refactor-witnessed test file. */
+export const MAX_COMMIT_TEST_FILE_ADD_REFACTOR_ELOC =
+    DIFF_BOUNDS_CONTRACT.testFileAddBands.refactorWitness.ceiling;
+
+/** Maximum single-file deleted weighted ELOC allowed in a commit without formal retirement. */
 export const MAX_COMMIT_FILE_DEL_5D_ELOC = DIFF_BOUNDS_CONTRACT.fileDelBands.plain.ceiling;
 
-/** Maximum single-file deleted 5D ELOC allowed in one commit with a refactor witness. */
+/** Maximum single-file deleted weighted ELOC allowed in one commit with a refactor witness. */
 export const MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC =
     DIFF_BOUNDS_CONTRACT.fileDelBands.witnessed.ceiling;
 
-/** Minimum substantive useful 5D turnover required for admission. */
+/** Minimum substantive useful weighted turnover required for admission. */
 export const MIN_SUBSTANTIVE_TURNOVER_FLOOR = 1.0;
 
 /** Mathematical floor for minimum admission turnover (based on AST block minimum depth). */
@@ -316,6 +215,7 @@ export interface DifferentialBoundsParams {
     readonly fileLocBudget?: number;
     readonly hasEquivalentExtraction?: boolean;
     readonly isFormalRetirement?: boolean;
+    readonly hasBatchRefactorWitness?: boolean;
 }
 
 /**
@@ -345,7 +245,7 @@ export interface DifferentialBoundsVerdict {
 }
 
 /**
- * Decomposed 5D ELOC differential metrics for a single file.
+ * Decomposed weighted ELOC differential metrics for a single file.
  */
 export interface File5dElocDelta {
     readonly filePath: string;
@@ -475,6 +375,41 @@ export function countUsefulAddedLines(addedLines: readonly string[]): number {
     return substantiveLineCount;
 }
 
+const DIFF_TEST_FILE_PATTERNS: readonly RegExp[] = [
+    /(^|\/)(tests?|__tests__)\//,
+    /\.(test|spec)\.[cm]?[jt]sx?$/,
+    /(^|\/)test_[^/]+\.(rs|gd|py)$/,
+    /^scripts\/common\/test-[^/]+\.js$/,
+    /^auto-refactor\/scripts\/validate-[^/]+\.js$/,
+];
+
+/**
+ * Classifies whether a file path belongs to the dedicated test-file track across JS/TS/Rust.
+ *
+ * @param filePath - Repository-relative or POSIX/Windows file path.
+ * @returns True when the file matches test-track conventions.
+ */
+export function isDiffTestFilePath(filePath: string): boolean {
+    if (!filePath) return false;
+    const normalized = filePath.replace(/\\/g, '/').replace(/^(?:\.\/)+/, '');
+    return DIFF_TEST_FILE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * Reports whether batch-level deletions witness cross-file refactor conservation.
+ *
+ * @param totalElocAdd - Total added weighted ELOC across the batch.
+ * @param totalElocDel - Total deleted weighted ELOC across the batch.
+ * @returns True when deletions satisfy both the absolute floor and conservation ratio.
+ */
+export function hasCrossFileRefactorWitness(totalElocAdd: number, totalElocDel: number): boolean {
+    if (!Number.isFinite(totalElocAdd) || !Number.isFinite(totalElocDel)) return false;
+    return (
+        totalElocDel >= CROSS_FILE_REFACTOR_MIN_DEL_ELOC &&
+        totalElocDel >= totalElocAdd * CROSS_FILE_REFACTOR_DEL_RATIO
+    );
+}
+
 /**
  * Computes upper and lower bounding envelopes for file modification.
  *
@@ -489,6 +424,9 @@ export function computeEnvelopeBounds(
         .filter((line) => line.trim().length > 0).length;
     const fileLocBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
     const isNewFile = originalLineCount === 0;
+    const addBands = isDiffTestFilePath(params.filePath)
+        ? DIFF_BOUNDS_CONTRACT.testFileAddBands
+        : DIFF_BOUNDS_CONTRACT.fileAddBands;
 
     // 1. Measure addition payload density first so deletions can calibrate refactor headroom
     const usefulAddedLines = countUsefulAddedLines(params.addedLines);
@@ -505,11 +443,16 @@ export function computeEnvelopeBounds(
     const hasRefactorWitness = Boolean(
         params.hasEquivalentExtraction ||
         params.isFormalRetirement ||
+        params.hasBatchRefactorWitness ||
         usefulDeletedLines > REFACTOR_WITNESS_MIN_DEL_ELOC,
     );
     const addCommitCeiling = hasRefactorWitness
-        ? MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC
-        : MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC;
+        ? addBands.refactorWitness.ceiling
+        : addBands.existingFile.ceiling;
+    const newFileCeiling =
+        params.hasBatchRefactorWitness || params.hasEquivalentExtraction
+            ? addBands.refactorWitness.ceiling
+            : addBands.newFile.ceiling;
 
     // 2. Addition envelope bounds (decoupled from static budget, clamped to atomic batch ceiling)
     const maxExpansionByRatio = Math.max(
@@ -518,7 +461,7 @@ export function computeEnvelopeBounds(
     );
     const remainingBudget = Math.max(0, fileLocBudget - originalLineCount);
     const additionUpperBound = isNewFile
-        ? Math.min(fileLocBudget, MAX_COMMIT_FILE_ADD_NEW_5D_ELOC)
+        ? Math.min(fileLocBudget, newFileCeiling)
         : hasRefactorWitness
           ? Math.min(remainingBudget, addCommitCeiling)
           : Math.min(addCommitCeiling, Math.min(remainingBudget, maxExpansionByRatio));
@@ -556,13 +499,13 @@ export function computeEnvelopeBounds(
 }
 
 /**
- * Computes pure 5D ELOC additions, deletions, and net turnover for a file change.
+ * Computes pure weighted ELOC additions, deletions, and net turnover for a file change.
  *
  * Excludes cosmetic comments, blanks, boilerplate passes, and relocated lines,
  * scaling additions by token semantic payload ratio (TSPR).
  *
  * @param params - File differential parameters.
- * @returns Decomposed 5D ELOC delta metrics.
+ * @returns Decomposed weighted ELOC delta metrics.
  */
 export function compute5dElocDelta(params: DifferentialBoundsParams): File5dElocDelta {
     const bounds = computeEnvelopeBounds(params);
@@ -628,7 +571,7 @@ function checkAdditionInflation(
         return {
             verdictCode: VERDICT_BLOCK_FILE_ADD_OVERFLOW,
             reason:
-                `Addition 5D ELOC volume (${bounds.eloc5dAdd.toFixed(1)} lines) exceeds the single-file expansion envelope ` +
+                `Addition weighted ELOC volume (${bounds.eloc5dAdd.toFixed(1)} lines) exceeds the single-file expansion envelope ` +
                 `(${bounds.addMax} lines). Modularize into smaller decoupled components before integrating.`,
         };
     }
@@ -658,7 +601,7 @@ function checkCapabilityErosion(
     return {
         verdictCode: VERDICT_BLOCK_FILE_DEL_OVERFLOW,
         reason:
-            `Deletion 5D ELOC volume (${bounds.eloc5dDel} lines) exceeds safe single-file erosion ceiling ` +
+            `Deletion weighted ELOC volume (${bounds.eloc5dDel} lines) exceeds safe single-file erosion ceiling ` +
             `(${bounds.delMax} lines)${isWitnessed ? '' : ' without verified equivalent module extraction or formal retirement'}.`,
     };
 }
@@ -832,6 +775,7 @@ export function resolveAdmissionLedgerPaths(workspaceRoot?: string): readonly st
     return [
         path.join(root, DIFF_BOUNDS_CONTRACT.ledgers.autoRefactorRelative),
         path.join(root, DIFF_BOUNDS_CONTRACT.ledgers.taxisRelative),
+        path.join(root, DIFF_BOUNDS_CONTRACT.ledgers.taxisLegacyRelative),
     ];
 }
 
