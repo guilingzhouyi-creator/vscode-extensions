@@ -62,3 +62,14 @@ Load `scripts/ps1/lib/gate-runtime.ps1` (PowerShell) or `scripts/sh/lib/gate-run
 3. **PID-Isolated Step Logs & Cleanup**: Concurrent gates must never share a fixed log path:
    - **PowerShell (`$PID`)**: Allocate `step-$PID.log` / `step-$PID.err.log` and remove in `try { ... } finally { Remove-Item ... }`.
    - **Bash (`$$` / `mktemp`)**: Allocate `step-$$.log` (or `mktemp`) and clean up via `trap 'rm -f "$STEP_LOG"' EXIT`.
+
+### Step Timeouts & Single-Source Failure Envelope
+
+New gate scripts must never hardcode step timeout literals or hand-roll `.audit-logs/last-failure.json` payloads:
+
+- **Registry Timeouts (`Get-GateStepTimeout` / `get_step_timeout`)**: Read `timeoutSeconds` from `scripts/common/gate-step-registry.json` with a default fallback:
+  - PowerShell: `$timeoutSec = Get-GateStepTimeout -StepId "STEP-ID" -DefaultSeconds 60`
+  - Bash: `TIMEOUT_SEC=$(get_step_timeout "STEP-ID" 60)`
+- **Single-Source Failure Envelope (`Write-GateFailureEnvelope` / `gate_write_failure_envelope`)**: Delegate to `node scripts/common/gate-failure-contract.js --write-envelope` (`scripts/common/lib/gate-envelope-cli.js`) for ANSI stripping, drive-letter path sanitization, and atomic `.audit-logs/last-failure.json` persistence:
+  - PowerShell: `Write-GateFailureEnvelope -Gate "pre-push" -StepId "STEP-ID" -ExitCode 1 -Command $cmd -Summary $msg`
+  - Bash: `gate_write_failure_envelope --gate "pre-push" --step-id "STEP-ID" --exit-code 1 --command "$cmd" --summary "$msg"`
