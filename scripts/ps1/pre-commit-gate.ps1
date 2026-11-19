@@ -3,19 +3,22 @@
 # 文件路径: scripts/ps1/pre-commit-gate.ps1
 # 架构定位: 本地 Git 提交前置物理卫生与质量安全门禁 (Windows PowerShell)
 # 依赖与触发: 触发方: .githooks/pre-commit / 本地 CLI 手动触发 | 上游: git commit | 下游: 提交暂存区 | 运行时: PowerShell 7+
-# 职责说明: 执行提交前物理卫生与质量安全检查（挂载 gate-fast-staged.js 极速流式验证 Gates 1-6、规则漂移熔断、精准增量编译、AST 局部切片，支持 Agent-Native 结构化输出）
+# 职责说明: 执行提交前物理卫生与质量安全检查（挂载 gate-fast-staged.js 极速流式验证、规则漂移熔断、精准增量编译、AST 局部切片，支持 Agent/JSON 结构化输出）
 # 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在卫生或质量违规阻断 | 设计依据: AGENTS.md 跨项目全局通用契约
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   pwsh -File scripts/ps1/pre-commit-gate.ps1
 #   pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent
-#   pwsh -File scripts/ps1/pre-commit-gate.ps1 -ViewLog
+#   pwsh -File scripts/ps1/pre-commit-gate.ps1 -Json
+#   pwsh -File scripts/ps1/pre-commit-gate.ps1 -Help
 # ==============================================================================
 [CmdletBinding()]
 param(
     [switch]$ViewLog,
     [switch]$Agent,
-    [switch]$Fast
+    [switch]$Json,
+    [switch]$Fast,
+    [switch]$Help
 )
 Set-StrictMode -Version Latest
 
@@ -28,12 +31,24 @@ $PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
+if ($Help) {
+    Write-Output "用法: pwsh -File scripts/ps1/pre-commit-gate.ps1 [-Agent] [-Json] [-Fast] [-ViewLog] [-Help]"
+    Write-Output "选项:"
+    Write-Output "  -Agent    以 Agent-Native JSON 信封格式输出校验结果"
+    Write-Output "  -Json     以 JSON 格式输出校验结果 (与 -Agent 等价)"
+    Write-Output "  -Fast     快速模式标记"
+    Write-Output "  -ViewLog  查看最近一次失败日志"
+    Write-Output "  -Help     显示此帮助信息"
+    exit 0
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+$isMachineMode = [bool]($Agent -or $Json)
 
 # 步骤身份、环境隔离、工具探测与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
 $script:GateRepoRoot = $repoRoot
 $script:GateEntryId = 'pre-commit'
-$script:GateSuppressOutput = [bool]$Agent
+$script:GateSuppressOutput = $isMachineMode
 . (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
 Initialize-GateGitIsolation -RepoRoot $repoRoot
 
@@ -57,14 +72,12 @@ if (-not $npmCmd) {
     exit 1
 }
 
-
 if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
     exit $LASTEXITCODE
 }
 
 $runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
-
 
 # 步骤身份只来自单源登记表：未知标识直接抛错，绝不回落到合成标识。
 function Write-PreCommitFailure {
@@ -85,7 +98,6 @@ function Write-PreCommitFailure {
     }
     $stepMeta = Resolve-StepMeta -StepId $StepId
 
-
     $diagDir = Join-Path $repoRoot ".audit-logs"
     if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
     $failLog = Join-Path $diagDir "last-pre-commit.log"
@@ -95,7 +107,7 @@ function Write-PreCommitFailure {
         $diagLines.Add("=================================================================")
         $diagLines.Add("❌ Pre-Commit 门禁拦截现场快照")
         $diagLines.Add("时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
-        $diagLines.Add("步骤: $StepName ($RuleId)")
+        $diagLines.Add("步骤: $($stepMeta.Id) ($RuleId)")
         $diagLines.Add("说明: $Summary")
         if ($Details) {
             $diagLines.Add("-----------------------------------------------------------------")
@@ -105,55 +117,16 @@ function Write-PreCommitFailure {
         [System.IO.File]::WriteAllLines($failLog, $diagLines, [System.Text.UTF8Encoding]::new($false))
     } catch {}
 
-    $violation = [ordered]@{
-        ruleId = $RuleId
-        severity = "BLOCK"
-        message = $Summary
-        actionableFix = $ActionableFix
-        verificationCommand = $VerifyCmd
-    }
-    if ($TargetFiles -and $TargetFiles.Count -gt 0) {
-        $violation.file = $TargetFiles[0]
-    }
-
-    $envelope = [ordered]@{
-        protocolVersion = "1.0.0"
-        runId = $runId
-        recordedAt = (Get-Date).ToString("o")
-        status = "BLOCK"
-        gate = "pre-commit"
-        step = $StepName
-        stepId = $StepId
-        failedCommand = $VerifyCmd
-        exitCode = 1
-        summary = $Summary
-        logFile = ".audit-logs/last-pre-commit.log"
-        violations = @($violation)
-        agentDirectives = [ordered]@{
-            targetFiles = if ($TargetFiles) { $TargetFiles } else { @() }
-            remediationPriority = @($RuleId)
-            verificationCommand = $VerifyCmd
-            fastRecheckCommand = "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent"
-        }
-    }
-
-    $snapshotJson = $envelope | ConvertTo-Json -Depth 5
-    try {
-        [System.IO.File]::WriteAllText((Join-Path $diagDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
-    } catch {}
-
-    return $snapshotJson
+    return (Write-GateFailureEnvelope -Gate "pre-commit" -StepId $StepId -StepTitle $stepMeta.Title `
+        -RuleId $RuleId -ExitCode 1 -RunId $runId -Command $VerifyCmd -Summary $Summary `
+        -ActionableFix $ActionableFix -VerifyCmd $VerifyCmd `
+        -FastRecheck "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent" `
+        -TargetFiles $TargetFiles -LogFile ".audit-logs/last-pre-commit.log" -PassThru)
 }
 
 <#
 .SYNOPSIS
     启动子进程并把双流收进临时文件，超出预算即级联终止。
-.DESCRIPTION
-    早期实现执行 scriptblock，无法把工作目录与命令行安全交给子进程，因此没有任何超时上限：
-    一次挂起的 npm 或 vitest 会让提交无限阻塞。这里改为显式 FilePath + ArgumentList，
-    并复用共享运行时的看门狗，超时按退出码 124 上报。
-.PARAMETER Output
-    返回对象携带标准输出与标准错误的合并行，供失败信封记录详情。
 #>
 function Invoke-ChildProcess {
     [CmdletBinding()]
@@ -173,11 +146,7 @@ function Invoke-ChildProcess {
             -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile -NoNewWindow -PassThru
         $ok = Wait-ProcessWithTimeout -Process $proc -TimeoutSeconds $TimeoutSeconds `
             -ProcessName ([System.IO.Path]::GetFileName($FilePath)) -LogFiles @($stdoutFile, $stderrFile) -DiagPrefix "timeout-child"
-        if (-not $ok) {
-            $exitCode = 124
-        } else {
-            $exitCode = $proc.ExitCode
-        }
+        $exitCode = if (-not $ok) { 124 } else { $proc.ExitCode }
         foreach ($file in @($stdoutFile, $stderrFile)) {
             if (Test-Path $file) {
                 $content = Get-Content -Path $file -Encoding utf8 -ErrorAction SilentlyContinue
@@ -192,13 +161,7 @@ function Invoke-ChildProcess {
 
 <#
 .SYNOPSIS
-    Launches a child gate process with a bounded wait.
-.DESCRIPTION
-    Replaces bare `Start-Process -PassThru -Wait`. A hung `npm run compile` or
-    test runner previously blocked the commit indefinitely; here the process is
-    killed once the budget expires and reported as a gate failure.
-.EXITCODE
-    Returns a process-like object whose ExitCode is 124 on timeout.
+    Launches a child gate process with a bounded wait; returns ExitCode 124 on timeout.
 #>
 function Start-GateProcess {
     [CmdletBinding()]
@@ -210,8 +173,7 @@ function Start-GateProcess {
     )
 
     $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -NoNewWindow -PassThru
-    $exited = $proc.WaitForExit($TimeoutSeconds * 1000)
-    if ($exited) {
+    if ($proc.WaitForExit($TimeoutSeconds * 1000)) {
         return $proc
     }
 
@@ -222,27 +184,46 @@ function Start-GateProcess {
 
 <#
 .SYNOPSIS
+    Executes a pre-commit check in either machine-envelope mode or interactive host mode.
+#>
+function Invoke-PreCommitCheck {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [Parameter(Mandatory = $true)][string]$RuleId,
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string]$Summary,
+        [Parameter(Mandatory = $true)][string]$ActionableFix,
+        [Parameter(Mandatory = $true)][string]$VerifyCmd,
+        [string[]]$TargetFiles = @(),
+        [int]$DefaultTimeout = 120
+    )
+
+    $timeoutSec = Get-GateStepTimeout -StepId $StepId -DefaultSeconds $DefaultTimeout
+    if ($isMachineMode) {
+        $childRes = Invoke-ChildProcess -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -TimeoutSeconds $timeoutSec
+        if ($childRes.ExitCode -ne 0) {
+            $json = Write-PreCommitFailure -StepId $StepId -RuleId $RuleId -Summary $Summary `
+                -ActionableFix $ActionableFix -VerifyCmd $VerifyCmd -TargetFiles $TargetFiles -Details ($childRes.Output -join "`n")
+            Write-Output $json
+            exit 1
+        }
+        return $true
+    }
+
+    $process = Start-GateProcess -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -TimeoutSeconds $timeoutSec
+    if ($process.ExitCode -ne 0) {
+        $script:failed = $true
+        return $false
+    }
+    return $true
+}
+
+<#
+.SYNOPSIS
     Runs `vitest related` over staged sources in command-line-safe batches.
-.DESCRIPTION
-    `npx.cmd` is a cmd.exe batch shim bounded by the 8191-character command line
-    limit. A mass rename staging several hundred sources exceeded that ceiling,
-    so the shim exited with "The command line is too long." before vitest ever
-    started, and the non-zero status surfaced as a bogus test failure. Launching
-    the vitest entry script through node raises the ceiling to the CreateProcess
-    bound, and the argument budget keeps every spawn well below it no matter how
-    many files a single commit stages.
-.PARAMETER RelativePaths
-    Project-relative POSIX paths with the `auto-refactor/` prefix already removed.
-.PARAMETER WorkingDirectory
-    Project root that owns the node_modules tree providing vitest.
-.PARAMETER NodeCommand
-    Resolved node executable used to launch the vitest entry script.
-.PARAMETER ArgumentBudget
-    Upper bound on joined path characters per spawn. Defaults to a conservative
-    fraction of the Windows limit, leaving headroom for the entry path and flags.
-.OUTPUTS
-    PSCustomObject with ExitCode (0 only when every batch passed) and Output
-    (merged child lines), so callers report the first failing batch verbatim.
 #>
 function Invoke-VitestRelated {
     [CmdletBinding()]
@@ -281,8 +262,7 @@ function Invoke-VitestRelated {
             Write-GateHost "  ℹ️  [BATCH] vitest related over $($chunk.Count) files (batch $ordinal of $($batches.Count))" -ForegroundColor DarkGray
         }
         $childArgs = @($entry, "related") + $chunk + @("--run", "--passWithNoTests=false")
-        $child = Invoke-ChildProcess -FilePath $NodeCommand `
-            -ArgumentList $childArgs `
+        $child = Invoke-ChildProcess -FilePath $NodeCommand -ArgumentList $childArgs `
             -WorkingDirectory $WorkingDirectory -TimeoutSeconds $TimeoutSeconds
         if ($child.Output) { $lines.AddRange([string[]]$child.Output) }
         if ($child.ExitCode -ne 0) {
@@ -293,6 +273,42 @@ function Invoke-VitestRelated {
     return [PSCustomObject]@{ ExitCode = 0; Output = $lines.ToArray() }
 }
 
+function Write-StreamingFailurePayload {
+    [CmdletBinding()]
+    param(
+        [string]$StepId,
+        [string]$RuleId,
+        [object]$StepData,
+        [string[]]$TargetFiles
+    )
+    $failDetail = if ($StepData -and $StepData.detail) { $StepData.detail } else { "$StepId 审查未通过或未产出数据 (Fail-Closed)" }
+    $failSummary = if ($StepData -and $StepData.summary) { $StepData.summary } else { $failDetail }
+    $json = Write-PreCommitFailure -StepId $StepId -RuleId $RuleId `
+        -Summary $failSummary -ActionableFix $failDetail `
+        -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $TargetFiles
+    Write-Output $json
+    exit 1
+}
+
+function Invoke-StreamingStepReport {
+    [CmdletBinding()]
+    param(
+        [string]$StepId,
+        [string]$RuleId,
+        [object]$StepData,
+        [string[]]$TargetFiles,
+        [string]$DefaultPass
+    )
+    if ($isMachineMode -and (-not $StepData -or $StepData.status -ne "PASS")) {
+        Write-StreamingFailurePayload -StepId $StepId -RuleId $RuleId -StepData $StepData -TargetFiles $TargetFiles
+    }
+    if (-not $StepData -or $StepData.status -ne "PASS") {
+        $failDetail = if ($StepData -and $StepData.detail) { $StepData.detail } else { "$StepId 审查未通过或未产出数据 (Fail-Closed)" }
+        return @{ Status = "BLOCK"; Detail = $failDetail }
+    }
+    $detail = if ($StepData.detail) { $StepData.detail } else { $DefaultPass }
+    return @{ Status = "PASS"; Detail = $detail }
+}
 
 # 根目录物理防污染与散落脚本前置雷达 (<3ms)
 $rootClutter = Get-ChildItem -Path $repoRoot -File -Depth 0 | Where-Object {
@@ -313,25 +329,18 @@ if ($rootClutter) {
     } else {
         "Delete root temporary file '$badFile' or run 'node scripts/common/validate-physical-hygiene.js --fix'."
     }
-    if ($Agent) {
-        $json = Write-PreCommitFailure `
-            -StepId "STAGED-HYGIENE-01" `
-            -RuleId $ruleId `
-            -Summary $summary `
-            -ActionableFix $actionableFix `
-            -VerifyCmd "node scripts/common/validate-physical-hygiene.js" `
-            -TargetFiles @($badFile) `
+    if ($isMachineMode) {
+        $json = Write-PreCommitFailure -StepId "STAGED-HYGIENE-01" -RuleId $ruleId -Summary $summary `
+            -ActionableFix $actionableFix -VerifyCmd "node scripts/common/validate-physical-hygiene.js" -TargetFiles @($badFile)
         Write-Output $json
         exit 1
-    } else {
-        Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "BLOCK" -Detail "根目录存在散落脚本或未受控临时脏文件: $badFile"
-        Write-GateHost "   $actionableFix" -ForegroundColor Yellow
-        exit 1
     }
+    Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "BLOCK" -Detail "根目录存在散落脚本或未受控临时脏文件: $badFile"
+    Write-GateHost "   $actionableFix" -ForegroundColor Yellow
+    exit 1
 }
 
-# 获取当前暂存区中的文件列表（新增、修改、重命名）
-# 暂存区不可读时不得回落为空列表：那会让"git 失败"与"暂存区为空"变成同一个 PASS。
+# 获取当前暂存区中的文件列表；不可读时 fail-closed，不得回落为空列表。
 $stagedFilesRaw = git diff --cached --name-only "--diff-filter=ACM" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-GateHost "✖ BLOCK  无法读取 Git 暂存区 (git diff --cached 退出码 $LASTEXITCODE)，pre-commit 不得在未审查的情况下放行。" -ForegroundColor Red
@@ -339,7 +348,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 $stagedFiles = @($stagedFilesRaw)
 if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1 -and [string]::IsNullOrWhiteSpace($stagedFiles[0]))) {
-    if ($Agent) {
+    if ($isMachineMode) {
         Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'
         exit 0
     }
@@ -347,126 +356,52 @@ if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1
     exit 0
 }
 
-if (-not $Agent) {
-    Write-GateHost "=================================================================" -ForegroundColor Cyan
-    $modeTag = if ($Fast) { " [快速模式 -Fast]" } else { "" }
-    Write-GateHost "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)$modeTag" -ForegroundColor Cyan
-    Write-GateHost "=================================================================" -ForegroundColor Cyan
-}
+Write-GateHost "=================================================================" -ForegroundColor Cyan
+$modeTag = if ($Fast) { " [快速模式 -Fast]" } else { "" }
+Write-GateHost "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)$modeTag" -ForegroundColor Cyan
+Write-GateHost "=================================================================" -ForegroundColor Cyan
 
 $failed = $false
-
-if ($Agent) {
+if ($isMachineMode) {
     $staleSnapshot = Join-Path $repoRoot ".audit-logs/last-failure.json"
     if (Test-Path $staleSnapshot) { Remove-Item -Path $staleSnapshot -Force -ErrorAction SilentlyContinue }
 }
 
 # --- 暂存区流式物理卫生与安全审查 ---
-if ($Agent) {
+Write-StepBanner -StepId "STAGED-HYGIENE-01"
+$hygieneTimeout = Get-GateStepTimeout -StepId "STAGED-HYGIENE-01" -DefaultSeconds 30
+if ($isMachineMode) {
     $outFast = & $nodeCmd (Join-Path $repoRoot "scripts/common/gate-fast-staged.js") --agent 2>&1
     if ($LASTEXITCODE -ne 0) {
         $failJsonPath = Join-Path $repoRoot ".audit-logs/last-failure.json"
-        if (Test-Path $failJsonPath) {
-            Get-Content $failJsonPath -Raw
-        } else {
-            Write-Output ($outFast -join "`n")
-        }
+        if (Test-Path $failJsonPath) { Get-Content $failJsonPath -Raw } else { Write-Output ($outFast -join "`n") }
         exit 1
     }
+    Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "PASS" -Detail "暂存区物理卫生与安全审查通过"
 } else {
-    Write-StepBanner -StepId "STAGED-HYGIENE-01"
-    $resFast = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/gate-fast-staged.js" -WorkingDirectory $repoRoot
-    if ($resFast.ExitCode -ne 0) {
-        Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "BLOCK" -Detail "暂存区物理卫生与安全审查未通过"
-        $failed = $true
-    } else {
-        Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "PASS" -Detail "暂存区物理卫生与安全审查通过"
-    }
+    $resFast = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/gate-fast-staged.js" -WorkingDirectory $repoRoot -TimeoutSeconds $hygieneTimeout
+    $okFast = ($resFast.ExitCode -eq 0)
+    if (-not $okFast) { $failed = $true }
+    Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status $(if ($okFast) { "PASS" } else { "BLOCK" }) -Detail $(if ($okFast) { "暂存区物理卫生与安全审查通过" } else { "暂存区物理卫生与安全审查未通过" })
 }
 
 # --- 单源规则漂移熔断 ---
-$touchesRules = $stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" }
-if ($touchesRules) {
-    if (-not $Agent) { Write-StepBanner -StepId "RULE-REGISTRY-02" }
-    if ($Agent) {
-        $childRes = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "validate-rules-registry") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 120
-        $out = $childRes.Output
-        if ($childRes.ExitCode -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "RULE-REGISTRY-02" `
-                -RuleId "RCFG-RULE-DRIFT" `
-                -Summary "Auto-refactor rule registry metadata drift detected." `
-                -ActionableFix "Run 'npm run validate-rules-registry' in auto-refactor to inspect and sync rules." `
-                -VerifyCmd "npm --prefix auto-refactor run validate-rules-registry" `
-                -TargetFiles @("auto-refactor/src/core/rules") `
-                -Details ($out -join "`n")
-            Write-Output $json
-            exit 1
-        }
-    } else {
-        $res = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "validate-rules-registry" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
-        if ($res.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "RULE-REGISTRY-02" -Status "BLOCK" -Detail "规则注册表元数据发生漂移"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "RULE-REGISTRY-02" -Status "PASS" -Detail "规则元数据单源一致"
-        }
-    }
+if ($stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" }) {
+    Write-StepBanner -StepId "RULE-REGISTRY-02"
+    $okRules = Invoke-PreCommitCheck -StepId "RULE-REGISTRY-02" -RuleId "RCFG-RULE-DRIFT" -FilePath $npmCmd -ArgumentList @("run", "validate-rules-registry") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -Summary "Auto-refactor rule registry metadata drift detected." -ActionableFix "Run 'npm run validate-rules-registry' in auto-refactor to inspect and sync rules." -VerifyCmd "npm --prefix auto-refactor run validate-rules-registry" -TargetFiles @("auto-refactor/src/core/rules") -DefaultTimeout 30
+    Write-StepVerdict -StepId "RULE-REGISTRY-02" -Status $(if ($okRules) { "PASS" } else { "BLOCK" }) -Detail $(if ($okRules) { "规则元数据单源一致" } else { "规则注册表元数据发生漂移" })
 }
 
-$touchesSkills = $stagedFiles | Where-Object { $_ -match "^\.agents/(skills|plugins)/" }
-if ($touchesSkills) {
-    if (-not $Agent) { Write-StepBanner -StepId "SKILLS-SPEC-03" }
-    if ($Agent) {
-        $out = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-skills.js") 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "SKILLS-SPEC-03" `
-                -RuleId "GUARD-SSOT-001" `
-                -Summary "Workspace skills specification or plugin isomorphism verification failed." `
-                -ActionableFix "Run 'node scripts/common/validate-skills.js' to inspect and fix skill metadata." `
-                -VerifyCmd "node scripts/common/validate-skills.js" `
-                -TargetFiles @(".agents/skills") `
-                -Details ($out -join "`n")
-            Write-Output $json
-            exit 1
-        }
-    } else {
-        $resSkills = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot
-        if ($resSkills.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "SKILLS-SPEC-03" -Status "BLOCK" -Detail "技能集规范或插件同构校验未通过"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "SKILLS-SPEC-03" -Status "PASS" -Detail "技能集规范与插件同构合规"
-        }
-    }
+if ($stagedFiles | Where-Object { $_ -match "^\.agents/(skills|plugins)/" }) {
+    Write-StepBanner -StepId "SKILLS-SPEC-03"
+    $okSkills = Invoke-PreCommitCheck -StepId "SKILLS-SPEC-03" -RuleId "GUARD-SSOT-001" -FilePath $nodeCmd -ArgumentList @((Join-Path $repoRoot "scripts/common/validate-skills.js")) -WorkingDirectory $repoRoot -Summary "Workspace skills specification or plugin isomorphism verification failed." -ActionableFix "Run 'node scripts/common/validate-skills.js' to inspect and fix skill metadata." -VerifyCmd "node scripts/common/validate-skills.js" -TargetFiles @(".agents/skills") -DefaultTimeout 30
+    Write-StepVerdict -StepId "SKILLS-SPEC-03" -Status $(if ($okSkills) { "PASS" } else { "BLOCK" }) -Detail $(if ($okSkills) { "技能集规范与插件同构合规" } else { "技能集规范或插件同构校验未通过" })
 }
 
-# --- 提交信息规则覆盖清单双向闭包：内核规则族与外部真源之间不允许静默遗漏 ---
-if (-not $Agent) { Write-StepBanner -StepId "COMMIT-MSG-COVERAGE-15" }
-if ($Agent) {
-    $out = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-commit-rule-coverage.js") 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $json = Write-PreCommitFailure `
-            -StepId "COMMIT-MSG-COVERAGE-15" `
-            -RuleId "FGT-MSG-002" `
-            -Summary "Commit message rule coverage closure does not hold in both directions." `
-            -ActionableFix "Run 'node scripts/common/validate-commit-rule-coverage.js' to inspect unmapped or zombie rules." `
-            -VerifyCmd "node scripts/common/validate-commit-rule-coverage.js" `
-            -TargetFiles @("scripts/common/commit-rule-coverage.json") `
-            -Details ($out -join "`n")
-        Write-Output $json
-        exit 1
-    }
-} else {
-    $resCoverage = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-rule-coverage.js" -WorkingDirectory $repoRoot
-    if ($resCoverage.ExitCode -ne 0) {
-        Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "BLOCK" -Detail "提交信息规则覆盖清单双向闭包不成立"
-        $failed = $true
-    } else {
-        Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "PASS" -Detail "覆盖清单双向闭包成立"
-    }
-}
+# --- 提交信息规则覆盖清单双向闭包 ---
+Write-StepBanner -StepId "COMMIT-MSG-COVERAGE-15"
+$okCov = Invoke-PreCommitCheck -StepId "COMMIT-MSG-COVERAGE-15" -RuleId "FGT-MSG-002" -FilePath $nodeCmd -ArgumentList @((Join-Path $repoRoot "scripts/common/validate-commit-rule-coverage.js")) -WorkingDirectory $repoRoot -Summary "Commit message rule coverage closure does not hold in both directions." -ActionableFix "Run 'node scripts/common/validate-commit-rule-coverage.js' to inspect unmapped or zombie rules." -VerifyCmd "node scripts/common/validate-commit-rule-coverage.js" -TargetFiles @("scripts/common/commit-rule-coverage.json") -DefaultTimeout 30
+Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status $(if ($okCov) { "PASS" } else { "BLOCK" }) -Detail $(if ($okCov) { "覆盖清单双向闭包成立" } else { "提交信息规则覆盖清单双向闭包不成立" })
 
 # --- 项目增量编译与语法验证 (精准增量触发) ---
 # 横幅由各步骤自身的触发分支渲染：入口处再打印一次会让同一标识出现两条横幅。
