@@ -517,70 +517,24 @@ if ($hasArCompile) {
 }
 
 if ($hasWgAudit) {
-    if (-not $Agent) { Write-StepBanner -StepId "DOMAIN-CONFIG-09" }
-    if ($Agent) {
-        $out = & $pythonCmd (Join-Path $repoRoot "WebGames/scripts/py/audit_config.py") "--strict" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "DOMAIN-CONFIG-09" `
-                -RuleId "ADV-CFG-001" `
-                -Summary "WebGames configuration architecture review failed." `
-                -ActionableFix "Run 'python WebGames/scripts/py/audit_config.py --strict' to inspect config issues." `
-                -VerifyCmd "python WebGames/scripts/py/audit_config.py --strict" `
-                -TargetFiles @("WebGames/config") `
-                -Details ($out -join "`n")
-            Write-Output $json
-            exit 1
-        }
-    } else {
-        $process = Start-GateProcess -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -WorkingDirectory $repoRoot
-        if ($process.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "DOMAIN-CONFIG-09" -Status "BLOCK" -Detail "WebGames 配置架构审查未通过"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "DOMAIN-CONFIG-09" -Status "PASS" -Detail "WebGames 配置架构审查通过"
-        }
-    }
+    Write-StepBanner -StepId "DOMAIN-CONFIG-09"
+    $okWg = Invoke-PreCommitCheck -StepId "DOMAIN-CONFIG-09" -RuleId "ADV-CFG-001" -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict") -WorkingDirectory $repoRoot -Summary "WebGames configuration architecture review failed." -ActionableFix "Run 'python WebGames/scripts/py/audit_config.py --strict' to inspect config issues." -VerifyCmd "python WebGames/scripts/py/audit_config.py --strict" -TargetFiles @("WebGames/config") -DefaultTimeout 30
+    Write-StepVerdict -StepId "DOMAIN-CONFIG-09" -Status $(if ($okWg) { "PASS" } else { "BLOCK" }) -Detail $(if ($okWg) { "WebGames 配置架构审查通过" } else { "WebGames 配置架构审查未通过" })
 }
 
 if ($hasFgCompile) {
-    if (-not $Agent) { Write-StepBanner -StepId "RUST-COMPILE-10" }
+    Write-StepBanner -StepId "RUST-COMPILE-10"
     if ($cargoCmd) {
         $fgToml = Join-Path $repoRoot "fractal-git/Cargo.toml"
-        if ($Agent) {
-            $out = & $cargoCmd check --workspace --manifest-path $fgToml --all-targets 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                $json = Write-PreCommitFailure `
-                    -StepId "RUST-COMPILE-10" `
-                    -RuleId "L0-COMPILE" `
-                    -Summary "Cargo check compilation failed in fractal-git." `
-                    -ActionableFix "Run 'cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." `
-                    -VerifyCmd "cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets" `
-                    -TargetFiles @("fractal-git/Cargo.toml") `
-                    -Details ($out -join "`n")
-                Write-Output $json
-                exit 1
-            }
-        } else {
-            $process = Start-GateProcess -FilePath $cargoCmd -ArgumentList "check", "--workspace", "--manifest-path", $fgToml, "--all-targets" -WorkingDirectory $repoRoot
-            if ($process.ExitCode -ne 0) {
-                Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "BLOCK" -Detail "fractal-git 增量编译未通过"
-                $failed = $true
-            } else {
-                Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "PASS" -Detail "增量编译与语法校验通过"
-            }
-        }
+        $okFg = Invoke-PreCommitCheck -StepId "RUST-COMPILE-10" -RuleId "L0-COMPILE" -FilePath $cargoCmd -ArgumentList @("check", "--workspace", "--manifest-path", $fgToml, "--all-targets") -WorkingDirectory $repoRoot -Summary "Cargo check compilation failed in fractal-git." -ActionableFix "Run 'cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." -VerifyCmd "cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets" -TargetFiles @("fractal-git/Cargo.toml") -DefaultTimeout 180
+        Write-StepVerdict -StepId "RUST-COMPILE-10" -Status $(if ($okFg) { "PASS" } else { "BLOCK" }) -Detail $(if ($okFg) { "增量编译与语法校验通过" } else { "fractal-git 增量编译未通过" })
     } else {
-        if ($Agent) {
+        if ($isMachineMode) {
             $cargoMissingDetails = "Agent 模式下 cargo 缺失属于空门禁，必须与 push 阶段 RUST-TAXIS-19 一致 fail-closed。"
-            $json = Write-PreCommitFailure `
-                -StepId "RUST-COMPILE-10" `
-                -RuleId "L0-COMPILE" `
+            $json = Write-PreCommitFailure -StepId "RUST-COMPILE-10" -RuleId "L0-COMPILE" `
                 -Summary "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行。" `
-                -ActionableFix "安装 Rust 工具链并确保 cargo 在 PATH 中，然后重新执行 bash scripts/sh/pre-commit-gate.sh --agent。" `
-                -VerifyCmd "cargo --version" `
-                -TargetFiles @("fractal-git/Cargo.toml") `
-                -Details $cargoMissingDetails
+                -ActionableFix "安装 Rust 工具链并确保 cargo 在 PATH 中，然后重新执行 pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent。" `
+                -VerifyCmd "cargo --version" -TargetFiles @("fractal-git/Cargo.toml") -Details $cargoMissingDetails
             Write-Output $json
             exit 1
         }
@@ -588,7 +542,7 @@ if ($hasFgCompile) {
         Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "BLOCK" -Detail "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行"
         $failed = $true
     }
-} elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^fractal-git/" })) {
+} elseif (-not $isMachineMode -and ($stagedFiles | Where-Object { $_ -match "^fractal-git/" })) {
     Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "SKIP" -Detail "仅文档或配置变更"
 }
 
