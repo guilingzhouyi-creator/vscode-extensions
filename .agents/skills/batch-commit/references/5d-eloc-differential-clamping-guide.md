@@ -14,18 +14,18 @@ Raw physical LOC checks encourage padding comments/trampolines, bulk deletions t
 
 $$\mathbf{D}(L) = [D_{\text{line}}, D_{\text{col}}, D_{\text{reuse}}, D_{\text{shared}}, D_{\text{payload}}]$$
 
-Weight $\omega(L)$ is `0.0` for blank lines, pure doc/inline comments, and $\le 3$-line pass-through trampolines, and `1.0` for substantive control flow, data operations, type definitions, and contracts:
-- Substantive line ratio: $R_{\text{sub}} = \frac{\text{LOC}_{\text{total}} - \text{LOC}_{\text{blank}} - \text{LOC}_{\text{comment}}}{\text{LOC}_{\text{total}}} \ge 0.60$
-- True payload retention: $\text{TSPR} = \frac{\text{ELOC}_{\text{5D}}}{\text{LOC}_{\text{total}}} \ge 0.40$
+Weight $\omega(L)$ is `0.0` for blank lines, pure doc/inline comments, and $\le 3$-line pass-through trampolines, and `1.0` for substantive control flow, data operations, type definitions, and contracts (SSOT: `scripts/common/diff-bounds-contract.json`):
+- Substantive line ratio: $R_{\text{sub}} = \frac{\text{LOC}_{\text{total}} - \text{LOC}_{\text{blank}} - \text{LOC}_{\text{comment}}}{\text{LOC}_{\text{total}}} \ge 0.45$ floor / $0.60$ target
+- True payload retention: $\text{TSPR} = \frac{\text{ELOC}_{\text{5D}}}{\text{LOC}_{\text{total}}} \ge 0.40$ target ($0.30$ floor)
 
 ---
 
-## 3. Two-Tier Differential Envelopes
+## 3. Two-Tier Differential Envelopes (`scripts/common/diff-bounds-contract.json`)
 
 | Tier | Bounds |
 | :--- | :--- |
-| **Layer A: Per-File Micro** | New file $E_{\text{add}} \le 180.0$ ELOC; existing file $E_{\text{add}} \le 120.0$ ELOC; $E_{\text{del}} \le 100.0$ ELOC (unless Verified Refactor); $R_{\text{sub}} \ge 0.60$, $\text{TSPR} \ge 0.40$ |
-| **Layer B: Batch Macro** | $\sum E_{\text{add}} \le 360.0$ 5D ELOC; $\sum E_{\text{del}} \le 280.0$ 5D ELOC; $E_{\text{turnover}} \ge \Theta_{\text{admission}}$ |
+| **Layer A: Per-File Micro** | Source add: new $\le 240$, existing $\le 180$, refactor-witness $\le 260$; Test add: new $\le 360$, existing $\le 260$, refactor-witness $\le 380$; Del: plain $\le 120$, witnessed $\le 360$; $R_{\text{sub}} \ge 0.45 / 0.60$, $\text{TSPR} \ge 0.40$ |
+| **Layer B: Batch Macro** | Pure growth add $\le 540$, cross-file refactor add $\le 720$ (`crossFileRefactorMinDelEloc = 30`, `crossFileRefactorDelRatio = 0.6`); test batch weight `0.5x`; batch del $\le 360$; $E_{\text{turnover}} \ge \Theta_{\text{admission}} \in [3.0, 25.0]$; ledger `.taxis/telemetry/admission_ledger.ndjson` |
 
 ---
 

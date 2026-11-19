@@ -21,59 +21,44 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
 - **何时联动**：Add analyzer or rule and register SSOT metadata → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`；Debug LayerVFS forks, 3-ply MCTS, or preset recipe plugins → `praxis-vfs-and-trajectory-learning` + `auto-refactor-dev` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
-## 1. Six-Layer Architecture, Rust+TS Byte Parity & Project Neutrality
+## 1. Six-Layer Architecture, Rust+TS Parity & Neutrality
 
-1. **6-Layer Unidirectional Topology**: L1 Native Operators (`crates/ops-{diff,graph,pattern,mask,clone}`, `ops-mask` split into `ascii`/`utf16`/`tests` with 3-part `// SAFETY:` proofs) $\to$ L2 `NormalizedNode` + `LineFeatureTape` + 8-language `SemanticGraph` $\to$ L3 (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled analyzers & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->) $\to$ L4 5-Tier Sparse MoE Router & `< 10ms` AST slice pipeline $\to$ L5 10-pillar scoring & CAI 2.0 evolution plane $\to$ L6 Praxis SDK & LayerVFS sandbox.
-2. **Rust+TS 100% Byte Parity**: Rust N-API operators and `src/core/native/*-shim.ts` must produce 100% identical JSON key order, UTF-8/LF line-column offsets, dominator tree ordering, and 4-decimal float precision (`validate-native-parity.js` & `validate-equivalence.js`).
-3. **Project Neutrality & Preset Plugins (`validate-project-neutrality.js`)**: Core analyzers and `recipeExtractor.ts` must never hardcode consumer-specific paths (`WebGames/`, `workspace-timing/`) or DSL rules; infer `ProjectArchetype` from manifests and load project rules via preset `trajectoryPlugin` (`presets/godot-game.config.json`).
-4. **Module Boundaries & Decomposition**: Maintain cohesive domain splits (`reportFinalizer` $\to$ `post-scan-{suppressions,arbitration,quality-scoring}`, `aas-reporter` $\to$ `aas-{dimension-details,health-metrics,defect-records}`, `python-modern` $\to$ `python-modern-{contracts,shadowing}`) with zero shell trampolines (`ARCH-FAC-001 = 0`, zero `VOL-DOC-001`).
-5. **`PathClassifier` & Telemetry Hardening**: Route all path exemptions through `PathClassifier` (`src/core/path/index.ts`); validate empty paths, null bytes, non-finite metrics, and EOF-less LCOV flush boundaries in `src/core/telemetry/`. Register long-lived caches with `sharedMemoryGovernor`.
-6. **Elastic Debt Quota (`elastic-debt-budget.ts`)**: Enforce rigid Critical/High limits across `SEC-*`/`DEP-*` alongside dynamic volume scaling; route family claims through `effectiveApply(...)`.
+1. **6-Layer Topology**: L1 Native Operators (`crates/ops-{diff,graph,pattern,mask,clone}`, `ops-mask` split `ascii`/`utf16`/`tests` with `// SAFETY:`) $\to$ L2 `NormalizedNode` + `LineFeatureTape` + 8-lang `SemanticGraph` $\to$ L3 (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> analyzers, <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->) $\to$ L4 Sparse MoE & `< 10ms` AST slices $\to$ L5 10-pillar/CAI 2.0 $\to$ L6 Praxis SDK & LayerVFS.
+2. **Rust+TS Parity**: Rust N-API and `src/core/native/*-shim.ts` must match JSON key order, UTF-8/LF offsets, dominator order, and 4-decimal floats (`validate-native-parity.js`, `validate-equivalence.js`).
+3. **Neutrality & Boundaries**: `validate-project-neutrality.js` forbids consumer paths (`WebGames/`, `workspace-timing/`); infer `ProjectArchetype` from manifests and load rules via `trajectoryPlugin` (`presets/godot-game.config.json`). Keep splits (`reportFinalizer`, `aas-reporter`, `python-modern`) free of trampolines (`ARCH-FAC-001 = 0`, zero `VOL-DOC-001`). Route exemptions via `PathClassifier`, caches via `sharedMemoryGovernor`, and `SEC-*`/`DEP-*` via `elastic-debt-budget.ts` (`effectiveApply(...)`).
 
 ---
 
-## 2. Four-Stage Analyzer Pipeline & Five-Tier Sparse MoE Routing
+## 2. Four-Stage Analyzers & Sparse MoE Delegation
 
-`analyzer-registry.ts`, `config/config.ts`, and `router/sparseRuleRouter.ts` assemble all 32 analyzers in monotonic Stage 0–3 order ($6 + 5 + 9 + 12 = 32$):
+`analyzer-registry.ts`, `config/config.ts`, and `router/sparseRuleRouter.ts` order 32 analyzers across Stage 0–3 ($6 + 5 + 9 + 12$):
 
-| Stage | Analyzer IDs (`AnalyzerId`) | Execution Scope & Core Checks |
+| Stage | Analyzer IDs (`AnalyzerId`) | Core Scope |
 | :--- | :--- | :--- |
-| **Stage 0: Physical & Security** (6) | `hygiene`, `shell-lint`, `shell-safety`, `large-file`, `secrets`, `security` | Byte-stream fast path; 0-byte/EOL, destructive taint (`GUARD-DESTR-001`), ELOC/LOC budget, secrets & injection |
-| **Stage 1: Lexical & Docs** (5) | `comments`, `naming`, `constants`, `docs`, `production-hygiene` | Token/line state machines; 6-field headers/ECR, naming conventions, magic literals, JSDoc sync, debug residue |
-| **Stage 2: Single-File AST** (9) | `simplify`, `complexity`, `stdlib`, `typescript-modern`, `python-modern`, `rust-modern`, `gdscript-modern`, `go-modern`, `frontend` | Single-file AST & CFG (`< 10ms` slices); control-flow flattening, $\text{CC}\le 15 / \text{Depth}\le 4$, `*-modern` idioms |
-| **Stage 3: Cross-File & Domain** (12) | `performance`, `architecture`, `data-architecture`, `dependency-layout`, `dependency-graph`, `gate-architecture`, `gdscript-game`, `vscode-extension`, `client-exposure`, `test-modernity`, `concurrency`, `governance` | Cross-file `SemanticGraph` (Tarjan SCC / dominator tree); zero loop alloc, facade substance, dependency cycles, async/lock hazards, SSOT closure |
+| **0: Physical** (6) | `hygiene`, `shell-lint`, `shell-safety`, `large-file`, `secrets`, `security` | Byte stream; 0-byte/EOL, taint (`GUARD-DESTR-001`), ELOC/LOC, secrets |
+| **1: Lexical** (5) | `comments`, `naming`, `constants`, `docs`, `production-hygiene` | Token/line FSM; 6-field JSDoc/ECR, naming, literals, debug residue |
+| **2: AST** (9) | `simplify`, `complexity`, `stdlib`, `typescript-modern`, `python-modern`, `rust-modern`, `gdscript-modern`, `go-modern`, `frontend` | `< 10ms` AST/CFG; flattening, $\text{CC}\le 15 / \text{Depth}\le 4$, `*-modern` |
+| **3: Graph** (12) | `performance`, `architecture`, `data-architecture`, `dependency-layout`, `dependency-graph`, `gate-architecture`, `gdscript-game`, `vscode-extension`, `client-exposure`, `test-modernity`, `concurrency`, `governance` | `SemanticGraph` (Tarjan SCC/dominators); loop alloc, facade substance, cycles, async/lock, SSOT |
 
-- **5-Tier Sparse MoE Invariants**:
-  1. **Preflight & Trigger Gating**: `file-preflight-gate.ts`, `sparse-activator.ts` (`LANGUAGE_ANALYZER_MATRIX`), and `trigger-catalog.ts` (`ASYNC_TRIGGERS`, `DOCS_EXTS`, `SHELL_EXTS`) bypass analyzers before AST parsing when file extensions or fast substring triggers do not match.
-  2. **32-Bit Unsigned Bitmask Parity**: `AnalyzerBit.CONCURRENCY = 1 << 31` sets the Int32 sign bit (`-2147483648`). `BIT_TO_ANALYZER_NAME`, `EXPERT_BY_BIT` (`expert-catalog.ts`), and `EXPERT_BASE_SCORES` (`expert-activation-library.ts`) must normalize keys with `(bit >>> 0)` and index both signed/unsigned keys, backed by `EXPERT_BY_INDEX` in `grouped-dispatcher.ts`.
-  3. **`LineFeatureTape` (`LINE_FLAG_*`) Pre-Gating**: Use precomputed per-line bitmasks (`LINE_FLAG_HAS_CALL_PAREN`, `LINE_FLAG_COMMENT`, `LINE_FLAG_IMPORT` in `source-mask.ts`) to skip non-matching lines in $O(1)$.
-  4. **32/32 `resetState()` Pooling & Lazy `ctx.sourceFile`**: Every analyzer must implement `resetState()` for `AnalyzerPool` reuse and evaluate `ctx.lines` / `ctx.maskedText` before touching `ctx.sourceFile` in `finalize(ctx)`.
-- **Rule & Regex SSOT**: Register rules as `FAMILY-TOPIC-NNN` across `src/core/rules/`, `dimensionRuleTable.ts` ($\text{AxesPerFinding} \le 4$), and `scripts/common/rule-catalog.json`; register all `scripts/validate-*.js` in `scripts/test-parallel.js` (<!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> suites, `validate-suite-manifest.js`). Centralize regex literals in `src/core/constants/regex-patterns.ts` (`validate-regex-ssot.js`). Avoid duplicate `export *` collisions in `src/api.ts` (`TS2308`).
+- **Sparse MoE**: Preflight/trigger gates, `(bit >>> 0)` bitmask parity (`AnalyzerBit.CONCURRENCY = 1 << 31`), `LineFeatureTape`, `resetState()` pooling, and lazy `ctx.sourceFile` live in [sparse-moe-and-ast-routing](../sparse-moe-and-ast-routing/SKILL.md).
+- **SSOT**: Register `FAMILY-TOPIC-NNN` across `src/core/rules/`, `dimensionRuleTable.ts` ($\text{AxesPerFinding}\le 4$), and `scripts/common/rule-catalog.json`; register validators in `scripts/test-parallel.js` (<!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> suites, `validate-suite-manifest.js`); centralize regexes in `src/core/constants/regex-patterns.ts` (`validate-regex-ssot.js`); prevent `export *` collisions in `src/api.ts` (`TS2308`).
 
 ---
 
-## 3. Praxis SDK, Dual-Surface Diff, Daemon & Hot-Path Discipline
+## 3. Praxis SDK, Daemon, Cleanup & 5D Diff Bounds
 
-1. **Praxis SDK & 3-Layer Diff**: `createPraxisClient` exposes `reviewWorkspace`, `reviewFile`, `reviewDiff`, and `evaluateMergeGate`, emitting symmetric `DiffAgentFace` + `DiffHumanFace` payloads across L1 (unit) $\to$ L2 (reverse dependency closure) $\to$ L3 (`shouldEscalateToL3A`), with union-find deduplication across <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count --> overlap clusters (`electPrimaryCard`).
-2. **Daemon & Atomic Staging**: Forbid blocking `*Sync` I/O on daemon hot paths (`PRF-IO-001`); isolate sync I/O behind `*IoBarrier` with sync methods ordered above `async`; cluster IPC command constants at module top (`NAM-LEN-002`); suffix timestamps with `*Ms` using `Brand<T, B>`; separate `stagingPath` and `compactStagingPath` with atomic `rename`.
-3. **5D ELOC Differential Bounds (`differential-bounds.ts`)**: Clamps per-file micro diffs (add $\le 120/180$, del $\le 100$) and batch macro diffs (add $\le 360$, del $\le 280$) with Jeffreys Beta admission threshold $\Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC and $\text{TSPR} \ge 0.40$.
-
----
-
-## 4. Gate Chain & Native CI Parity
-
-1. **Full Gate Pipeline**: `npm run gate` chains `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `test:no-build` (eliminating duplicate `tsc` builds, mirrored in `pre-push-gate`); `audit-all --fast` schedules incremental `gate:self:slice`.
-2. **Fail-Closed Native Build**: Prebuilt `index.node` stays gitignored; `validate-native-parity.js` fails closed (exit 1) when native bindings are missing, and CI builds live via `dtolnay/rust-toolchain@stable` + `npm run build:native`.
-3. **Commit & Ledger Guards**: Changes under `crates/**` trigger Cargo workspace checks in `pre-commit-gate`; `vitest related` enforces `--passWithNoTests=false`; `validate-rule-dictionary-closure.js` verifies <!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> canonical rules; `validate-trajectory-ledger.js` guards `baseline-signatures.json` and `governance-supervisor.json` weights; `audit-all` reverts timestamp-only diffs via `--revert-timestamp`.
+1. **Praxis & Daemon**: `createPraxisClient` emits `DiffAgentFace` + `DiffHumanFace` across L1 $\to$ L2 $\to$ L3 (`shouldEscalateToL3A`), deduplicating <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count --> overlap clusters (`electPrimaryCard`). Ban hot `*Sync` I/O (`PRF-IO-001`); isolate behind `*IoBarrier`; top-cluster IPC constants (`NAM-LEN-002`); `*Ms` (`Brand<T, B>`); atomic `stagingPath` rename.
+2. **5D Bounds (`diff-bounds-contract.ts`)**: Leaf loader for `scripts/common/diff-bounds-contract.json` (`diff-bounds-governor.ts`, `diff-bounds-batch.ts`): source $\le 240/180/260$, test $\le 360/260/380$, del $\le 120/360$, batch add $\le 540/720$ (`0.5x` test), del $\le 360$, $\Theta_{\text{admission}}\in [3.0, 25.0]$, substantive `0.45/0.60`, $\text{TSPR}\ge 0.40$ (`.taxis/telemetry/admission_ledger.ndjson`).
+3. **Gate Chain & Cleanup**: `npm run gate` runs `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `test:no-build`; clean temp dirs via `auto-refactor/scripts/lib/resilient-fs-cleanup.js` (`rmSyncWithRetry`). Fail-closed `validate-native-parity.js`; `crates/**` triggers Cargo; `vitest related` `--passWithNoTests=false`; `validate-rule-dictionary-closure.js` (<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> canonical); `validate-trajectory-ledger.js` + `--revert-timestamp`.
 
 ---
 
-## 5. Verification & References
+## 4. Verification & References
 
 ```bash
 cd auto-refactor && npm run build && npm run gate && npm test && node scripts/bench-hot-paths.js
 ```
 
-- [praxis-client-and-diff-topology.md](references/praxis-client-and-diff-topology.md): Praxis SDK interfaces, 3-layer Diff topology, union-find clustering & Rust+TS byte-parity matrix.
-- [type-level-engineering-and-caching.md](references/type-level-engineering-and-caching.md): Nominal `Brand<T, B>` types, 4-tier cache invalidation & 12 hot-path memory patterns.
-- [analyzer-boilerplate.ts](templates/analyzer-boilerplate.ts) / [validate-suite-boilerplate.js](templates/validate-suite-boilerplate.js): Standard analyzer & validation suite templates.
+- [praxis-client-and-diff-topology.md](references/praxis-client-and-diff-topology.md): Praxis SDK interfaces, 3-layer Diff topology, union-find clustering & Rust+TS parity.
+- [type-level-engineering-and-caching.md](references/type-level-engineering-and-caching.md): Nominal `Brand<T, B>` types, 4-tier cache invalidation & hot-path memory patterns.
+- [analyzer-boilerplate.ts](templates/analyzer-boilerplate.ts) / [validate-suite-boilerplate.js](templates/validate-suite-boilerplate.js): Analyzer & validation suite templates.

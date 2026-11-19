@@ -23,63 +23,38 @@ Governs bottom-up 6-layer topological commit batching, parallel session isolatio
 
 ## 1. Bottom-Up Six-Layer Commit Topology
 
-Split multi-file ($> 15$ files) or cross-layer changes into self-contained, independently compilable commits ordered from L1 to L6:
-1. **Batch L1 (Contracts & Storage)**: Types, schemas, persistence protocols (`feat`/`refactor`).
-2. **Batch L2 (Infrastructure & Operators)**: Pools, native operators, runtime primitives (`feat`/`refactor`).
-3. **Batch L3 (Config & Rule Catalogs)**: Config tables, SSOT rule catalogs (`feat`/`refactor`).
-4. **Batch L4 (Domain & Views)**: Business logic, analyzers, UI views (`feat`/`refactor`).
-5. **Batch L5 (Quality & Tests)**: Unit/regression suites, density/complexity tuning (`test`/`refactor`).
-6. **Batch L6 (Documentation & Archives)**: Architecture specs, skills, blueprints (`docs`).
-
-- **Code Beat vs. Telemetry Beat**: Commit production code first (Code Beat), then commit audit snapshots/telemetry separately (Telemetry Beat). Record `mark_chapter` checkpoints (Commit SHA, passed suites, remaining batches) after major layers.
+Split multi-file ($> 15$) or cross-layer edits into self-contained commits ordered L1 $\to$ L6:
+**L1 Contracts/Storage** $\to$ **L2 Infra/Operators** $\to$ **L3 Config/Rules** $\to$ **L4 Domain/Views** $\to$ **L5 Quality/Tests** $\to$ **L6 Docs/Archives** (`docs`).
+Commit production+tests (**Code Beat**) before audit snapshots (**Telemetry Beat**), emitting `mark_chapter` checkpoints after major layers.
 
 ---
 
 ## 2. Four-Step S-P-C-V Execution Loop
 
-### Step 1: Explicit Whitelist Staging & Parallel Session Isolation (`git add <files>`)
-1. **Explicit File List**: Never run `git add .` or `git add -A`. Stage only files belonging to the current batch and within the current session's Path Jail (`git add path/to/a.ts path/to/b.ts`).
-2. **Parallel Session Isolation**: Treat any modified/untracked files outside your task scope in `git status -s` as active parallel sessions — zero touch, zero formatting, zero cleanup. **Never** run `git checkout -- .`, `git restore .`, `git clean -fd`, or `git reset --hard`.
-3. **5D ELOC Differential Clamping (`FGT-GAT-001`)**:
-   - **Per-File Micro Envelope**: New file $E_{\text{add}} \le 360.0$ 5D ELOC; existing file $E_{\text{add}} \le 120.0$ (or $\le 180.0$ with $\ge 10$ lines refactored deletion); deletion $E_{\text{del}} \le 100.0$ (max $280.0$ with refactoring witness); substantive ratio $\ge 0.60$, $\text{TSPR} \ge 0.40$.
-   - **Batch Macro Envelope**: $\sum E_{\text{add}} \le 360.0$ 5D ELOC, $\sum E_{\text{del}} \le 280.0$ 5D ELOC, turnover $\sum E_{\text{add}} + 0.8 \sum E_{\text{del}} \ge \Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC.
-   - **Overflow Deconstruction**: Resolve `FILE_ADD_OVERFLOW` or `BATCH_ADD_OVERFLOW` by extracting cohesive algorithms into dedicated submodules (each new file receives a $360.0$ quota) or splitting commits; never lower gate thresholds. See [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md).
+### Step 1: Staging, Session Mutex & 5D Diff Bounds (`git add <files>`)
+1. **Whitelist & Mutex**: Ban `git add .`, `git add -A`, `git checkout -- .`, `git restore .`, `git clean -fd`, `git reset --hard`. Stage only current-batch Path-Jail files (`git add a.ts b.ts`); leave external dirty files in `git status -s` untouched.
+2. **5D ELOC Bounds (`FGT-GAT-001`, SSOT: `scripts/common/diff-bounds-contract.json`)**:
+   - **Micro**: Source add new $\le 240$, existing $\le 180$, refactor-witness $\le 260$; test add new $\le 360$, existing $\le 260$, refactor-witness $\le 380$; del plain $\le 120$, witnessed $\le 360$; substantive floor/target `0.45/0.60`, $\text{TSPR}\ge 0.40$.
+   - **Macro**: Pure growth add $\le 540$, cross-file refactor add $\le 720$ (`crossFileRefactorMinDelEloc=30`, `crossFileRefactorDelRatio=0.6`), test weight `0.5x`, del $\le 360$, turnover $\ge \Theta_{\text{admission}}\in [3.0, 25.0]$ (`.taxis/telemetry/admission_ledger.ndjson`).
+   - **Overflow**: Fix `FILE_ADD_OVERFLOW` / `BATCH_ADD_OVERFLOW` by extracting cohesive submodules ($240$ source / $360$ test ceiling) or splitting commits ([5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)).
 
-### Step 2: Author Commit Message & Run Offline Pre-Flight (`commit-msg-gate`)
-1. **Header Grammar**: `<type>(<scope>): <imperative summary>` (`type` $\in$ `feat|fix|refactor|docs|test|chore|style|perf|ci|build`; total length $15 \sim 80$ chars, subject $10 \sim 70$ chars; ASCII `(` `)` and `): `; no trailing `.`; no BOM/zero-width chars; no emoji).
-2. **Mandatory Sections & Lengths**:
-   - First section `[Project]` (`CMG-PRJ-001`): `- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>`
-   - `[Why]` ($\ge 15$ non-whitespace chars), `[Verification]` ($\ge 12$ non-whitespace chars, qualitative assertions only), plus `[Added]` (`feat`), `[Fixed]` ($\ge 12$ chars, `fix`), `[Changed]` (`refactor`/`perf`), or `[Breaking Changes]` (`!`).
-   - Use ASCII brackets `[...]` and `- ` bullets ($\ge 8$ chars each), separated by single blank lines; total body $\ge 30$ non-whitespace chars.
-3. **Six Forbidden Style Classes & Rule Closure**:
+### Step 2: Author Message & Pre-Flight (`commit-msg-gate`)
+1. **Header & Body**: `<type>(<scope>): <imperative summary>` (`feat|fix|refactor|docs|test|chore|style|perf|ci|build`; $15\text{–}80$ chars, subject $10\text{–}70$, ASCII `): `, no `.`, BOM, or emoji). First section `[Project]` (`CMG-PRJ-001`: `workspace-timing | auto-refactor | WebGames | fractal-git | governance`), `[Why]` ($\ge 15$), `[Verification]` ($\ge 12$, qualitative only), plus `[Added]`/`[Fixed]` ($\ge 12$)/`[Changed]`/`[Breaking Changes]`; `- ` bullets $\ge 8$, body $\ge 30$ chars.
+2. **Forbidden Styles (`CMG-STY-001`~`008` & `RCFG-RULE-DRIFT`)**:
 
 | Rule ID | Category | Blocked Examples | Requirement |
 | :--- | :--- | :--- | :--- |
-| `CMG-STY-001` | Perfunctory / Sprint Codenames | `wip`, `temp`, `tmp`, `phase2`, `sprint 3`, `st7`, `w3`, `pass 2` | State exact technical scope and invariants |
-| `CMG-STY-002` | Exaggeration | `100%`, `perfect`, `ultimate`, `industrial-grade`, hype labels | State concrete mechanisms and boundary cases |
-| `CMG-STY-003` | Pejorative | `useless code`, `broken beyond repair`, derogatory remarks | State objective technical root cause |
-| `CMG-STY-004` | Meta-Narrative | Claims about adjusting prose tone or removing hype words | Describe code/doc changes directly |
-| `CMG-STY-005` | Procedural Log Dump | `exit code 0`, `returned 0`, `all checks green` | State falsifiable behavioral assertions in `[Verification]` |
-| `CMG-STY-006` | Raw Execution Counts | `146 tests passed`, `50.8s`, `419 files`, `98% coverage` | Zero Arabic numerals/percentages in `[Verification]` |
+| `CMG-STY-001` | Sprint / Wip | `wip`, `temp`, `tmp`, `phase2`, `sprint 3`, `st7`, `w3`, `pass 2` | Exact technical scope & invariants |
+| `CMG-STY-002` | Exaggeration | `100%`, `perfect`, `ultimate`, `industrial-grade` | Concrete mechanisms & edge cases |
+| `CMG-STY-003` | Pejorative | `useless code`, `broken beyond repair` | Objective technical root cause |
+| `CMG-STY-004` | Meta-Prose | Notes on prose tone or removing hype | Describe code/doc changes directly |
+| `CMG-STY-005` | Log Dump | `exit code 0`, `returned 0`, `all checks green` | Falsifiable behavioral assertions |
+| `CMG-STY-006` | Raw Counts | `146 tests passed`, `50.8s`, `419 files`, `98%` | Zero digits/% in `[Verification]` |
 
-   - Also enforce `CMG-STY-008` (no first-person pronouns `I`/`we`/`my`/`our`; write `"disk read/write"` instead of `I/O`) and `RCFG-RULE-DRIFT` (every rule ID must exist in `scripts/common/rule-catalog.json`).
-4. **Pre-Flight Check**:
-   ```powershell
-   pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
-   ```
+   - Enforce `CMG-STY-008` (no `I`/`we`/`my`/`our`; `"disk read/write"`, not `I/O`) and `RCFG-RULE-DRIFT` (`scripts/common/rule-catalog.json`). Run `pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"`.
 
-### Step 3: Staged Hygiene & AST Slice Pre-Flight (`pre-commit-gate`)
-```powershell
-pwsh -File scripts/ps1/pre-commit-gate.ps1
-```
-If `GUARD-AST-001` (`CC > 15` or `Depth > 4`) fires, flatten branches with early guard returns or extract pure helper predicates, re-stage via `git add <file>`, and re-run. All gate subprocesses must run headlessly without stealing GUI focus.
-
-### Step 4: Atomic Commit & Final Regression (`git commit`)
-```powershell
-git commit -F "$dir\commit_batch_N.txt"
-pwsh -File scripts/ps1/audit-all.ps1
-```
-Never pass `--no-verify`. Keep user-facing `CHANGELOG.md` / `README.md` isolated from internal engineering commit jargon.
+### Step 3: Hygiene & Commit (`pre-commit-gate` $\to$ `git commit`)
+Run `pwsh -File scripts/ps1/pre-commit-gate.ps1` headlessly (`GUARD-AST-001`: flatten $\text{CC}>15$ / $\text{Depth}>4$, re-stage, re-run). Commit via `git commit -F "$dir\commit_batch_N.txt"` (never `--no-verify`), then `pwsh -File scripts/ps1/audit-all.ps1`. Keep `CHANGELOG.md`/`README.md` jargon-free.
 
 ---
 

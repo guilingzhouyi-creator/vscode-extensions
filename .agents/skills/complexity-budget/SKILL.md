@@ -23,51 +23,31 @@ Defines per-function AST slice budgets, control-flow flattening patterns, dual-t
 
 ## 1. Per-Function AST Slice Budgets (`GUARD-AST-001`)
 
-| Metric | Rigid Limit | Elastic Envelope | Remediation Pattern |
+SSOT: `scripts/common/quality-budget-contract.json` and `scripts/common/lib/eloc-line-classifier.js`:
+
+| Metric | Limit | Elastic Envelope | Remediation |
 | :--- | :---: | :--- | :--- |
-| **Cyclomatic / Cognitive Complexity (`CC`)** | $\text{CC} \le 15$ | • Flat loop-free `if/switch` dispatchers ($\text{Depth} \le 2$): $\text{CC} \le 25$<br/>• File-private pure functions ($\text{Depth} \le 3$, loop-free): $\text{CC} \le 18\text{–}20$ (exported API locked at $\le 15$)<br/>• `*archetype*` & `*.test.ts`: $\text{CC} \le 20$ | Extract pure helper predicates; replace cascading branches with frozen `Map` / lookup tables ([control-flow-flattening-patterns.md#3-strategy-map-dispatch-on-to-o1-cc](references/control-flow-flattening-patterns.md#3-strategy-map-dispatch-on-to-o1-cc)) |
-| **Control-Flow Nesting (`Depth`)** | $\text{Depth} \le 4$ | Target $\text{Depth} \le 2\text{–}3$; $\text{Depth} > 4$ is blocked workspace-wide (`CPX-NEST-001`) | Flatten via early guard returns (`return`/`continue`/`break`) ([control-flow-flattening-patterns.md#1-guard-clauses-early-returns](references/control-flow-flattening-patterns.md#1-guard-clauses-early-returns)) and extract loop-body `try-catch` into pure parsers ([control-flow-flattening-patterns.md#2-isolate-parsing-pipelines-from-streaming-loops](references/control-flow-flattening-patterns.md#2-isolate-parsing-pipelines-from-streaming-loops), [flat-control-flow-patterns.ts](templates/flat-control-flow-patterns.ts)) |
-| **Single-Line Token Noise (`Noise`)** | $\text{Noise} \le 4.0$ | Ratio of non-identifier chars to identifier chars on non-blank code lines $\le 4.0$ | Extract named intermediate constants; eliminate nested ternaries and inline regex chains |
+| **`CC`** | $\le 15$ | Flat dispatchers ($\text{Depth}\le 2$): $\le 25$; file-private pure ($\text{Depth}\le 3$, loop-free): $\le 18\text{–}20$; `*archetype*`/`*.test.ts`: $\le 20$ | Predicates; frozen `Map` dispatch ([control-flow-flattening-patterns.md#3-strategy-map-dispatch-on-to-o1-cc](references/control-flow-flattening-patterns.md#3-strategy-map-dispatch-on-to-o1-cc)) |
+| **`Depth`** | $\le 4$ | Target $\le 2\text{–}3$; $> 4$ blocked (`CPX-NEST-001`) | Guard returns ([control-flow-flattening-patterns.md#1-guard-clauses-early-returns](references/control-flow-flattening-patterns.md#1-guard-clauses-early-returns)); isolate loop `try-catch` ([control-flow-flattening-patterns.md#2-isolate-parsing-pipelines-from-streaming-loops](references/control-flow-flattening-patterns.md#2-isolate-parsing-pipelines-from-streaming-loops), [flat-control-flow-patterns.ts](templates/flat-control-flow-patterns.ts)) |
+| **`Noise`** | $\le 4.0$ | Non-identifier / identifier ratio $\le 4.0$ | Named constants; ban nested ternaries |
 
 ---
 
-## 2. Dual-Track Volume, 1:3 Dynamic Envelope & 5D Code Density
+## 2. Volume, 1:3 Envelope & 5D Density
 
-1. **Absolute Ceilings (`evaluate-eloc-budget.js`)**: Effective code lines $\text{ELOC} \le 900$; physical lines $\text{LOC} \le 1400$.
-2. **1:3 Bidirectional Dynamic Envelope ([dynamic-envelope-cheatsheet.md](references/dynamic-envelope-cheatsheet.md))**:
-   - **Forward Physical Ceiling**: $\text{LOC}_{\text{max}} = \min(1400, \max(150, \lceil \text{ELOC} \times 3.0 \rceil))$.
-   - **Reverse Semantic Floor**: When $\text{LOC} \ge 250$, require $\text{ELOC} \ge \lfloor \text{LOC} / 3.0 \rfloor$ ($\ge 33.3\%$ code density).
-   - **High-Load Comment Floor**: When $\text{ELOC} \ge 600$, require $\text{Comments} / \text{LOC} \ge 0.08$ ($\ge 8\%$).
-   - **Cohesion Preservation**: Never mechanically fragment cohesive modules already within $\text{ELOC} \le 900, \text{LOC} \le 1400$ into tiny 50-line files; prioritize eliminating loop allocations (`CPX-SPACE-001`).
-3. **5D Code Density & Plumbing Overhead (`validate-code-density.js`)**:
-   - **Token Density ($\tau = \text{tokens} / \text{ELOC}$)**: Floor $\tau \ge 2.5$ (`VOL-DIL-001`, blocks vertical line-splitting sprawl); ceiling $\tau \le 22.0$ (`GUARD-AST-001`, blocks dense one-liners).
-   - **Plumbing Overhead & Payload (`ARCH-FAC-001`)**: $\text{POR} \le 0.60$, $\text{TSPR} \ge 0.40$ (`index.*`, `*.d.ts`, `constants.*` exempt).
-   - **Role Envelopes**: `algorithm_computation` ($\text{ELOC} \le 1100, \text{LOC} \le 1500, \text{CC} \le 20$); `rules_registry` ($\text{ELOC} \le 2000, \text{LOC} \le 3000$); `shared_library` ($\text{ELOC} \le 450, \text{LOC} \le 600$).
+1. **Ceilings (`evaluate-eloc-budget.js`)**: $\text{ELOC}\le 900$, $\text{LOC}\le 1400$ (`quality-budget-contract.json`); never shred in-budget modules into 50-line files (`CPX-SPACE-001`).
+2. **1:3 Envelope ([dynamic-envelope-cheatsheet.md](references/dynamic-envelope-cheatsheet.md))**: $\text{LOC}_{\text{max}} = \min(1400, \max(150, \lceil \text{ELOC}\times 3.0 \rceil))$; at $\text{LOC}\ge 250$, $\text{ELOC}\ge \lfloor \text{LOC}/3.0 \rfloor$; at $\text{ELOC}\ge 600$, $\text{Comments}/\text{LOC}\ge 0.08$.
+3. **5D Density (`validate-code-density.js`)**: $\tau \in [2.5, 22.0]$ (`VOL-DIL-001` / `GUARD-AST-001`), $\text{POR}\le 0.60$, $\text{TSPR}\ge 0.40$ (`ARCH-FAC-001`; `index.*`/`*.d.ts`/`constants.*` exempt). Roles: `algorithm_computation` ($\le 1100/1500$, $\text{CC}\le 20$), `rules_registry` ($\le 2000/3000$), `shared_library` ($\le 450/600$).
 
 ---
 
-## 3. Six-Field JSDoc Header, ECR Comment Model & Algorithm Bounds
+## 3. JSDoc Header, ECR, Loop Alloc & Verification
 
-1. **6-Field Module Header**: Core modules (`src/**`, operators, facades, scripts) must start with a JSDoc block containing: `Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities` (numbered 1–4), and `Design Rationale` (or `Exit Semantics & Design Rationale`).
-2. **Effective Comment Ratio (`ECR = max(0, sum(w_i)) / totalCommentLines`)**:
-   - Weights: `DESIGN_RATIONALE` / `ARCHITECTURE_INTENT` / `ALGORITHMIC_PROOF` (`+1.0`), `LIFECYCLE_OWNERSHIP` / `INVARIANT_BOUNDARY` (`+0.9`), `API_CONTRACT` (`+0.8`), `TRIVIAL_TRANSLATION` / `BEHAVIOR_ECHO` (`0.0 / -0.2`), `WATER_LOGGING` (`-0.5`).
-   - When `totalCommentLines >= 5`, $\text{ECR} < 0.40$ or $\ge 2$ `WATER_LOGGING` lines triggers `GOV-GAM-001`. Forbid ghost-branch comments and sprint codenames (`W1~W9`, `Pass 1..6`, `Sprint 3`).
-3. **Algorithm Degradation Bounds**: Non-trivial operators (Myers Diff, AST walkers, solvers) must document worst-case complexity, fallback thresholds (e.g., Myers fallback to `histogramDiff` when $\max(\text{midN} + \text{midM}) > 1500$ or matrix $> 2\times 10^6$), and buffer length invariants (`hashA.length === a.length`).
-
----
-
-## 4. Zero Loop Heap Allocation (`CPX-SPACE-001` / `ADV-PRF-002` / `PRF-MEM-001`) & Anti-Gaming
-
-1. **8 Zero-Allocation Rules in Hot Loops**: ① Hoist closures/object literals outside loops; ② preallocate `Float64Array`/`Int32Array` buffers; ③ accumulate strings via array `.push()` + post-loop `.join('\n')`; ④ iterate `Map`/`Set` directly without `[...map.entries()]`; ⑤ pool stateful objects with `resetState()` / `reset_state()`; ⑥ use cursor index `queue[head++]` instead of `Array.shift()`; ⑦ reuse `cachedLines` instead of repeated `.split('\n')`; ⑧ hoist regexes to module-level `const RE_*` (`PRF-MEM-001`).
-2. **Anti-Gaming Circuit Breaker (`BLOCK_GAMING_DETECTED` / `GOV-GAM-001`)**: Refactoring commits with $\text{ELOC}_{\text{semantic}} \le 15\%$ and zero net technical debt elimination are blocked.
-
----
-
-## 5. Verification Commands
+1. **6-Field Header & ECR**: Modules declare `Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities`, `Design Rationale`. $\text{ECR} = \max(0, \sum w_i)/\text{totalCommentLines}$ (`DESIGN_RATIONALE`/`ARCHITECTURE_INTENT`/`ALGORITHMIC_PROOF` `+1.0`, `LIFECYCLE_OWNERSHIP`/`INVARIANT_BOUNDARY` `+0.9`, `API_CONTRACT` `+0.8`, `TRIVIAL_TRANSLATION`/`BEHAVIOR_ECHO` `0/-0.2`, `WATER_LOGGING` `-0.5`); at $\ge 5$ lines, $\text{ECR}<0.40$ or $\ge 2$ `WATER_LOGGING` triggers `GOV-GAM-001`. Document complexity bounds, fallbacks (Myers $\to$ `histogramDiff` $> 1500$ or $> 2\times 10^6$), and length invariants (`hashA.length === a.length`).
+2. **Zero Loop Alloc (`CPX-SPACE-001` / `ADV-PRF-002` / `PRF-MEM-001`)**: Hoist closures/objects/`const RE_*`; preallocate typed arrays; `.push()`+`.join('\n')`; iterate `Map`/`Set` directly; `resetState()`; `queue[head++]`; reuse `cachedLines`.
+3. **Anti-Gaming (`BLOCK_GAMING_DETECTED` / `GOV-GAM-001`)**: Blocks $\text{ELOC}_{\text{semantic}}\le 15\%$ refactors with zero debt cut.
 
 ```powershell
-node scripts/common/evaluate-eloc-budget.js
-node auto-refactor/scripts/validate-comment-governance.js
-pwsh -File scripts/ps1/pre-commit-gate.ps1
-node scripts/common/validate-code-density.js --all
+node scripts/common/evaluate-eloc-budget.js && node auto-refactor/scripts/validate-comment-governance.js
+pwsh -File scripts/ps1/pre-commit-gate.ps1 && node scripts/common/validate-code-density.js --all
 ```

@@ -23,28 +23,26 @@ Unifies **user-facing documentation isolation (`README.md` / `CHANGELOG.md` zero
 
 ## 1. User-Facing Documentation Isolation (`DOC-RD-001` / `DOC-CL-001`)
 
-`CHANGELOG.md` and extension root `README.md` target end users and must never leak internal engineering or gate jargon:
+`CHANGELOG.md` and `README.md` target end users and must never expose internal engineering jargon:
 
-| Dimension | Blocked Internal Jargon (❌ Violation) | Required User-Facing Value Statement (✅ Compliant) |
+| Dimension | Blocked Internal Jargon | User-Facing Value |
 | :--- | :--- | :--- |
-| **Architecture** | "5-layer decoupling", "ablate trampolines", "SubAgent assembly" | "Faster dashboard rendering", "Instant stats across large workspaces" |
-| **Complexity & Memory** | "CC <= 15", "ELOC budget", "1:3 dynamic envelope", "zero heap alloc" | "Lower background CPU & memory footprint", "Lightweight long-session tracking" |
-| **Gates & Sprints** | "commit-msg gate", "audit-all green", "Phase_XX / Batch N" | "Improved crash recovery reliability", "Complete bilingual localization" |
+| **Architecture** | "5-layer decoupling", "ablate trampolines", "SubAgent" | "Faster dashboard rendering", "Instant large-workspace stats" |
+| **Budget/Memory** | "CC <= 15", "ELOC budget", "1:3 envelope", "zero alloc" | "Lower CPU & memory footprint", "Lightweight tracking" |
+| **Gates/Sprints** | "commit-msg gate", "audit-all green", "Phase_XX / Batch N" | "Improved crash recovery", "Complete bilingual UI" |
 
-1. **Keep-a-Changelog Format**: Heading `## [X.Y.Z] - YYYY-MM-DD` with standard subsections (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`).
-2. **Product `README.md` Layout**: Include only `[Tagline -> Features -> Quick Start -> Extension Settings -> Feedback]`; place internal architecture diagrams in `docs/architecture.md`.
-
----
-
-## 2. Local Packaging, Dual-Host `-HotSync` & Registry Self-Healing (`package.ps1` / `package.sh`)
-
-Artifacts output to `dist/<ext>/`, retaining the latest 5 versions (`-Keep 5` automatic rotation):
-- **`-HotSync` Dual-Host Sync**: Bypasses `.vsix` compression to sync compiled output directly into `$env:USERPROFILE\.vscode\extensions` and `$env:USERPROFILE\.cursor\extensions` (`<publisher>.<name>-<version>`).
-- **`Repair-ExtensionRegistry` Self-Healing**: Parses host `extensions.json` before sync, removes Ghost Entries whose physical `relativeLocation` directory no longer exists, and writes back UTF-8 without BOM so extension commands and status-bar items register cleanly.
+- **Format**: Keep-a-Changelog `## [X.Y.Z] - YYYY-MM-DD` (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`); `README.md` uses `[Tagline -> Features -> Quick Start -> Extension Settings -> Feedback]` (internals in `docs/architecture.md`).
 
 ---
 
-## 3. SemVer Bump (`version-bump.sh`) & Release Tagging (`release-tag.sh`)
+## 2. Discovery, `-HotSync` & Registry Repair
+
+- **SSOT Discovery**: Packaging, version bumps, release tags, and CI discover extensions via `node scripts/common/project-registry-resolver.js --vscode-extensions`.
+- **`package.ps1` / `package.sh`**: Output `.vsix` to `dist/<ext>/` (`-Keep 5`); `-HotSync` copies compiled builds to `$env:USERPROFILE\.vscode\extensions` and `$env:USERPROFILE\.cursor\extensions` (`<publisher>.<name>-<version>`); `Repair-ExtensionRegistry` prunes Ghost Entries from host `extensions.json` (UTF-8 no BOM).
+
+---
+
+## 3. SemVer Bump, Release Tagging & Assets
 
 ```bash
 bash scripts/sh/check-display-assets.sh
@@ -53,9 +51,5 @@ pwsh -File scripts/ps1/package.ps1 -HotSync
 bash scripts/sh/release-tag.sh workspace-timing patch --message "v0.5.1 — Improve crash recovery and bilingual dictionary" --no-push
 ```
 
----
-
-## 4. JIT References & Templates
-
-- [extension-registry-repair.md](references/extension-registry-repair.md): Ghost-entry registry repair mechanics and jargon-to-user-value translation matrix.
-- [package-release-runbook.md](templates/package-release-runbook.md): Keep-a-Changelog template, product README skeleton, and end-to-end release checklist.
+- [extension-registry-repair.md](references/extension-registry-repair.md): Ghost-entry repair mechanics and jargon translation matrix.
+- [package-release-runbook.md](templates/package-release-runbook.md): Keep-a-Changelog template, README skeleton, and release checklist.
