@@ -17,7 +17,7 @@ const path = require("path");
 const { execSync, execFileSync } = require("child_process");
 const { getSafeGitEnv, readStagedBuffersBatch, getStagedFiles: queryStagedFiles } = require("./git-env");
 const analyzers = require("./lib/staged-slice-analyzers");
-const { isFunctionNode, isExportedFunction } = analyzers;
+const { isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise } = analyzers;
 
 let ts;
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -429,116 +429,6 @@ const NESTING_BLOCK_KINDS = new Set([
   ts.SyntaxKind.TryStatement,
   ts.SyntaxKind.SwitchStatement,
 ]);
-
-/**
- * State Machine Invariant: Calculates McCabe Cyclomatic Complexity for a single function scope.
- * Complexity starts at 1, incrementing on each decision branch (if, loop, case, catch, logical operators).
- * Nested child functions are ignored to isolate complexity to the target function boundary.
- *
- * @param {ts.Node} node - Function AST node
- * @returns {number} Computed cyclomatic complexity
- */
-function calculateComplexity(node) {
-  let complexity = 1;
-  function walk(n) {
-    if (n !== node && isFunctionNode(n)) {
-      return;
-    }
-    if (BRANCHING_KINDS.has(n.kind)) {
-      complexity++;
-    } else if (
-      ts.isBinaryExpression(n) &&
-      LOGICAL_BINARY_OPS.has(n.operatorToken.kind)
-    ) {
-      complexity++;
-    }
-    ts.forEachChild(n, walk);
-  }
-  ts.forEachChild(node, walk);
-  return complexity;
-}
-
-/**
- * Scans a function AST node to check for presence of loop constructs (for, while, do).
- * Functions containing loops are ineligible for flat dispatcher or low blast radius bonuses.
- *
- * @param {ts.Node} node - Function AST node
- * @returns {boolean}
- */
-function hasLoopConstruct(node) {
-  let found = false;
-  function walk(n) {
-    if (found) return;
-    if (n !== node && isFunctionNode(n)) {
-      return;
-    }
-    if (LOOP_KINDS.has(n.kind)) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(n, walk);
-  }
-  ts.forEachChild(node, walk);
-  return found;
-}
-
-/**
- * State Machine Invariant: Recursively traverses AST control flow blocks to calculate maximum nesting depth.
- * Guard clause awareness: Chained else-if statements do not increment nesting depth.
- *
- * @param {ts.Node} node - AST node
- * @param {number} currentDepth - Current block nesting level
- * @param {{ val: number }} maxObserved - Container tracking peak nesting depth
- */
-function checkNesting(node, currentDepth, maxObserved) {
-  let depth = currentDepth;
-  const isBlock = NESTING_BLOCK_KINDS.has(node.kind);
-
-  const isElseIf =
-    node.kind === ts.SyntaxKind.IfStatement &&
-    node.parent &&
-    node.parent.kind === ts.SyntaxKind.IfStatement &&
-    node.parent.elseStatement === node;
-
-  if (isBlock && !isElseIf) {
-    depth++;
-    if (depth > maxObserved.val) {
-      maxObserved.val = depth;
-    }
-  }
-
-  ts.forEachChild(node, (child) => {
-    if (!isFunctionNode(child)) {
-      checkNesting(child, depth, maxObserved);
-    }
-  });
-}
-
-/**
- * Computes Effective Lines of Code (ELOC) and noise ratio (kappa_noise).
- *
- * @param {string} content - Raw source file content
- * @returns {{ totalLines: number, eloc: number, noiseRatio: number }}
- */
-function calculateElocAndNoise(content) {
-  const lines = content.split("\n");
-  const totalLines = lines.length;
-  let eloc = 0;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (
-      trimmed.length > 0 &&
-      !trimmed.startsWith("//") &&
-      !trimmed.startsWith("/*") &&
-      !trimmed.startsWith("*")
-    ) {
-      eloc++;
-    }
-  }
-  const nonEloc = Math.max(0, totalLines - eloc);
-  const noiseRatio = nonEloc / Math.max(1, eloc);
-  return { totalLines, eloc, noiseRatio };
-}
 
 /**
  * Resolves effective cyclomatic complexity ceiling based on function blast radius and role.
