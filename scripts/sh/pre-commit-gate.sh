@@ -258,107 +258,45 @@ fi
 # --- 项目增量编译与语法验证 (精准增量触发) ---
 TOUCHED_WT_COMPILE=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(src/.+\.ts|tsconfig.*\.json)' || true)
 TOUCHED_AR_COMPILE=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src/.+\.ts|tsconfig.*\.json|crates/.+\.rs|crates/.+\.toml|crates/Cargo\.(toml|lock))' || true)
-# Rust sources need the crate workspace checked, not the TypeScript project: a staged `.rs` file
-# can break `cargo check` while `tsc` stays perfectly green, which is how the crate workspace
-# previously reached pre-push without ever being compiled at commit time.
 TOUCHED_AR_CRATES=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/crates/.+(\.rs|\.toml)$' || true)
 TOUCHED_WG_AUDIT=$(echo "$STAGED_FILES" | grep -E '^WebGames/(config/|scripts/py/audit_config\.py)' || true)
 TOUCHED_FG_COMPILE=$(echo "$STAGED_FILES" | grep -E '^fractal-git/(crates/.+\.rs|src/.+\.rs|Cargo\.(toml|lock))' || true)
 
 if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! (cd workspace-timing && "$NPM_BIN" run compile) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "EXTENSION-COMPILE-04" \
-                "L0-COMPILE" \
-                "TypeScript compilation failed in workspace-timing." \
-                "Run 'npm run compile' in workspace-timing and resolve compiler errors." \
-                "npm --prefix workspace-timing run compile" \
-                "workspace-timing/src"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+    write_step_banner "EXTENSION-COMPILE-04"
+    if run_pre_commit_check "EXTENSION-COMPILE-04" "L0-COMPILE" "$ROOT_DIR/workspace-timing" "TypeScript compilation failed in workspace-timing." "Run 'npm run compile' in workspace-timing and resolve compiler errors." "npm --prefix workspace-timing run compile" "workspace-timing/src" "$NPM_BIN" run compile; then
+        write_step_verdict "EXTENSION-COMPILE-04" PASS "workspace-timing 增量编译通过"
     else
-        write_step_banner "EXTENSION-COMPILE-04"
-        if ! (cd workspace-timing && "$NPM_BIN" run compile) >"$STEP_LOG" 2>&1; then
-            write_step_verdict "EXTENSION-COMPILE-04" BLOCK "workspace-timing 编译失败"
-            tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-            FAILED=1
-        else
-            write_step_verdict "EXTENSION-COMPILE-04" PASS "workspace-timing 增量编译通过"
-        fi
+        write_step_verdict "EXTENSION-COMPILE-04" BLOCK "workspace-timing 编译失败"
     fi
 
     if [[ "$FAILED" -eq 0 ]]; then
-        if [[ "$AGENT_MODE" -eq 1 ]]; then
-            if ! (cd workspace-timing && "$NPM_BIN" run test:fast) >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "EXTENSION-TESTS-05" \
-                    "GUARD-SYS-001" \
-                    "Unit tests failed in workspace-timing." \
-                    "Run 'npm run test:fast' in workspace-timing and resolve failing tests." \
-                    "npm --prefix workspace-timing run test:fast" \
-                    "workspace-timing/src"
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-                exit 1
-            fi
+        write_step_banner "EXTENSION-TESTS-05"
+        if run_pre_commit_check "EXTENSION-TESTS-05" "GUARD-SYS-001" "$ROOT_DIR/workspace-timing" "Unit tests failed in workspace-timing." "Run 'npm run test:fast' in workspace-timing and resolve failing tests." "npm --prefix workspace-timing run test:fast" "workspace-timing/src" "$NPM_BIN" run test:fast; then
+            write_step_verdict "EXTENSION-TESTS-05" PASS "快速单元测试通过"
         else
-            write_step_banner "EXTENSION-TESTS-05"
-            if ! (cd workspace-timing && "$NPM_BIN" run test:fast) >"$STEP_LOG" 2>&1; then
-                write_step_verdict "EXTENSION-TESTS-05" BLOCK "workspace-timing 快速单测未通过"
-                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-                FAILED=1
-            else
-                write_step_verdict "EXTENSION-TESTS-05" PASS "快速单元测试通过"
-            fi
+            write_step_verdict "EXTENSION-TESTS-05" BLOCK "workspace-timing 快速单测未通过"
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^workspace-timing/'; then
     write_step_verdict "EXTENSION-COMPILE-04" SKIP "仅文档或配置变更"
 fi
 
-TOUCHED_WT_DOC=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)' || true)
-if [[ -n "$TOUCHED_WT_DOC" ]]; then
+if echo "$STAGED_FILES" | grep -qE '^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)'; then
+    write_step_banner "EXTENSION-DOCS-06"
     WT_LAYOUT_READY=1
-    WT_LAYOUT_ARTIFACT="workspace-timing/scripts/dist/audit/text-layout.js"
-    if [[ ! -f "$WT_LAYOUT_ARTIFACT" ]]; then
-        echo "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..."
-        if ! (cd workspace-timing && "$NPM_BIN" run scripts:build) >"$STEP_LOG" 2>&1; then
+    if [[ ! -f "workspace-timing/scripts/dist/audit/text-layout.js" ]]; then
+        log_gate "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..."
+        if ! run_pre_commit_check "EXTENSION-DOCS-06" "L3-DOC-LAYOUT" "$ROOT_DIR/workspace-timing" "workspace-timing scripts:build failed; text-layout artifact is unavailable." "Run 'npm run scripts:build' in workspace-timing and resolve compiler errors." "npm --prefix workspace-timing run scripts:build" "workspace-timing/scripts/audit/text-layout.ts" "$NPM_BIN" run scripts:build; then
             WT_LAYOUT_READY=0
-            if [[ "$AGENT_MODE" -eq 1 ]]; then
-                record_pre_commit_failure "EXTENSION-DOCS-06" \
-                    "L3-DOC-LAYOUT" \
-                    "workspace-timing scripts:build failed; text-layout artifact is unavailable." \
-                    "Run 'npm run scripts:build' in workspace-timing and resolve compiler errors." \
-                    "npm --prefix workspace-timing run scripts:build" \
-                    "workspace-timing/scripts/audit/text-layout.ts"
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-                exit 1
-            fi
             write_step_verdict "EXTENSION-DOCS-06" BLOCK "审查脚本构建失败"
-            tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-            FAILED=1
         fi
     fi
     if [[ "$WT_LAYOUT_READY" -eq 1 ]]; then
-        if [[ "$AGENT_MODE" -eq 1 ]]; then
-            if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "EXTENSION-DOCS-06" \
-                    "L3-DOC-LAYOUT" \
-                    "workspace-timing text layout or changelog authenticity check failed." \
-                    "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." \
-                    "node workspace-timing/scripts/dist/audit/text-layout.js" \
-                    "workspace-timing/CHANGELOG.md"
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-                exit 1
-            fi
+        if run_pre_commit_check "EXTENSION-DOCS-06" "L3-DOC-LAYOUT" "$ROOT_DIR/workspace-timing" "workspace-timing text layout or changelog authenticity check failed." "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." "node workspace-timing/scripts/dist/audit/text-layout.js" "workspace-timing/CHANGELOG.md" "$NODE_BIN" scripts/dist/audit/text-layout.js; then
+            write_step_verdict "EXTENSION-DOCS-06" PASS "文档布局与变更日志真实性合规"
         else
-            write_step_banner "EXTENSION-DOCS-06"
-            if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
-                write_step_verdict "EXTENSION-DOCS-06" BLOCK "文档文本布局或变更日志真实性核验未通过"
-                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-                FAILED=1
-            else
-                write_step_verdict "EXTENSION-DOCS-06" PASS "文档布局与变更日志真实性合规"
-            fi
+            write_step_verdict "EXTENSION-DOCS-06" BLOCK "文档文本布局或变更日志真实性核验未通过"
         fi
     fi
 fi
