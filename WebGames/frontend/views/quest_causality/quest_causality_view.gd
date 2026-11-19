@@ -86,31 +86,25 @@ var _tabs: Variant = null
 var show_completed_dag: bool = true
 
 # ==============================================================================
-# 外部视图契约兼容方法（映射到视图状态，不触碰 @onready 节点）
+# 视图公开交互接口（映射到视图状态，不触碰 @onready 节点）
 # ==============================================================================
 
-## 兼容快照注入入口：更新任务列表。
-func set_quest_list_snapshot(quests: Array) -> void:
-	apply_snapshot({"quests": quests})
-
-## 按任务编号选中任务详情并写入 active_quest_detail。
+## 按任务编号选中任务详情并写入 active_quest_detail
 func select_quest_detail(quest_id: String) -> Dictionary:
 	for quest_entry in quest_list:
-		if str(quest_entry.get("quest_id", "")) == quest_id or str(quest_entry.get("id", "")) == quest_id:
+		if str(quest_entry.get("quest_id", "")) == quest_id:
 			active_quest_detail = quest_entry
 			return {"success": true, "quest": quest_entry}
 	return {"success": false, "quest_id": quest_id}
-
-## 兼容快照注入入口：更新因果环 DAG 节点列表。
-func set_causality_dag_snapshot(nodes: Array) -> void:
-	apply_snapshot({"causality_dag": nodes})
 
 ## 统一快照渲染映射：任务列表与因果 DAG → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("quests"):
 		quest_list = FrontendSnapshot.read_array(snapshot, "quests")
-	if snapshot.has("causality_dag"):
-		causality_dag_nodes = FrontendSnapshot.read_array(snapshot, "causality_dag")
+	if snapshot.has("dag_nodes"):
+		causality_dag_nodes = FrontendSnapshot.read_array(snapshot, "dag_nodes")
+	if snapshot.has("bounty_targets"):
+		bounty_targets = FrontendSnapshot.read_array(snapshot, "bounty_targets")
 
 func _get_tabs():
 	if _tabs == null:
@@ -123,20 +117,20 @@ func _ready() -> void:
 	# 1. 应用主题
 	_apply_theme()
 
-	# 2. 加载预设数据
-	_load_mock_data()
+	# 2. 加载域快照
+	_load_domain_snapshot()
 
 	# 3. 初始化 Tab 标题
 	_init_tab_titles()
 
 	# 4. 初始化静态文案
-	_init_static_text()
+	_get_tabs().init_static_text()
 
 	# 5. 初始化各子界面
 	_init_quest_list_tab()
 	_get_tabs().init_quest_detail_tab()
-	_init_causality_dag_tab()
-	_init_bounty_tab()
+	_get_tabs().init_causality_dag_tab()
+	_get_tabs().init_bounty_tab()
 
 	# 6. 绑定信号（仅本地 UI 交互反馈）
 	_connect_signals()
@@ -170,12 +164,14 @@ func _init_tab_titles() -> void:
 # 静态文案初始化（非动态数据节点，i18n 绑定）
 # ==============================================================================
 
-## 初始化全部静态文案（15 个非唯一标签 + 各 Tab 动态默认值，i18n 全驱动）
-func _init_static_text() -> void:
-	_get_tabs().init_static_text()
-
-func _load_mock_data() -> void:
-	_get_tabs().load_mock_data()
+func _load_domain_snapshot() -> void:
+	var quest_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("quest")
+	if not quest_snapshot.is_empty():
+		apply_snapshot(quest_snapshot)
+	else:
+		quest_list = []
+		causality_dag_nodes = []
+		bounty_targets = []
 
 # ==============================================================================
 
@@ -247,25 +243,7 @@ func _status_name(status_code: String) -> String:
 		_: return status_code
 
 # ==============================================================================
-# ==============================================================================
-# Tab 1~3 委托给 QuestCausalityTabs
-# ==============================================================================
-
-func _init_causality_dag_tab() -> void:
-	_get_tabs().init_causality_dag_tab()
-
-func _refresh_dag_node_list() -> void:
-	_get_tabs().refresh_dag_node_list()
-
-func _dag_status_name(status_code: String) -> String:
-	return _get_tabs().dag_status_name(status_code)
-
-func _init_bounty_tab() -> void:
-	_get_tabs().init_bounty_tab()
-
-func _refresh_bounty_targets(tier: int) -> void:
-	_get_tabs().refresh_bounty_targets(tier)
-
+# 信号绑定
 # ==============================================================================
 
 ## 绑定本地 UI 交互信号（四 Tab 全部控件的本地交互事件）
@@ -284,13 +262,13 @@ func _connect_signals() -> void:
 	connect_managed(_quest_submit_button.pressed, _on_quest_submit)
 
 	# 因果环 DAG
-	connect_managed(_show_completed_check_box.toggled, _on_show_completed_toggled)
-	connect_managed(_dag_node_list.item_selected, _on_dag_node_selected)
+	connect_managed(_show_completed_check_box.toggled, _get_tabs().on_show_completed_toggled)
+	connect_managed(_dag_node_list.item_selected, _get_tabs().on_dag_node_selected)
 
 	# 悬赏
-	connect_managed(_bounty_tier_tab.tab_changed, _on_bounty_tier_changed)
-	connect_managed(_bounty_target_list.item_selected, _on_bounty_target_selected)
-	connect_managed(_bounty_accept_button.pressed, _on_bounty_accept)
+	connect_managed(_bounty_tier_tab.tab_changed, _get_tabs().on_bounty_tier_changed)
+	connect_managed(_bounty_target_list.item_selected, _get_tabs().on_bounty_target_selected)
+	connect_managed(_bounty_accept_button.pressed, _get_tabs().on_bounty_accept)
 
 # ==============================================================================
 # 返回按钮
@@ -373,20 +351,3 @@ func _sync_quest_status(quest_entry: Dictionary) -> void:
 # ==============================================================================
 # 因果环 DAG 交互
 # ==============================================================================
-# Tab 2 & 3 交互回调委托
-# ==============================================================================
-
-func _on_show_completed_toggled(pressed: bool) -> void:
-	_get_tabs().on_show_completed_toggled(pressed)
-
-func _on_dag_node_selected(index: int) -> void:
-	_get_tabs().on_dag_node_selected(index)
-
-func _on_bounty_tier_changed(tab: int) -> void:
-	_get_tabs().on_bounty_tier_changed(tab)
-
-func _on_bounty_target_selected(index: int) -> void:
-	_get_tabs().on_bounty_target_selected(index)
-
-func _on_bounty_accept() -> void:
-	_get_tabs().on_bounty_accept()

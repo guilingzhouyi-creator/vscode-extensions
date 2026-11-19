@@ -22,85 +22,9 @@ var state_panel: KStatePanel = null
 
 var _view: Variant = null
 
-var mock_quests: Array = [
-	{
-		"quest_id": "Q_MAIN_01", "title": "ui.fe07.mock.quest.q_main_01.title", "category": "MAIN", "status": "ACTIVE",
-		"giver": "ui.fe07.mock.quest.q_main_01.giver", "level_req": 20,
-		"desc": "ui.fe07.mock.quest.q_main_01.desc",
-		"objectives": ["ui.fe07.mock.quest.q_main_01.obj1", "ui.fe07.mock.quest.q_main_01.obj2"],
-		"rewards": ["ui.fe07.mock.quest.q_main_01.rwd1", "ui.fe07.mock.quest.q_main_01.rwd2", "ui.fe07.mock.quest.q_main_01.rwd3"]
-	},
-	{
-		"quest_id": "Q_MAIN_02", "title": "ui.fe07.mock.quest.q_main_02.title", "category": "MAIN", "status": "AVAILABLE",
-		"giver": "ui.fe07.mock.quest.q_main_02.giver", "level_req": 15,
-		"desc": "ui.fe07.mock.quest.q_main_02.desc",
-		"objectives": ["ui.fe07.mock.quest.q_main_02.obj1", "ui.fe07.mock.quest.q_main_02.obj2"],
-		"rewards": ["ui.fe07.mock.quest.q_main_02.rwd1", "ui.fe07.mock.quest.q_main_02.rwd2"]
-	},
-	{
-		"quest_id": "Q_SIDE_01", "title": "ui.fe07.mock.quest.q_side_01.title", "category": "SIDE", "status": "ACTIVE",
-		"giver": "ui.fe07.mock.quest.q_side_01.giver", "level_req": 5,
-		"desc": "ui.fe07.mock.quest.q_side_01.desc",
-		"objectives": ["ui.fe07.mock.quest.q_side_01.obj1"],
-		"rewards": ["ui.fe07.mock.quest.q_side_01.rwd1", "ui.fe07.mock.quest.q_side_01.rwd2"]
-	},
-	{
-		"quest_id": "Q_SIDE_02", "title": "ui.fe07.mock.quest.q_side_02.title", "category": "SIDE", "status": "AVAILABLE",
-		"giver": "ui.fe07.mock.quest.q_side_02.giver", "level_req": 8,
-		"desc": "ui.fe07.mock.quest.q_side_02.desc",
-		"objectives": ["ui.fe07.mock.quest.q_side_02.obj1", "ui.fe07.mock.quest.q_side_02.obj2"],
-		"rewards": ["ui.fe07.mock.quest.q_side_02.rwd1", "ui.fe07.mock.quest.q_side_02.rwd2"]
-	},
-	{
-		"quest_id": "Q_COM_01", "title": "ui.fe07.mock.quest.q_com_01.title", "category": "COMMISSION", "status": "COMPLETED",
-		"giver": "ui.fe07.mock.quest.q_com_01.giver", "level_req": 10,
-		"desc": "ui.fe07.mock.quest.q_com_01.desc",
-		"objectives": ["ui.fe07.mock.quest.q_com_01.obj1"],
-		"rewards": ["ui.fe07.mock.quest.q_com_01.rwd1"]
-	},
-	{
-		"quest_id": "Q_COM_02", "title": "ui.fe07.mock.quest.q_com_02.title", "category": "COMMISSION", "status": "ACTIVE",
-		"giver": "ui.fe07.mock.quest.q_com_02.giver", "level_req": 12,
-		"desc": "ui.fe07.mock.quest.q_com_02.desc",
-		"objectives": ["ui.fe07.mock.quest.q_com_02.obj1"],
-		"rewards": ["ui.fe07.mock.quest.q_com_02.rwd1", "ui.fe07.mock.quest.q_com_02.rwd2"]
-	}
-]
-
-var mock_dag_nodes: Array = [
-	{"node_id": "DAG_01", "name": "ui.fe07.mock.dag.dag_01.name", "status": "COMPLETED", "chain_desc": "ui.fe07.mock.dag.dag_01.chain_desc"},
-	{"node_id": "DAG_02", "name": "ui.fe07.mock.dag.dag_02.name", "status": "COMPLETED", "chain_desc": "ui.fe07.mock.dag.dag_02.chain_desc"},
-	{"node_id": "DAG_03", "name": "ui.fe07.mock.dag.dag_03.name", "status": "ACTIVE", "chain_desc": "ui.fe07.mock.dag.dag_03.chain_desc"},
-	{"node_id": "DAG_04", "name": "ui.fe07.mock.dag.dag_04.name", "status": "ACTIVE", "chain_desc": "ui.fe07.mock.dag.dag_04.chain_desc"},
-	{"node_id": "DAG_05", "name": "ui.fe07.mock.dag.dag_05.name", "status": "LOCKED", "chain_desc": "ui.fe07.mock.dag.dag_05.chain_desc"},
-	{"node_id": "DAG_06", "name": "ui.fe07.mock.dag.dag_06.name", "status": "LOCKED", "chain_desc": "ui.fe07.mock.dag.dag_06.chain_desc"},
-	{"node_id": "DAG_07", "name": "ui.fe07.mock.dag.dag_07.name", "status": "LOCKED", "chain_desc": "ui.fe07.mock.dag.dag_07.chain_desc"}
-]
-
-var mock_bounty_targets: Array = [
-	{"target_id": "B_T1_01", "name": "ui.fe07.mock.bounty.b_t1_01.name", "tier": 1, "reward_gold": 500, "time_remain": "ui.fe07.mock.bounty.b_t1_01.time", "desc": "ui.fe07.mock.bounty.b_t1_01.desc"},
-	{"target_id": "B_T2_01", "name": "ui.fe07.mock.bounty.b_t2_01.name", "tier": 2, "reward_gold": 1500, "time_remain": "ui.fe07.mock.bounty.b_t2_01.time", "desc": "ui.fe07.mock.bounty.b_t2_01.desc"},
-	{"target_id": "B_T2_02", "name": "ui.fe07.mock.bounty.b_t2_02.name", "tier": 2, "reward_gold": 2000, "time_remain": "ui.fe07.mock.bounty.b_t2_02.time", "desc": "ui.fe07.mock.bounty.b_t2_02.desc"},
-	{"target_id": "B_T3_01", "name": "ui.fe07.mock.bounty.b_t3_01.name", "tier": 3, "reward_gold": 5000, "time_remain": "ui.fe07.mock.bounty.b_t3_01.time", "desc": "ui.fe07.mock.bounty.b_t3_01.desc"},
-	{"target_id": "B_T4_01", "name": "ui.fe07.mock.bounty.b_t4_01.name", "tier": 4, "reward_gold": 12000, "time_remain": "ui.fe07.mock.bounty.b_t4_01.time", "desc": "ui.fe07.mock.bounty.b_t4_01.desc"},
-	{"target_id": "B_T5_01", "name": "ui.fe07.mock.bounty.b_t5_01.name", "tier": 5, "reward_gold": 50000, "time_remain": "ui.fe07.mock.bounty.b_t5_01.time", "desc": "ui.fe07.mock.bounty.b_t5_01.desc"},
-	{"target_id": "B_T5_02", "name": "ui.fe07.mock.bounty.b_t5_02.name", "tier": 5, "reward_gold": 80000, "time_remain": "ui.fe07.mock.bounty.b_t5_02.time", "desc": "ui.fe07.mock.bounty.b_t5_02.desc"}
-]
-
 ## 绑定宿主任务与因果视图实例。
 func setup(host_view: BaseScreen) -> void:
 	_view = host_view
-
-## 将预设任务、因果环节点与悬赏目标列表深拷贝加载至宿主视图状态。
-func load_mock_data() -> void:
-	if ServiceLocator.get_mode() == "mock":
-		_view.quest_list = mock_quests.duplicate(true)
-		_view.causality_dag_nodes = mock_dag_nodes.duplicate(true)
-		_view.bounty_targets = mock_bounty_targets.duplicate(true)
-		return
-	_view.quest_list = []
-	_view.causality_dag_nodes = []
-	_view.bounty_targets = []
 
 ## 初始化任务视图主 Tab 栏标题文案。
 func init_tab_titles() -> void:
