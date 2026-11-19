@@ -35,7 +35,7 @@ const {
   checkHeadReceipt,
 } = require('./git-env');
 const checks = require('./lib/fast-staged-checks');
-const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent, validateCommentOnly, collectIndentWidthWarnings, validateFileVolume } = checks;
+const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent, validateCommentOnly, collectIndentWidthWarnings, validateFileVolume, VIOLATION_TPLS } = checks;
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -127,20 +127,6 @@ const ROOT_DISALLOWED_SCRIPT_EXTS = new Set([
 const CLUTTER_FILE_PATTERN =
   /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp|.*\.actual\.json|.*\.log)$/i;
 
-const ALLOWED_SHORT_STEMS = new Set(
-  'ui en zh db io ci os vm fs re id ip gm'.split(' ')
-);
-
-const STANDARD_TECH_ABBREVIATIONS = new Set(
-  ('ui db io os vm fs id ip ci cd sdk api cli ast cfg lut doc req res msg btn pkg src ctx fmt cmd ptr str ' +
-   'std fps rng pr sh ps md ts js py gd rs 2d 3d 4k 5d ssl ssh tcp udp dns rpc ipc csr soa swar simd cc eloc loc gc ' +
-   'diff rgb hex fn cb rx tx env app dev fsm npc gm rpg pve pvp hp mp cdc vs prf mcp ssot ir cai e2e wasm zh cn mcts vfs sm2 sm3 sm4 l1 l2 l3').split(' ')
-);
-
-const IGNORED_BASENAMES = new Set(
-  'index main lib mod api types cli readme changelog license'.split(' ')
-);
-
 const RAW_GATE_SPECS = `EMPTY-FILE|暂存区零空文件与零纯注释空壳检查通过||
 LINE-ENDING|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
 PATH-LEAK|绝对路径与协议防泄漏检查通过|5|✖ BLOCK  PATH-LEAK: 检测到新增代码中包含绝对路径或盘符泄漏:
@@ -160,40 +146,6 @@ const GATE_SPECS = Object.freeze(
   })
 );
 
-const RAW_VIOLATION_TPLS = `SLANG_NAME|零黑话与规范命名 (禁止 temp/wip/new/stN/pN)|重命名文件以移除临时黑话标记
-NAME_VOWEL|含元音语素或标准技术缩写|修正文件名单词拼写或使用标准技术缩写
-NAME_SEGMENTS|按子目录分层重构文件名，减少连接词段数
-NAME_SHORT|>= 3 chars|重命名文件以提供具有领域语义的描述名称
-NAME_LONG|<= 55 chars|通过划分清晰子目录解耦超长文件名
-EOL_PS1|CRLF|将该 PowerShell 脚本换行符转换为 CRLF
-EOL_LF|LF|将该文件换行符转换为 LF
-VOL_ELOC|ELOC <= ${MAX_ELOC_BUDGET}|消除冗余实现并提取子模块以控制 ELOC <= ${MAX_ELOC_BUDGET}
-VOL_LOC|LOC <= ${MAX_LOC_BUDGET}|重构超大文件，按子领域解耦以控制 LOC <= ${MAX_LOC_BUDGET}
-VOL_RATIO|垂直行稀释比超标 (totalLoc > eloc * ${DENSITY_RATIO_LABEL})|消除空行堆叠或将长篇散文注释移至 Markdown 规范文档
-ARCH_FAC|接线代码占比过高 (wiringRatio > ${PLUMBING_RATIO_LABEL})|消除空心透传跳板或为门面注入实质领域能力/不可变性冻结
-EMPTY_FILE|0 bytes|> 0 bytes with semantic payload|删除该空文件或实现实质代码逻辑
-EMPTY_WS|0 non-whitespace characters|实质内容|删除该虚空文件或填充代码
-PATH_LEAK|相对路径或环境变量动态解析|替换绝对路径或盘符为相对路径或 path.resolve(__dirname, ...)
-SECRET_LEAK|暂存代码包含疑似未脱敏的密钥或私钥|敏感凭证特征串|环境变量或模拟密钥|立即移除真实密钥并配置环境变量注入，严禁提交凭证到版本库
-ROOT_SCRIPT|工作区根目录严禁平铺散落代码脚本|scripts/ 规范子目录|将脚本移动至 scripts/common/, scripts/ps1/, scripts/sh/ 或项目 scripts/py/ 并保持根目录整洁 (EXT-DIR-001)
-ROOT_CLUTTER|检测到根目录或工作区临时脏文件/日志|工作区洁净无临时脏污|删除临时文件或日志 (HYG-CLT-001)`;
-
-const VIOLATION_TPLS = Object.freeze(
-  RAW_VIOLATION_TPLS.split('\n').reduce((acc, row) => {
-    const parts = row.split('|');
-    const [key, p1, p2, p3, p4] = parts;
-    if (parts.length === 5) {
-      acc[key] = { message: p1, actual: p2, expected: p3, actionableFix: p4 };
-    } else if (parts.length === 4) {
-      acc[key] = { actual: p1, expected: p2, actionableFix: p3 };
-    } else if (parts.length === 2) {
-      acc[key] = { actionableFix: p1 };
-    } else {
-      acc[key] = { expected: p1, actionableFix: p2 };
-    }
-    return acc;
-  }, {})
-);
 
 function getStagedFiles(repoRoot, explicitFiles = []) {
   // Strict on the index read only: when the caller supplied explicit files there is nothing to
