@@ -229,77 +229,30 @@ else
 fi
 
 # --- 单源规则漂移熔断 ---
-TOUCHED_RULES=$(echo "$STAGED_FILES" | grep -E "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" || true)
-if [[ -n "$TOUCHED_RULES" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! (cd auto-refactor && "$NPM_BIN" run validate-rules-registry) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "RULE-REGISTRY-02" \
-                "RCFG-RULE-DRIFT" \
-                "Auto-refactor rule registry metadata drift detected." \
-                "Run 'npm run validate-rules-registry' in auto-refactor to inspect and sync rules." \
-                "npm --prefix auto-refactor run validate-rules-registry" \
-                "auto-refactor/src/core/rules"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+if echo "$STAGED_FILES" | grep -qE "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/"; then
+    write_step_banner "RULE-REGISTRY-02"
+    if run_pre_commit_check "RULE-REGISTRY-02" "RCFG-RULE-DRIFT" "$ROOT_DIR/auto-refactor" "Auto-refactor rule registry metadata drift detected." "Run 'npm run validate-rules-registry' in auto-refactor to inspect and sync rules." "npm --prefix auto-refactor run validate-rules-registry" "auto-refactor/src/core/rules" "$NPM_BIN" run validate-rules-registry; then
+        write_step_verdict "RULE-REGISTRY-02" PASS "规则元数据单源一致"
     else
-        write_step_banner "RULE-REGISTRY-02"
-        if ! (cd auto-refactor && "$NPM_BIN" run validate-rules-registry) >"$STEP_LOG" 2>&1; then
-            write_step_verdict "RULE-REGISTRY-02" BLOCK "规则注册表元数据发生漂移"
-            tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-            FAILED=1
-        else
-            write_step_verdict "RULE-REGISTRY-02" PASS "规则元数据单源一致"
-        fi
+        write_step_verdict "RULE-REGISTRY-02" BLOCK "规则注册表元数据发生漂移"
     fi
 fi
 
-TOUCHED_SKILLS=$(echo "$STAGED_FILES" | grep -E '^\.agents/(skills|plugins)/' || true)
-if [[ -n "$TOUCHED_SKILLS" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! "$NODE_BIN" scripts/common/validate-skills.js >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "SKILLS-SPEC-03" \
-                "GUARD-SSOT-001" \
-                "Workspace skills specification or plugin isomorphism verification failed." \
-                "Run 'node scripts/common/validate-skills.js' to inspect and fix skill metadata." \
-                "node scripts/common/validate-skills.js" \
-                ".agents/skills"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+if echo "$STAGED_FILES" | grep -qE '^\.agents/(skills|plugins)/'; then
+    write_step_banner "SKILLS-SPEC-03"
+    if run_pre_commit_check "SKILLS-SPEC-03" "GUARD-SSOT-001" "$ROOT_DIR" "Workspace skills specification or plugin isomorphism verification failed." "Run 'node scripts/common/validate-skills.js' to inspect and fix skill metadata." "node scripts/common/validate-skills.js" ".agents/skills" "$NODE_BIN" scripts/common/validate-skills.js; then
+        write_step_verdict "SKILLS-SPEC-03" PASS "技能集规范与插件同构合规"
     else
-        write_step_banner "SKILLS-SPEC-03"
-        if ! "$NODE_BIN" scripts/common/validate-skills.js; then
-            write_step_verdict "SKILLS-SPEC-03" BLOCK "技能集规范或插件同构校验未通过"
-            FAILED=1
-        else
-            write_step_verdict "SKILLS-SPEC-03" PASS "技能集规范与插件同构合规"
-        fi
+        write_step_verdict "SKILLS-SPEC-03" BLOCK "技能集规范或插件同构校验未通过"
     fi
 fi
 
-# --- 提交信息规则覆盖清单双向闭包：内核规则族与外部真源之间不允许静默遗漏 ---
-write_step_banner "COMMIT-MSG-COVERAGE-15" "提交信息规则覆盖清单双向闭包校验"
-if [[ "$AGENT_MODE" == "1" ]]; then
-    if ! "$NODE_BIN" scripts/common/validate-commit-rule-coverage.js >"$STEP_LOG" 2>&1; then
-        record_pre_commit_failure "COMMIT-MSG-COVERAGE-15" \
-            "FGT-MSG-002" \
-            "Commit message rule coverage closure does not hold in both directions." \
-            "Run node scripts/common/validate-commit-rule-coverage.js to inspect unmapped or zombie rules." \
-            "node scripts/common/validate-commit-rule-coverage.js" \
-            "scripts/common/commit-rule-coverage.json"
-        write_step_verdict "COMMIT-MSG-COVERAGE-15" BLOCK "提交信息规则覆盖清单双向闭包不成立"
-        cat "$ROOT_DIR/.audit-logs/last-failure.json"
-        exit 1
-    fi
+# --- 提交信息规则覆盖清单双向闭包 ---
+write_step_banner "COMMIT-MSG-COVERAGE-15"
+if run_pre_commit_check "COMMIT-MSG-COVERAGE-15" "FGT-MSG-002" "$ROOT_DIR" "Commit message rule coverage closure does not hold in both directions." "Run node scripts/common/validate-commit-rule-coverage.js to inspect unmapped or zombie rules." "node scripts/common/validate-commit-rule-coverage.js" "scripts/common/commit-rule-coverage.json" "$NODE_BIN" scripts/common/validate-commit-rule-coverage.js; then
     write_step_verdict "COMMIT-MSG-COVERAGE-15" PASS "覆盖清单双向闭包成立"
 else
-    if ! "$NODE_BIN" scripts/common/validate-commit-rule-coverage.js; then
-        write_step_verdict "COMMIT-MSG-COVERAGE-15" BLOCK "提交信息规则覆盖清单双向闭包不成立"
-        FAILED=1
-    else
-        write_step_verdict "COMMIT-MSG-COVERAGE-15" PASS "覆盖清单双向闭包成立"
-    fi
+    write_step_verdict "COMMIT-MSG-COVERAGE-15" BLOCK "提交信息规则覆盖清单双向闭包不成立"
 fi
 
 # --- 项目增量编译与语法验证 (精准增量触发) ---
