@@ -213,10 +213,10 @@ static func _decode_disk_record(parsed_map: Dictionary, key_32: PackedByteArray,
 ## 密码学审计：逐行校验加密日志文件的 HMAC 签名、序号合法性、超限截断与防篡改哈希链完整性
 static func verify_encrypted_log_file(file_path: String, key_32: PackedByteArray, is_hmac_chain_enabled: bool = true) -> Dictionary:
 	if not FileAccess.file_exists(file_path):
-		return {"ok": false, "verified_count": 0, "tampered_at_seq": 0, "error": LogConstants.LOG_ERR_FILE_NOT_FOUND}
+		return {"ok": false, "verified_count": 0, "tampered_at_seq": 0, "error_code": LogConstants.LOG_ERR_FILE_NOT_FOUND}
 	var file_handle := FileAccess.open(file_path, FileAccess.READ)
 	if file_handle == null:
-		return {"ok": false, "verified_count": 0, "tampered_at_seq": 0, "error": LogConstants.LOG_ERR_FILE_OPEN_FAILED}
+		return {"ok": false, "verified_count": 0, "tampered_at_seq": 0, "error_code": LogConstants.LOG_ERR_FILE_OPEN_FAILED}
 
 	var previous_chain := LogConstants.CHAIN_GENESIS_HASH
 	var verified_count := 0
@@ -227,33 +227,33 @@ static func verify_encrypted_log_file(file_path: String, key_32: PackedByteArray
 			continue
 		if json_parser.parse(line) != OK or not (json_parser.data is Dictionary):
 			file_handle.close()
-			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": 0, "error": LogConstants.LOG_ERR_JSON_CORRUPT}
+			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": 0, "error_code": LogConstants.LOG_ERR_JSON_CORRUPT}
 		var envelope: Dictionary = json_parser.data
 		var sequence_number := int(envelope.get(LogConstants.ENC_KEY_SEQUENCE, 0))
 		if sequence_number <= 0:
 			file_handle.close()
-			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": sequence_number, "error": LogConstants.LOG_ERR_SEQ_NON_MONOTONIC}
+			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": sequence_number, "error_code": LogConstants.LOG_ERR_SEQ_NON_MONOTONIC}
 		var opened := CryptoIntegrityLib.open_log_record_envelope(envelope, key_32, true)
 		if not bool(opened.get("ok", false)):
 			file_handle.close()
-			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": sequence_number, "error": str(opened.get("error", LogConstants.LOG_ERR_MAC_MISMATCH))}
+			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": sequence_number, "error_code": str(opened.get("error_code", LogConstants.LOG_ERR_MAC_MISMATCH))}
 		var ciphertext_base64 := str(envelope.get(LogConstants.ENC_KEY_CIPHERTEXT, ""))
 		var chain_base := previous_chain if is_hmac_chain_enabled else LogConstants.CHAIN_GENESIS_HASH
 		var expected_chain := CryptoIntegrityLib.compute_chain_digest(chain_base, sequence_number, ciphertext_base64)
 		var recorded_chain := str(envelope.get(LogConstants.ENC_KEY_CHAIN_HASH, ""))
 		if not CryptoIntegrityLib.constant_time_equals(expected_chain, recorded_chain):
 			file_handle.close()
-			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": sequence_number, "error": LogConstants.LOG_ERR_CHAIN_BROKEN}
+			return {"ok": false, "verified_count": verified_count, "tampered_at_seq": sequence_number, "error_code": LogConstants.LOG_ERR_CHAIN_BROKEN}
 		previous_chain = recorded_chain
 		verified_count += 1
 
 	var has_exceeded_scan_limit := _has_more_nonempty_lines(file_handle)
 	file_handle.close()
 	if verified_count == 0:
-		return {"ok": false, "verified_count": 0, "tampered_at_seq": 0, "error": LogConstants.LOG_ERR_TRUNCATED_EMPTY}
+		return {"ok": false, "verified_count": 0, "tampered_at_seq": 0, "error_code": LogConstants.LOG_ERR_TRUNCATED_EMPTY}
 	if has_exceeded_scan_limit:
-		return {"ok": false, "verified_count": verified_count, "tampered_at_seq": 0, "error": LogConstants.LOG_ERR_SCAN_LIMIT}
-	return {"ok": true, "verified_count": verified_count, "tampered_at_seq": 0, "error": ""}
+		return {"ok": false, "verified_count": verified_count, "tampered_at_seq": 0, "error_code": LogConstants.LOG_ERR_SCAN_LIMIT}
+	return {"ok": true, "verified_count": verified_count, "tampered_at_seq": 0, "error_code": ""}
 
 static func _has_more_nonempty_lines(file_handle: FileAccess) -> bool:
 	while not file_handle.eof_reached():

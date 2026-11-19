@@ -48,35 +48,70 @@ const TAG_DICT: int = 0x09
 const TAG_BINARY_BLOB: int = 0x0A
 
 static var _crc_table: PackedInt32Array = PackedInt32Array()
+static var _crc_table_1: PackedInt32Array = PackedInt32Array()
+static var _crc_table_2: PackedInt32Array = PackedInt32Array()
+static var _crc_table_3: PackedInt32Array = PackedInt32Array()
+static var _crc_table_mutex: Mutex = Mutex.new()
 
 # ==============================================================================
-# 二、CRC32 完整性计算
+# 二、CRC32 完整性计算 (Slicing-by-4 4字节批处理加速)
 # ==============================================================================
 
-## 惰性初始化 CRC-32 静态查找表 (IEEE 802.3)
+## 惰性初始化 CRC-32 四路查找表 (IEEE 802.3, Slicing-by-4)
 static func _ensure_crc_table() -> void:
-	if not _crc_table.is_empty():
+	if not _crc_table_3.is_empty():
 		return
-	_crc_table.resize(256)
-	for byte_index in range(256):
-		var crc_value: int = byte_index
-		for _bit_index in range(8):
-			# GDScript int 为有符号 64 位，右移后需掩码消除符号位扩展以对齐无符号 32 位逻辑右移
-			if (crc_value & 1) != 0:
-				crc_value = 0xEDB88320 ^ ((crc_value >> 1) & 0x7FFFFFFF)
-			else:
-				crc_value = (crc_value >> 1) & 0x7FFFFFFF
-		_crc_table[byte_index] = crc_value
+	_crc_table_mutex.lock()
+	if _crc_table_3.is_empty():
+		var table0 := PackedInt32Array()
+		var table1 := PackedInt32Array()
+		var table2 := PackedInt32Array()
+		var table3 := PackedInt32Array()
+		table0.resize(256)
+		table1.resize(256)
+		table2.resize(256)
+		table3.resize(256)
+		for byte_index in range(256):
+			var crc_value: int = byte_index
+			for _bit_index in range(8):
+				if (crc_value & 1) != 0:
+					crc_value = 0xEDB88320 ^ ((crc_value >> 1) & 0x7FFFFFFF)
+				else:
+					crc_value = (crc_value >> 1) & 0x7FFFFFFF
+			table0[byte_index] = crc_value
+		for entry_index in range(256):
+			var chained_crc: int = table0[entry_index]
+			chained_crc = table0[chained_crc & 0xFF] ^ ((chained_crc >> 8) & 0x00FFFFFF)
+			table1[entry_index] = chained_crc
+			chained_crc = table0[chained_crc & 0xFF] ^ ((chained_crc >> 8) & 0x00FFFFFF)
+			table2[entry_index] = chained_crc
+			chained_crc = table0[chained_crc & 0xFF] ^ ((chained_crc >> 8) & 0x00FFFFFF)
+			table3[entry_index] = chained_crc
+		_crc_table = table0
+		_crc_table_1 = table1
+		_crc_table_2 = table2
+		_crc_table_3 = table3
+	_crc_table_mutex.unlock()
 
-## 计算二进制字节数组的 CRC-32 校验和
+## 计算二进制字节数组的 CRC-32 校验和（Slicing-by-4 原生字读取 + 尾字节收敛）
 static func compute_crc32(bytes: PackedByteArray) -> int:
 	_ensure_crc_table()
+	var table0: PackedInt32Array = _crc_table
+	var table1: PackedInt32Array = _crc_table_1
+	var table2: PackedInt32Array = _crc_table_2
+	var table3: PackedInt32Array = _crc_table_3
 	var crc_value: int = 0xFFFFFFFF
 	var byte_count: int = bytes.size()
-	for byte_index in range(byte_count):
-		var byte_value: int = bytes[byte_index]
-		var table_index: int = (crc_value ^ byte_value) & 0xFF
-		crc_value = _crc_table[table_index] ^ ((crc_value >> 8) & 0x00FFFFFF)
+	var byte_offset: int = 0
+	var aligned_limit: int = byte_count & ~3
+	while byte_offset < aligned_limit:
+		var word_value: int = bytes.decode_u32(byte_offset) ^ crc_value
+		crc_value = table3[word_value & 0xFF] ^ table2[(word_value >> 8) & 0xFF] ^ table1[(word_value >> 16) & 0xFF] ^ table0[(word_value >> 24) & 0xFF]
+		byte_offset += 4
+	while byte_offset < byte_count:
+		var table_index: int = (crc_value ^ bytes[byte_offset]) & 0xFF
+		crc_value = table0[table_index] ^ ((crc_value >> 8) & 0x00FFFFFF)
+		byte_offset += 1
 	return (crc_value ^ 0xFFFFFFFF) & 0xFFFFFFFF
 
 # ==============================================================================

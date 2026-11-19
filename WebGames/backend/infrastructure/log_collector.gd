@@ -89,7 +89,7 @@ static func log(
 	# 构造期脱敏（Inv-LS-2 安全红线）：入流前同时对 context 与 message 正文执行脱敏
 	RedactionRule.apply_to_record(record, context)
 
-	# 分发至全局事件总线（向后兼容广播；EventBus 内部已接线 LogRingBuffer 与 TelemetryAggregate）
+	# 分发至全局事件总线（EventBus 内部已接线 LogRingBuffer 与 TelemetryAggregate）
 	var event_bus := EventBusCore.get_instance()
 	if event_bus != null:
 		event_bus.emit_log_record(record)

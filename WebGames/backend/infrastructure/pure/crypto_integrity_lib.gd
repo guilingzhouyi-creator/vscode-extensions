@@ -197,9 +197,9 @@ static func open_log_record_envelope(
 	should_verify_mac: bool = true
 ) -> Dictionary:
 	if not is_encrypted_envelope(envelope):
-		return {"ok": false, "data": {}, "chain_hash": "", "error": "INVALID_ENVELOPE"}
+		return {"ok": false, "data": {}, "chain_hash": "", "error_code": "INVALID_ENVELOPE"}
 	if key_32.size() != LogConstants.AES_KEY_SIZE:
-		return {"ok": false, "data": {}, "chain_hash": "", "error": "INVALID_KEY_SIZE"}
+		return {"ok": false, "data": {}, "chain_hash": "", "error_code": "INVALID_KEY_SIZE"}
 
 	var version := int(envelope.get(LogConstants.ENC_KEY_VERSION, LogConstants.ENC_VERSION_V1))
 	var algorithm_name := str(envelope.get(LogConstants.ENC_KEY_ALGO, LogConstants.ENC_ALGO_AES_256_CBC))
@@ -214,21 +214,21 @@ static func open_log_record_envelope(
 		var mac_payload := "%d:%s:%d:%s:%s:%s" % [version, algorithm_name, sequence_number, initialization_vector_hex, ciphertext_base64, chain_hash]
 		var expected_mac := hmac_sha256_hex(mac_key, mac_payload.to_utf8_buffer())
 		if not constant_time_equals(expected_mac, mac_hex):
-			return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": LogConstants.LOG_ERR_MAC_MISMATCH}
+			return {"ok": false, "data": {}, "chain_hash": chain_hash, "error_code": LogConstants.LOG_ERR_MAC_MISMATCH}
 
 	var encryption_key := derive_subkey_32(key_32, LogConstants.ENC_SUBKEY_AES_CONTEXT)
 	var initialization_vector_bytes := initialization_vector_hex.hex_decode()
 	var plain_bytes := aes_cbc_decrypt_b64(ciphertext_base64, encryption_key, initialization_vector_bytes)
 	if plain_bytes.is_empty():
-		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "DECRYPT_FAILED"}
+		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error_code": "DECRYPT_FAILED"}
 
 	var parsed: Variant = JSON.parse_string(plain_bytes.get_string_from_utf8())
 	if not (parsed is Dictionary):
-		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "JSON_PARSE_FAILED"}
+		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error_code": "JSON_PARSE_FAILED"}
 	var parsed_payload: Dictionary = parsed
 	if parsed_payload.has(LogConstants.KEY_SEQUENCE) and int(parsed_payload.get(LogConstants.KEY_SEQUENCE, sequence_number)) != sequence_number:
-		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "SEQUENCE_MISMATCH"}
-	return {"ok": true, "data": parsed_payload, "chain_hash": chain_hash, "error": ""}
+		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error_code": "SEQUENCE_MISMATCH"}
+	return {"ok": true, "data": parsed_payload, "chain_hash": chain_hash, "error_code": ""}
 
 ## 判断 JSON 字典是否为本引擎加密日志信封格式
 static func is_encrypted_envelope(candidate_envelope: Dictionary) -> bool:

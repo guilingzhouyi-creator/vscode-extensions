@@ -124,10 +124,10 @@ static func resolve_route(requested_table: String, path: String = "") -> ConfigR
 				route.sub_table_id = subtable_parts[2]
 			return route
 
-	# 回退至主表别名
+	# 映射至领域默认主子表
 	if _primary_aliases.has(requested_table):
 		route.resolved_table = _primary_aliases[requested_table]
-		route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.LEGACY_COMPAT_ALIAS
+		route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.DOMAIN_PRIMARY_SUBTABLE
 		var alias_parts := route.resolved_table.split(".")
 		if alias_parts.size() >= 3:
 			route.sub_table_id = alias_parts[2]
@@ -135,7 +135,7 @@ static func resolve_route(requested_table: String, path: String = "") -> ConfigR
 	elif parts.size() == 2 and parts[0] == "domains":
 		route.resolved_table = "%s.%s.core" % [parts[0], parts[1]]
 		route.sub_table_id = "core"
-		route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.LEGACY_COMPAT_ALIAS
+		route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.DOMAIN_PRIMARY_SUBTABLE
 		return route
 
 	return route

@@ -143,6 +143,7 @@ func _trigger_resource_buffering(request: CutsceneRequestDTO, has_physical_asset
 
 func _broadcast_playback_started(request: CutsceneRequestDTO, duration: float) -> void:
 	_notify_event("cutscene.started", {
+		"category_key": "system",
 		"cutscene_id": request.cutscene_id,
 		"video_path": request.video_path,
 		"is_placeholder": request.is_placeholder,
@@ -175,6 +176,7 @@ func update_playback_progress(current_time: float, total_duration: float, subtit
 	_current_state.active_subtitle_text = subtitle_text
 
 	_notify_event("cutscene.playback_progress", {
+		"category_key": "system",
 		"cutscene_id": _current_state.cutscene_id,
 		"current_time": current_time,
 		"progress": _current_state.progress_ratio,
@@ -190,6 +192,7 @@ func finish_cutscene() -> void:
 	var completed_request := _active_request
 
 	_notify_event("cutscene.finished", {
+		"category_key": "system",
 		"cutscene_id": _current_state.cutscene_id,
 		"context_payload": completed_request.context_payload if completed_request != null else {}
 	})
@@ -212,6 +215,7 @@ func skip_cutscene() -> bool:
 	var skipped_request := _active_request
 
 	_notify_event("cutscene.skipped", {
+		"category_key": "system",
 		"cutscene_id": _current_state.cutscene_id,
 		"skip_time": _current_state.current_time_sec,
 		"context_payload": skipped_request.context_payload

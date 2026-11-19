@@ -270,6 +270,7 @@ static func teardown() -> Dictionary:
 
 	# 广播生命周期拆卸完成事件（与 contracts.json / event_bus_config.json 对齐）
 	EventBusCore.get_instance().emit_domain_event("lifecycle.teardown_completed", {
+		"category_key": "lifecycle",
 		"timestamp_utc": int(Time.get_unix_time_from_system()),
 		"teared_down_subsystems": teared_down
 	})

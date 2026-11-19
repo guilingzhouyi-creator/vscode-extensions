@@ -35,28 +35,23 @@ static var _path_cache: Dictionary = {}
 ## 路径分段缓存上限：防运行期动态键（msg/拼接路径）无界增长
 const PATH_CACHE_MAX_ENTRIES: int = 4096
 
-## 已解析配置原始值缓存（table -> { path -> raw_value }，所有表变更/MOD 叠层/热重载统一清空）
+## 已解析配置原始值双代轮转缓存（table -> { path -> raw_value }，所有表变更/MOD 叠层/热重载统一清空）
 static var _resolved_value_cache: Dictionary = {}
+static var _resolved_value_previous: Dictionary = {}
 static var _resolved_value_count: int = 0
-const RESOLVED_CACHE_MAX_ENTRIES: int = 4096
+static var _prefetch_task_id: int = -1
+const RESOLVED_CACHE_MAX_ENTRIES: int = 2048
 
 static func _clear_lookup_caches() -> void:
 	_path_cache.clear()
 	_resolved_value_cache.clear()
+	_resolved_value_previous.clear()
 	_resolved_value_count = 0
 
-const PATH_STORAGE_CATALOG_SCRIPT: String = "res://backend/domains/persistence_protocol/storage_resource_catalog.gd"
-const PATH_AUX_WORKER_POOL_SCRIPT: String = "res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd"
-const PATH_BATCH_LOAD_REQUEST_SCRIPT: String = "res://backend/domains/persistence_protocol/dto/batch_load_request_dto.gd"
-const CAT_CONFIG: String = "config"
 const EVENT_ALL_TABLES_READY: String = "config.all_tables_ready"
 const EXT_JSON: String = ".json"
 const EXT_KDAT: String = ".kdat"
 const PATH_CONFIG_BUNDLE: String = "res://config/config.kdat"
-const METHOD_GET_INSTANCE: String = "get_instance"
-const METHOD_RESOLVE_CONFIG_TABLE_ENTRY: String = "resolve_config_table_entry"
-const METHOD_GET_CRITICAL_BOOT_ENTRIES: String = "get_critical_boot_entries"
-const BATCH_ID_CONFIG_BULK: String = "config_bulk_async"
 
 ## 必需配置表清单（分层规范：infrastructure.* / domains.* / frontend.* / items.*）。
 ## 分层目录规则：
@@ -148,6 +143,7 @@ static var _required_tables: Array = [
 
 ## 确保配置已加载（首次访问时惰性加载；重复调用零开销）
 static func ensure_loaded() -> void:
+	await_prefetch_if_running()
 	if _loaded:
 		return
 	_tables.clear()
@@ -164,6 +160,35 @@ static func ensure_loaded() -> void:
 	_loaded = true
 	_clear_lookup_caches()
 	_validate_required_tables()
+
+## 若后台贪婪预热仍在执行，等待其原子汇入完成（保证热重载与全量访问零竞态）
+static func await_prefetch_if_running() -> void:
+	if _prefetch_task_id != -1:
+		WorkerThreadPool.wait_for_task_completion(_prefetch_task_id)
+		_prefetch_task_id = -1
+
+## 贪婪后台并发预热：先同步加载 L0（<=5ms），再通过 WorkerThreadPool 并发预热其余尚未装载的配置表
+static func prefetch_remaining_tables_async(on_completed: Callable = Callable()) -> void:
+	ensure_l0_loaded_sync()
+	await_prefetch_if_running()
+	if not GameConfigLoader.resolve_config_bundle_path().is_empty():
+		ensure_loaded()
+		if on_completed.is_valid():
+			on_completed.call(_tables.size())
+		return
+	_tables_mutex.lock()
+	var missing_entries: Array[Dictionary] = GameConfigLoader.collect_missing_config_entries(_tables)
+	_tables_mutex.unlock()
+	if missing_entries.is_empty():
+		_validate_required_tables()
+		if on_completed.is_valid():
+			on_completed.call(_tables.size())
+		return
+	var worker := func() -> void:
+		GameConfigLoader.execute_greedy_prefetch_worker(
+			missing_entries, _tables, _base_tables, _base_tables_synced, _tables_mutex, on_completed
+		)
+	_prefetch_task_id = WorkerThreadPool.add_task(worker, true, "GameConfigGreedyPrefetch")
 
 ## 必需表校验：缺失时输出警告（防止配置漏删/改名导致业务静默回退到代码默认值）
 static func _validate_required_tables() -> void:
@@ -196,7 +221,7 @@ static func load_via_storage_async(on_completed: Callable = Callable()) -> void:
 				_tables_mutex.unlock()
 	var on_done := func(_batch_id: String, total: int, _failed: int) -> void:
 		_validate_required_tables()
-		EventBusCore.get_instance().emit_domain_event(EVENT_ALL_TABLES_READY, {"total": total})
+		EventBusCore.get_instance().emit_domain_event(EVENT_ALL_TABLES_READY, {"category_key": "system", "total": total})
 		if on_completed.is_valid():
 			on_completed.call(total)
 	if not GameConfigLoader.try_enqueue_async_config_batch(_tables, on_table_loaded, on_done):
@@ -237,6 +262,7 @@ static func _flush_loader_warnings(warnings: Array) -> void:
 ## 命名注意：不可命名为 reload()——GDScript 内建 GDScript.reload() 会遮蔽同名静态方法
 ## （调用被解析到脚本资源重载并返回 Error，导致热重载永远不生效），故统一使用 reload_config()。
 static func reload_config() -> Dictionary:
+	await_prefetch_if_running()
 	# 保留旧表快照引用：_tables 在 reload_config 成功交换前不被原地修改，无需先深拷贝全量表。
 	var old_tables: Dictionary = _tables
 	var was_loaded: bool = _loaded
@@ -249,7 +275,7 @@ static func reload_config() -> Dictionary:
 
 	if not _scan_failures.is_empty():
 		return {
-			"success": false, "version": _reload_counter, "error": "BUILD_FAILED",
+			"success": false, "version": _reload_counter, "error_code": "BUILD_FAILED",
 			"details": _scan_failures.duplicate(true), "added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
@@ -259,7 +285,7 @@ static func reload_config() -> Dictionary:
 		_tables = old_tables
 		_loaded = was_loaded
 		return {
-			"success": false, "version": _reload_counter, "error": "MISSING_REQUIRED_TABLE",
+			"success": false, "version": _reload_counter, "error_code": "MISSING_REQUIRED_TABLE",
 			"details": missing, "added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
@@ -267,7 +293,7 @@ static func reload_config() -> Dictionary:
 	if built.is_empty() and not old_tables.is_empty():
 		_loaded = was_loaded
 		return {
-			"success": false, "version": _reload_counter, "error": "BUILD_FAILED",
+			"success": false, "version": _reload_counter, "error_code": "BUILD_FAILED",
 			"added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
@@ -286,7 +312,7 @@ static func reload_config() -> Dictionary:
 		_base_tables_synced = true
 		_rebuild_tables_from_active_layers()
 	_clear_lookup_caches()
-	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": snapshot_differences["changed"]})
+	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"category_key": "system", "version": _reload_counter, "changed": snapshot_differences["changed"]})
 	return {
 		"success": true,
 		"version": _reload_counter,
@@ -454,6 +480,7 @@ static func apply_mod_overlay_stack(layers: Array) -> Dictionary:
 	var overlaid_table_names := _rebuild_tables_from_active_layers()
 	_clear_lookup_caches()
 	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
+		"category_key": "system",
 		"version": _reload_counter,
 		"pack_ids": _active_mod_overlays.duplicate(),
 		"tables": overlaid_table_names
@@ -478,6 +505,7 @@ static func push_mod_overlay_layer(
 	var overlaid_table_names := _rebuild_tables_from_active_layers()
 	_clear_lookup_caches()
 	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
+		"category_key": "system",
 		"version": _reload_counter,
 		"pack_ids": _active_mod_overlays.duplicate(),
 		"tables": overlaid_table_names
@@ -505,6 +533,7 @@ static func apply_mod_overlay_tables(
 	_clear_lookup_caches()
 
 	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
+		"category_key": "system",
 		"version": _reload_counter,
 		"pack_ids": _active_mod_overlays.duplicate(),
 		"tables": overlaid_table_names
@@ -538,6 +567,7 @@ static func clear_mod_overlay_tables() -> Dictionary:
 	_clear_lookup_caches()
 
 	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_cleared", {
+		"category_key": "system",
 		"version": _reload_counter,
 		"cleared_packs": cleared_packs
 	})
@@ -562,6 +592,7 @@ static func reload_subtable(subtable_name: String) -> Dictionary:
 	_clear_lookup_caches()
 
 	EventBusCore.get_instance().emit_domain_event("config.subtable_reloaded", {
+		"category_key": "system",
 		"subtable": resolved,
 		"version": _reload_counter
 	})
@@ -639,6 +670,25 @@ static func has_table(table_name: String) -> bool:
 	_ensure_table_loaded_jit_with_base(target_table)
 	return _tables.has(target_table)
 
+static func _promote_previous_cache_hit(
+	table_name: String,
+	path: String,
+	active_bucket_variant: Variant
+) -> Array:
+	var previous_bucket_variant: Variant = _resolved_value_previous.get(table_name, null)
+	if not (previous_bucket_variant is Dictionary):
+		return [false, null]
+	var previous_bucket: Dictionary = previous_bucket_variant
+	if not previous_bucket.has(path):
+		return [false, null]
+	var promoted_value: Variant = previous_bucket[path]
+	var active_bucket: Dictionary = active_bucket_variant if active_bucket_variant is Dictionary else {}
+	if active_bucket_variant == null:
+		_resolved_value_cache[table_name] = active_bucket
+	active_bucket[path] = promoted_value
+	_resolved_value_count += 1
+	return [true, promoted_value]
+
 static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 	var table_cache_variant: Variant = null
 	if _loaded:
@@ -647,12 +697,16 @@ static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 			var cached_bucket: Dictionary = table_cache_variant
 			if cached_bucket.has(path):
 				return cached_bucket[path]
+		var promoted_hit: Array = _promote_previous_cache_hit(table_name, path, table_cache_variant)
+		if bool(promoted_hit[0]):
+			return promoted_hit[1]
 	else:
 		ensure_loaded()
 	var resolved_value: Variant = null
+	var path_parts := _split_path(path)
 	var target_table: String = ConfigRouterEngine.resolve_target_table(table_name, path)
 	_ensure_table_loaded_jit_with_base(target_table)
-	var raw_value: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)
+	var raw_value: Variant = GameConfigLoader.traverse_table_path(_tables.get(target_table, {}), path_parts)
 	if raw_value != null:
 		resolved_value = raw_value
 	else:
@@ -663,12 +717,13 @@ static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 			if subtable_name == target_table:
 				continue
 			_ensure_table_loaded_jit_with_base(subtable_name)
-			var subtable_value: Variant = _lookup_path_in_table(_tables.get(subtable_name, empty_table), path)
+			var subtable_value: Variant = GameConfigLoader.traverse_table_path(_tables.get(subtable_name, empty_table), path_parts)
 			if subtable_value != null:
 				resolved_value = subtable_value
 				break
 	if _resolved_value_count >= RESOLVED_CACHE_MAX_ENTRIES:
-		_resolved_value_cache.clear()
+		_resolved_value_previous = _resolved_value_cache
+		_resolved_value_cache = {}
 		_resolved_value_count = 0
 		table_cache_variant = null
 	var write_bucket: Dictionary
@@ -750,21 +805,6 @@ static func get_many(table_name: String, paths: PackedStringArray) -> Dictionary
 		if raw_value != null:
 			collected_values[path] = raw_value
 	return collected_values
-
-static func _lookup_path_in_table(table: Variant, path: String) -> Variant:
-	var current_node: Variant = table
-	for part in _split_path(path):
-		if current_node is Dictionary and current_node.has(part):
-			current_node = current_node[part]
-		elif current_node is Array and part.is_valid_int():
-			var array_index := part.to_int()
-			if array_index >= 0 and array_index < (current_node as Array).size():
-				current_node = (current_node as Array)[array_index]
-			else:
-				return null
-		else:
-			return null
-	return current_node
 
 ## 领域文案统一读取：表 = narratives.<domain_id>，未命中回退键名本身。
 ## 各领域 `_msg(key)` 私有助手一律一行委托到此（语义单点化，改动只需改这一处）；

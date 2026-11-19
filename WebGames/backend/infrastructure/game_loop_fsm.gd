@@ -46,7 +46,7 @@ func push_state(new_state: EngineState, context_payload: Dictionary = {}) -> voi
 		return
 	state_stack.append(new_state)
 	current_state = new_state
-	EventBusCore.get_instance().emit_domain_event("engine.state_pushed", {"args": [new_state], "summary": {"state": new_state}})
+	EventBusCore.get_instance().emit_domain_event("engine.state_pushed", {"category_key": "lifecycle", "args": [new_state], "summary": {"state": new_state}})
 
 ## 弹栈：回到上一状态（栈深 1 时拒绝，保持单活）
 func pop_state() -> EngineState:
@@ -54,7 +54,7 @@ func pop_state() -> EngineState:
 		return current_state
 	state_stack.pop_back()
 	current_state = state_stack.back()
-	EventBusCore.get_instance().emit_domain_event("engine.state_popped", {"args": [current_state], "summary": {"state": current_state}})
+	EventBusCore.get_instance().emit_domain_event("engine.state_popped", {"category_key": "lifecycle", "args": [current_state], "summary": {"state": current_state}})
 	return current_state
 
 ## 切换：清空栈至目标状态（用于登录→选角等切段）
@@ -62,7 +62,7 @@ func switch_to(target: EngineState, context_payload: Dictionary = {}) -> void:
 	state_stack = [target]
 	current_state = target
 	global_context = context_payload.duplicate() if not context_payload.is_empty() else {}
-	EventBusCore.get_instance().emit_domain_event("engine.state_switched", {"args": [target], "summary": {"state": target}})
+	EventBusCore.get_instance().emit_domain_event("engine.state_switched", {"category_key": "lifecycle", "args": [target], "summary": {"state": target}})
 
 ## 是否可弹栈（栈深 > 1 时保持栈顶单活）
 func can_pop() -> bool:

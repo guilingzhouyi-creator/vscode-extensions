@@ -135,7 +135,7 @@ func _accept_pending_connections() -> void:
 func _create_peer_slot(incoming_peer: StreamPeerTCP) -> Dictionary:
 	return {
 		"socket": incoming_peer,
-		"pending_text": "",
+		"pending_bytes": PackedByteArray(),
 		"authenticated": _session_passphrase.is_empty(),
 	}
 
@@ -158,14 +158,17 @@ func _drain_peer_lines(peer_slot: Dictionary, remaining_budget: int) -> int:
 	var peer_socket: StreamPeerTCP = peer_slot.get("socket") as StreamPeerTCP
 	_append_available_socket_bytes(peer_slot, peer_socket)
 
+	var pending_bytes: PackedByteArray = peer_slot.get("pending_bytes", PackedByteArray()) as PackedByteArray
+	if pending_bytes.is_empty():
+		return 0
 	var handled_lines: int = 0
+	var search_cursor: int = 0
 	while handled_lines < remaining_budget:
-		var buffer_text: String = str(peer_slot.get("pending_text", ""))
-		var newline_offset: int = buffer_text.find("\n")
+		var newline_offset: int = pending_bytes.find(10, search_cursor)
 		if newline_offset < 0:
 			break
-		var frame_line: String = buffer_text.substr(0, newline_offset).strip_edges()
-		peer_slot["pending_text"] = buffer_text.substr(newline_offset + 1)
+		var frame_line: String = pending_bytes.slice(search_cursor, newline_offset).get_string_from_utf8().strip_edges()
+		search_cursor = newline_offset + 1
 		if frame_line.is_empty():
 			continue
 		var response_packet: Dictionary = _router.dispatch_frame(
@@ -174,6 +177,8 @@ func _drain_peer_lines(peer_slot: Dictionary, remaining_budget: int) -> int:
 		_write_peer_response(peer_socket, response_packet)
 		handled_lines += 1
 		_dispatched_count += 1
+	if search_cursor > 0:
+		peer_slot["pending_bytes"] = pending_bytes.slice(search_cursor) if search_cursor < pending_bytes.size() else PackedByteArray()
 	return handled_lines
 
 
@@ -186,11 +191,12 @@ func _append_available_socket_bytes(peer_slot: Dictionary, peer_socket: StreamPe
 	if read_packet.size() < 2 or int(read_packet[0]) != OK:
 		return
 	var raw_bytes: PackedByteArray = read_packet[1] as PackedByteArray
-	var accumulated_text: String = str(peer_slot.get("pending_text", "")) + raw_bytes.get_string_from_utf8()
-	if accumulated_text.length() > MAX_LINE_BYTES:
-		accumulated_text = ""
+	var pending_bytes: PackedByteArray = peer_slot.get("pending_bytes", PackedByteArray()) as PackedByteArray
+	pending_bytes.append_array(raw_bytes)
+	if pending_bytes.size() > MAX_LINE_BYTES:
+		pending_bytes.clear()
 		_write_peer_response(peer_socket, _router.build_error_response("", "ERR_IPC_LINE_TOO_LONG", "Incoming JSON frame exceeds byte limit"))
-	peer_slot["pending_text"] = accumulated_text
+	peer_slot["pending_bytes"] = pending_bytes
 
 
 func _write_peer_response(peer_socket: StreamPeerTCP, response_packet: Dictionary) -> void:

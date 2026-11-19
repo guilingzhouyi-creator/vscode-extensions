@@ -21,18 +21,65 @@ static var _forbidden_tokens: Array[String] = [
 	"/", "\\", ":", "*", "?", "\"", "<", ">", "|", ".."
 ]
 
+static var _cached_config_version: int = -1
+static var _cached_save_directory: String = "user://saves/"
+static var _cached_save_extension: String = ".kalar_save"
+static var _cached_temporary_suffix: String = ".tmp"
+static var _cached_backup_suffix: String = ".bak"
+static var _cached_maximum_name_length: int = 64
+static var _cached_format_version: String = "1.0.0"
+static var _cached_minimum_supported_version: String = "1.0.0"
+static var _cached_engine_name: String = "PureWorldEngine_Godot4"
+static var _cached_hash_preview_length: int = 8
+static var _cached_atomic_enabled: bool = true
+static var _cached_backup_policy: String = "abort"
+static var _cached_orphan_cleanup: bool = true
+static var _initialized_save_dirs: Dictionary = {}
+static var _save_mutation_sequence: int = 0
+
+static func _sync_persistence_config() -> void:
+	var current_version: int = GameConfig.config_reload_version()
+	if _cached_config_version == current_version:
+		return
+	_cached_save_directory = GameConfig.get_string("infrastructure.persistence", "save_dir", "user://saves/")
+	_cached_save_extension = GameConfig.get_string("infrastructure.persistence", "save_extension", ".kalar_save")
+	_cached_temporary_suffix = GameConfig.get_string("infrastructure.persistence", "atomic_write/tmp_suffix", ".tmp")
+	_cached_backup_suffix = GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_suffix", ".bak")
+	_cached_maximum_name_length = GameConfig.get_int("infrastructure.persistence", "atomic_write/max_save_name_length", 64)
+	_cached_format_version = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
+	_cached_minimum_supported_version = GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
+	_cached_engine_name = GameConfig.get_string("infrastructure.persistence", "engine", "PureWorldEngine_Godot4")
+	_cached_hash_preview_length = GameConfig.get_int("infrastructure.persistence", "hash_preview_len", 8)
+	_cached_atomic_enabled = GameConfig.get_bool("infrastructure.persistence", "atomic_write/enabled", true)
+	_cached_backup_policy = GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_fail_policy", "abort")
+	_cached_orphan_cleanup = GameConfig.get_bool("infrastructure.persistence", "recovery/orphan_tmp_cleanup", true)
+	_initialized_save_dirs.clear()
+	_cached_config_version = current_version
+
+## 获取存档写删变更单调序列号（供上层内存基线缓存判失效）
+static func get_save_mutation_sequence() -> int:
+	return _save_mutation_sequence
+
 ## 确保存档目录存在（递归创建，幂等）；并按 recovery/orphan_tmp_cleanup 清理孤儿临时文件
 static func ensure_save_directory() -> void:
-	var save_directory := _save_dir()
-	AtomicFileWriter.ensure_directory(save_directory)
-	_cleanup_orphan_tmp_files(save_directory)
+	_sync_persistence_config()
+	AtomicFileWriter.ensure_directory(_cached_save_directory)
+	_cleanup_orphan_tmp_files(_cached_save_directory)
+	_initialized_save_dirs[_cached_save_directory] = true
+
+static func _ensure_save_directory_once() -> void:
+	_sync_persistence_config()
+	if _initialized_save_dirs.has(_cached_save_directory):
+		return
+	ensure_save_directory()
 
 ## 孤儿临时文件清理（存档韧性契约）：原子写在 rename 前被中断会遗留 *{tmp_suffix}
 ## 文件，既不参与校验也不被任何流程回收，长期累积占用存档目录。启动/写档入口按配置清理并留痕。
 static func _cleanup_orphan_tmp_files(save_directory: String) -> void:
-	if not GameConfig.get_bool("infrastructure.persistence", "recovery/orphan_tmp_cleanup", true):
+	_sync_persistence_config()
+	if not _cached_orphan_cleanup:
 		return
-	var removed := AtomicFileWriter.cleanup_orphan_tmp_files(save_directory, _tmp_suffix())
+	var removed := AtomicFileWriter.cleanup_orphan_tmp_files(save_directory, _cached_temporary_suffix)
 	if removed > 0:
 		EventBusCore.get_instance().emit_log("warn", _msg("orphan_tmp_cleaned", {"count": removed}))
 
@@ -60,25 +107,25 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 	if not is_valid_save_name(save_name):
 		return _fail("save", "INVALID_SAVE_NAME", _msg("invalid_save_name", {"name": save_name}))
 
-	ensure_save_directory()
-	var file_path := _save_dir() + save_name + _save_extension()
+	_ensure_save_directory_once()
+	var file_path := _cached_save_directory + save_name + _cached_save_extension
 	var has_existing_save := FileAccess.file_exists(file_path)
-	var has_existing_backup := FileAccess.file_exists(file_path + _backup_suffix())
+	var has_existing_backup := FileAccess.file_exists(file_path + _cached_backup_suffix)
 
 	var save_payload: Dictionary = payload.get("data", {})
 	var canonical_data_text := JSON.stringify(save_payload)
 	var sha256_hash := compute_sha256(canonical_data_text)
 
 	var full_envelope := {
-		"format_version": GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0"),
-		"engine": GameConfig.get_string("infrastructure.persistence", "engine", "PureWorldEngine_Godot4"),
+		"format_version": _cached_format_version,
+		"engine": _cached_engine_name,
 		"save_name": save_name,
 		"created_timestamp": Time.get_unix_time_from_system(),
 		"signature_sha256": sha256_hash,
 		"data_json": canonical_data_text
 	}
 
-	var envelope_json_text := JSON.stringify(full_envelope, "\t")
+	var envelope_json_text := JSON.stringify(full_envelope)
 
 	var write_result := _atomic_write(file_path, envelope_json_text)
 	if not write_result.is_empty():
@@ -88,14 +135,14 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 		write_result["recovery"] = _restore_hint(has_existing_save, has_existing_backup)
 		return write_result
 
-	var hash_preview_length := GameConfig.get_int("infrastructure.persistence", "hash_preview_len", 8)
-	EventBusCore.get_instance().emit_log("info", _msg("save_success", {"path": file_path, "hash": sha256_hash.substr(0, hash_preview_length)}))
+	_save_mutation_sequence += 1
+	EventBusCore.get_instance().emit_log("info", _msg("save_success", {"path": file_path, "hash": sha256_hash.substr(0, _cached_hash_preview_length)}))
 	return {
 		"success": true,
 		"stage": "COMMIT",
 		"error_code": "",
 		"save_exists": FileAccess.file_exists(file_path),
-		"backup_exists": FileAccess.file_exists(file_path + _backup_suffix()),
+		"backup_exists": FileAccess.file_exists(file_path + _cached_backup_suffix),
 		"recovery": "",
 		"path": file_path,
 		"sha256": sha256_hash
@@ -134,8 +181,9 @@ static func load_game(save_name: String) -> Dictionary:
 
 	# format_version 方向闸门（Inv-DF-4）：旧引擎不得静默直通未来版本存档，
 	# 低于最低支持版本亦拒绝（迁移链外）。当前单版本：min == current（配置驱动）
-	var current_version := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
-	var min_supported := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
+	_sync_persistence_config()
+	var current_version := _cached_format_version
+	var min_supported := _cached_minimum_supported_version
 	var envelope_version: String = String(envelope_map.get("format_version", ""))
 	if envelope_version.is_empty():
 		return _fail_or_recover("load", "INVALID_ENVELOPE", SystemBaseMessages.MSG_SAVE_MISSING_FORMAT_VERSION, save_name)
@@ -214,12 +262,13 @@ static func restore_backup(save_name: String) -> Dictionary:
 
 	# 2. 写恢复临时文件并原子交换至正档（不先删除正档）
 	var replace_result: Dictionary = AtomicFileWriter.replace_via_tmp(file_path, backup_content, _tmp_suffix())
-	if not bool(replace_result.get("success", false)):
-		var error_code_text: String = str(replace_result.get("error_code", ERR_FILE_CANT_WRITE))
-		if str(replace_result.get("error_stage", "")) == "tmp_open":
-			return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": error_code_text}))
-		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": error_code_text}))
-	return {"success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path}
+	if bool(replace_result.get("success", false)):
+		_save_mutation_sequence += 1
+		return {"success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path}
+	var error_code_text: String = str(replace_result.get("error_code", ERR_FILE_CANT_WRITE))
+	if str(replace_result.get("error_stage", "")) == "tmp_open":
+		return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": error_code_text}))
+	return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": error_code_text}))
 
 # ==============================================================================
 # 五、内部实现（原子写 / 失败构造 / 配置读取）
@@ -282,15 +331,14 @@ static func _restore_hint(has_existing_save: bool, has_existing_backup: bool) ->
 
 ## 返回空 Dictionary 表示成功；否则为失败结果字典
 static func _atomic_write(file_path: String, content: String) -> Dictionary:
-	var is_atomic_enabled: bool = GameConfig.get_bool("infrastructure.persistence", "atomic_write/enabled", true)
-	var policy: String = GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_fail_policy", "abort")
+	_sync_persistence_config()
 	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
-		"atomic_enabled": is_atomic_enabled,
-		"tmp_suffix": _tmp_suffix(),
+		"atomic_enabled": _cached_atomic_enabled,
+		"tmp_suffix": _cached_temporary_suffix,
 		"create_backup": true,
-		"backup_suffix": _backup_suffix(),
+		"backup_suffix": _cached_backup_suffix,
 		"backup_retention": 1,
-		"backup_fail_policy": policy
+		"backup_fail_policy": _cached_backup_policy
 	})
 	var backup_error: int = int(write_result.get("backup_error", OK))
 	if backup_error != OK:
@@ -302,28 +350,33 @@ static func _atomic_write(file_path: String, content: String) -> Dictionary:
 	if error_stage == "backup":
 		return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed", {"error": error_code_text}))
 	if error_stage == "rename":
-		return {"success": false, "error": _msg("atomic_replace_fail", {"error": error_code_text})}
-	return {"success": false, "error": _msg("open_write_fail", {"error": error_code_text})}
+		return _fail("WRITE", "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": error_code_text}))
+	return _fail("WRITE", "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": error_code_text}))
 
 ## 存档根目录（infrastructure.persistence save_dir 配置，默认 user://saves/）
 static func _save_dir() -> String:
-	return GameConfig.get_string("infrastructure.persistence", "save_dir", "user://saves/")
+	_sync_persistence_config()
+	return _cached_save_directory
 
 ## 存档扩展名（infrastructure.persistence save_extension 配置，默认 .kalar_save）
 static func _save_extension() -> String:
-	return GameConfig.get_string("infrastructure.persistence", "save_extension", ".kalar_save")
+	_sync_persistence_config()
+	return _cached_save_extension
 
 ## 临时文件后缀（atomic_write/tmp_suffix 配置，默认 .tmp）
 static func _tmp_suffix() -> String:
-	return GameConfig.get_string("infrastructure.persistence", "atomic_write/tmp_suffix", ".tmp")
+	_sync_persistence_config()
+	return _cached_temporary_suffix
 
 ## 备份文件后缀（atomic_write/backup_suffix 配置，默认 .bak）
 static func _backup_suffix() -> String:
-	return GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_suffix", ".bak")
+	_sync_persistence_config()
+	return _cached_backup_suffix
 
 ## 存档名最大长度（atomic_write/max_save_name_length 配置，默认 64）
 static func _max_name_len() -> int:
-	return GameConfig.get_int("infrastructure.persistence", "atomic_write/max_save_name_length", 64)
+	_sync_persistence_config()
+	return _cached_maximum_name_length
 
 ## 点分版本比较（left_version > right_version 返回 true；非数字段按 0 处理）
 static func _version_newer_than(left_version: String, right_version: String) -> bool:
