@@ -1,15 +1,16 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 日志采集/去重/提纯/压缩链路基线 (Log Pipeline Benchmarks)
+# 模块归属: 性能基准层 (Benchmarks · 日志与文案渲染基线)
 # 文件路径: res://benchmarks/bench_logging.gd
-# 职责: 量化日志数据流现状链路的吞吐地基——广播、文案渲染、领域事件解析，
-#       以及去重/压缩改造将依赖的原子原语（序列化/指纹/字符串规整）基准。
-#       用途: P66/P67 日志改造（结构化采集/去重提纯/压缩落盘）前后跑本套件对比
-#       ops/s 与耗时分布，度量改造是否侵蚀日志链路吞吐（吞吐不得显著下滑）。
-# 测量基座: BenchHarness.measure（预热 + 计时 + ops/sec 统一口径）。
-# 注意: 本套件在 headless 下运行（无前端信号接收方），emit 开销即纯广播基线。
+# 架构定位: Log Pipeline Benchmark Suite
+# 依赖与触发: 触发方: bench_runner.gd | 上游: EventBusCore, GameConfig | 下游: BenchHarness
+# 职责说明: 量化日志广播、文案模板渲染、领域事件解析及序列化/SHA-256 去重原语吞吐量。
+# 退出语义与设计依据: 返回 { category, metrics } 标准基准字典 | 依据: 无头纯广播与原语耗时基线契约
 # ==============================================================================
+
+## BenchLogging：日志采集、文案渲染与指纹原语吞吐基准套件
 class_name BenchLogging extends RefCounted
 
+## 执行日志链路基准测试并返回度量结果集合
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()
@@ -51,7 +52,7 @@ static func run_benchmarks() -> Dictionary:
 		func(): bus.emit_domain_event("combat.round_started", {"category_key": "combat"})
 	))
 
-	# --- 去重/压缩改造依赖的原子原语基线（P67 落盘/去重指纹/压缩序列化的参照） ---
+	# --- 去重/压缩架构依赖的原子原语基线（落盘/去重指纹/压缩序列化的参照） ---
 	var sample_payload := {
 		"sequence": 123456, "channel": "combat_round_coordinator", "level": "info",
 		"message": "回合结算完成", "trace_id": "TRACE_8F3A", "duration_ms": 42,

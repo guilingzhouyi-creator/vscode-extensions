@@ -1,11 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 基准测量基座 (Benchmark Harness)
+# 模块归属: 性能基准层 (Benchmarks · 统一测量基座)
 # 文件路径: res://benchmarks/bench_harness.gd
-# 职责: 统一的基准测量工具：预热 + 计时 + 吞吐量(ops/sec)计算。
-#       所有 bench_*.gd 套件共用本基座，保证测量口径一致、结果可横向对比。
-# 注意: 本文件定义了 class_name，但新文件引用时请一律 preload，
-#       不要依赖 .godot/global_script_class_cache.cfg 的缓存（新文件尚未入库）。
+# 架构定位: Benchmark Harness & Metric Formatter
+# 依赖与触发: 触发方: bench_*.gd 与 bench_runner.gd | 下游: JSON 报告
+# 职责说明: 提供统一的预热、微秒计时、ops/sec 换算、格式化与输出目录幂等创建能力。
+# 退出语义与设计依据: 纯静态基座类，无退出码 | 依据: Bench 套系统一吞吐统计口径契约
 # ==============================================================================
+
+## BenchHarness：基准测试通用预热与微秒计时基座
 class_name BenchHarness extends RefCounted
 
 const WARMUP_CAP: int = 2000

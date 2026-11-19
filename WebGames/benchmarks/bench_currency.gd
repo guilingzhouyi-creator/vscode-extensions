@@ -1,15 +1,16 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 货币处理与流通吞吐基线 (Currency Flow Benchmarks)
+# 模块归属: 性能基准层 (Benchmarks · 货币流通吞吐基线)
 # 文件路径: res://benchmarks/bench_currency.gd
-# 职责: 量化货币数据流「处理与流通」热路径的单次操作吞吐——交易结算、消费扣减、
-#       债务计息、钱包换算与跨大陆流通。作为后续货币改造（新增流通管线/审计留痕/
-#       联机清算）的性能地基基线：改造前后跑本套件对比 ops/s 不得显著下滑。
-# 测量基座: BenchHarness.measure（预热 + 计时 + ops/sec 统一口径）。
-# 与 bench_domains 货币段的边界: bench_domains 已覆盖换算/质量/套利/刚性水池，
-#   本套件聚焦「流通状态机路径」（apply_transaction/try_spend/债务），互补不重复。
+# 架构定位: Currency Flow Benchmark Suite
+# 依赖与触发: 触发方: bench_runner.gd | 上游: CharacterWalletEntity, CurrencySolver | 下游: BenchHarness
+# 职责说明: 量化货币流通热路径（交易结算、消费扣减、债务计息与钱包换算）的单次操作吞吐。
+# 退出语义与设计依据: 返回 { category, metrics } 标准基准字典 | 依据: BenchDomains 互补热路径基准
 # ==============================================================================
+
+## BenchCurrency：货币交易与钱包流通状态机吞吐基准套件
 class_name BenchCurrency extends RefCounted
 
+## 执行货币流通热路径基准测试并返回度量结果集合
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()

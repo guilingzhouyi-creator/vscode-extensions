@@ -1,11 +1,16 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 领域求解器基准 (Domain Solver Benchmarks)
+# 模块归属: 性能基准层 (Benchmarks · 领域求解器基线)
 # 文件路径: res://benchmarks/bench_domains.gd
-# 职责: 量化代表领域求解器的单次操作吞吐（货币经济 / 确定性防作弊），
-#       定位高调用频次热路径的性能地基。新增领域基准按同样格式追加即可。
+# 架构定位: Domain Solver Benchmark Suite
+# 依赖与触发: 触发方: bench_runner.gd | 上游: 货币/确定性权威域求解器 | 下游: BenchHarness
+# 职责说明: 量化核心领域求解器单次操作吞吐，定位高调用频次热路径的性能基线。
+# 退出语义与设计依据: 返回 { category, metrics } 标准基准字典 | 依据: 纯领域求解器零状态基准契约
 # ==============================================================================
+
+## BenchDomains：领域数值求解器与防作弊校验吞吐基准套件
 class_name BenchDomains extends RefCounted
 
+## 执行领域求解器基准测试并返回度量结果集合
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()

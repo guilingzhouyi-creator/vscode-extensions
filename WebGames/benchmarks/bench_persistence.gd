@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 持久化基准 (Persistence Benchmarks)
+# 模块归属: 性能基准层 (Benchmarks · 持久化往返基线)
 # 文件路径: res://benchmarks/bench_persistence.gd
-# 职责: 量化 SaveManager 存档往返与底层 JSON / SHA-256 原语吞吐，
-#       评估存档链路的数据吞吐量与扩容成本。基准探针存档用后即删（幂等）。
+# 架构定位: Persistence Throughput Benchmark Suite
+# 依赖与触发: 触发方: bench_runner.gd | 上游: SaveManager, GameConfig | 下游: BenchHarness
+# 职责说明: 量化 SaveManager 存档往返与底层 JSON / SHA-256 原语吞吐；探针存档用后即删（幂等）。
+# 退出语义与设计依据: 返回 { category, metrics } 标准基准字典 | 依据: 无残留探针测试契约
 # ==============================================================================
+
+## BenchPersistence：存档往返序列化与完整性校验吞吐基准套件
 class_name BenchPersistence extends RefCounted
 
 const BENCH_SAVE_NAME: String = "bench_throughput_probe"
@@ -11,6 +15,7 @@ const BENCH_SAVE_NAME: String = "bench_throughput_probe"
 ## 往返结果回写区（bind 按值捕获字典副本，无法回写外层局部变量，故用静态区）
 static var _last_roundtrip: Dictionary = {}
 
+## 执行持久化链路基准测试并返回度量结果集合
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()

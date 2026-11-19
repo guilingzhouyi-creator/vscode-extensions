@@ -1,12 +1,16 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 全域吞吐量/性能基准运行器
+# 模块归属: 性能基准层 (Benchmarks · CLI 主调度器)
 # 文件路径: res://benchmarks/bench_runner.gd
-# 职责: 依次执行全部基准套件（基础设施 / 持久化 / 领域求解器），汇总输出
-#       吞吐量报告。运行方式:
-#         godot --headless -s res://benchmarks/bench_runner.gd -- <报告输出路径>
-#       报告输出路径缺省为 res://benchmarks/reports/bench_latest.json。
+# 架构定位: Headless Benchmark Runner Entrypoint
+# 依赖与触发: 触发方: bench-run / bench-sweep CLI | 下游: Bench* 全部套件与 bench_latest.json
+# 职责说明: 依次执行全量基准套件，汇总打印吞吐统计并输出标准化 JSON 基准报告。
+# 退出语义与设计依据: SceneTree 无头入口，执行完毕 quit(0) | 依据: bench_latest/baseline 报告协议
 # ==============================================================================
-extends SceneTree
+
+## BenchRunner：全域性能基准运行器入口场景树
+class_name BenchRunner extends SceneTree
+
+const BenchRuntimeCommsScript = preload("res://benchmarks/bench_runtime_comms.gd")
 
 func _init() -> void:
 	var report_path := _resolve_report_path()
@@ -15,12 +19,17 @@ func _init() -> void:
 	print("=".repeat(78) + "\n")
 
 	var categories: Array = []
-	categories.append(BenchInfrastructure.run_benchmarks())
-	categories.append(BenchPersistence.run_benchmarks())
-	categories.append(BenchDomains.run_benchmarks())
-	categories.append(BenchCurrency.run_benchmarks())
-	categories.append(BenchLogging.run_benchmarks())
-	categories.append(BenchBus.run_benchmarks())
+	var standard_suites: Array = [
+		BenchInfrastructure,
+		BenchPersistence,
+		BenchDomains,
+		BenchCurrency,
+		BenchLogging,
+		BenchBus,
+	]
+	for suite_class in standard_suites:
+		categories.append(suite_class.run_benchmarks())
+	categories.append_array(BenchRuntimeCommsScript.run_benchmarks())
 
 	var total_metrics: int = 0
 	for cat in categories:

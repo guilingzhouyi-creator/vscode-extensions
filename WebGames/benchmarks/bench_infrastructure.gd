@@ -1,11 +1,16 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 基础设施基准 (Infrastructure Benchmarks)
+# 模块归属: 性能基准层 (Benchmarks · 基础设施基线)
 # 文件路径: res://benchmarks/bench_infrastructure.gd
-# 职责: 量化 GameConfig / EventBus / WorldClockMaster 三大基础设施的吞吐量，
-#       作为引擎运行时性能地基的基线参考（热路径读取、事件广播、时钟推进）。
+# 架构定位: Infrastructure Throughput Benchmark Suite
+# 依赖与触发: 触发方: bench_runner.gd | 上游: GameConfig, EventBusCore, WorldClockMaster | 下游: BenchHarness
+# 职责说明: 量化 GameConfig、EventBus 与 WorldClockMaster 的热路径读取、事件广播与时钟推进吞吐量。
+# 退出语义与设计依据: 返回 { category, metrics } 标准基准字典 | 依据: 引擎基础设施吞吐回归门禁依据
 # ==============================================================================
+
+## BenchInfrastructure：核心基础设施组件吞吐基准套件
 class_name BenchInfrastructure extends RefCounted
 
+## 执行基础设施基准测试并返回度量结果集合
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()
