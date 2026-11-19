@@ -41,14 +41,13 @@ KIT_ITEM_LIMIT = 10
 
 
 def extract_rules_list(rules_data: Any) -> list[dict[str, Any]]:
-    """从列表或对象形态中提取路由规则列表。"""
+    """从规范 routing_rules 对象或列表形态中提取路由规则列表。"""
     if isinstance(rules_data, list):
         return [rule for rule in rules_data if isinstance(rule, dict)]
     if isinstance(rules_data, dict):
-        for key in ("routing_rules", "rules", "prologue_routing_rules"):
-            value = rules_data.get(key)
-            if isinstance(value, list):
-                return [rule for rule in value if isinstance(rule, dict)]
+        value = rules_data.get("prologue_routing_rules")
+        if isinstance(value, list):
+            return [rule for rule in value if isinstance(rule, dict)]
     return []
 
 
@@ -78,7 +77,9 @@ def check_destiny_ui_capabilities(
 
     for mode_key in ("origin_selection_mode", "trait_selection_mode"):
         value = ui_cap.get(mode_key)
-        if value is not None and (not isinstance(value, str) or value not in VALID_UI_SELECTION_MODES):
+        if value is not None and (
+            not isinstance(value, str) or value not in VALID_UI_SELECTION_MODES
+        ):
             add_diag(
                 diags,
                 "ERR_DESTINY_INVALID_UI_MODE",
@@ -148,7 +149,11 @@ def check_single_origin_budget(
     """校验单个自定义身世的六维加成预算、初始金币上限与序章 DAG/套件引用。"""
     origin_id = str(origin.get("origin_id") or origin.get("id") or f"index_{index}")
     gold = origin.get("initial_gold", 0)
-    if not is_valid_number(gold) or gold < GOLD_CAP_MIN or (enforce_addon_caps and gold > GOLD_CAP_MAX):
+    if (
+        not is_valid_number(gold)
+        or gold < GOLD_CAP_MIN
+        or (enforce_addon_caps and gold > GOLD_CAP_MAX)
+    ):
         detail = (
             f"自定义身世 '{origin_id}' 初始金币 {gold} 超出合法区间 [0, 1000]"
             if enforce_addon_caps
@@ -175,7 +180,10 @@ def check_single_origin_budget(
         check_origin_stat_bonuses(origin_id, bonuses, rel_name, diags)
 
     prologue_dag_id = origin.get("prologue_dag_id")
-    if prologue_dag_id and (not isinstance(prologue_dag_id, str) or prologue_dag_id.strip() not in valid_dags):
+    if prologue_dag_id and (
+        not isinstance(prologue_dag_id, str)
+        or prologue_dag_id.strip() not in valid_dags
+    ):
         add_diag(
             diags,
             "ERR_DESTINY_UNKNOWN_DAG_REF",
@@ -186,7 +194,9 @@ def check_single_origin_budget(
         )
 
     starter_kit_id = origin.get("starter_kit_id")
-    if starter_kit_id and (not isinstance(starter_kit_id, str) or starter_kit_id.strip() not in valid_kits):
+    if starter_kit_id and (
+        not isinstance(starter_kit_id, str) or starter_kit_id.strip() not in valid_kits
+    ):
         add_diag(
             diags,
             "ERR_DESTINY_UNKNOWN_KIT_REF",
@@ -281,7 +291,11 @@ def check_destiny_causality_traits(
     cost_map = extract_trait_cost_map(destiny_data, rel_name, diags)
     custom_traits = normalize_named_items(destiny_data.get("custom_traits"), "trait_id")
     raw_presets = destiny_data.get("paired_presets")
-    presets = [preset for preset in raw_presets if isinstance(preset, dict)] if isinstance(raw_presets, list) else []
+    presets = (
+        [preset for preset in raw_presets if isinstance(preset, dict)]
+        if isinstance(raw_presets, list)
+        else []
+    )
 
     if custom_traits and not presets:
         add_diag(
@@ -294,10 +308,22 @@ def check_destiny_causality_traits(
         return
 
     for index, preset in enumerate(presets):
-        positive_ref = preset.get("positive") if "positive" in preset else preset.get("positive_trait")
-        negative_ref = preset.get("negative") if "negative" in preset else preset.get("negative_trait")
-        positive_cost = resolve_endpoint_cost(positive_ref, preset.get("positive_cost"), cost_map)
-        negative_cost = resolve_endpoint_cost(negative_ref, preset.get("negative_cost"), cost_map)
+        positive_ref = (
+            preset.get("positive")
+            if "positive" in preset
+            else preset.get("positive_trait")
+        )
+        negative_ref = (
+            preset.get("negative")
+            if "negative" in preset
+            else preset.get("negative_trait")
+        )
+        positive_cost = resolve_endpoint_cost(
+            positive_ref, preset.get("positive_cost"), cost_map
+        )
+        negative_cost = resolve_endpoint_cost(
+            negative_ref, preset.get("negative_cost"), cost_map
+        )
 
         if positive_cost is None or negative_cost is None:
             add_diag(
@@ -373,7 +399,11 @@ def check_single_starter_kit(
     """校验单个自定义初始装备套件。"""
     kit_id = str(kit.get("kit_id") or kit.get("id") or f"kit_{index}")
     gold = kit.get("initial_gold", 0)
-    if not is_valid_number(gold) or gold < GOLD_CAP_MIN or (enforce_addon_caps and gold > GOLD_CAP_MAX):
+    if (
+        not is_valid_number(gold)
+        or gold < GOLD_CAP_MIN
+        or (enforce_addon_caps and gold > GOLD_CAP_MAX)
+    ):
         detail = (
             f"自定义套件 '{kit_id}' 的 initial_gold ({gold}) 超出 [0, 1000] 上限"
             if enforce_addon_caps
@@ -402,7 +432,9 @@ def check_single_starter_kit(
         validate_kit_item_entry(kit_id, item_index, item, rel_name, diags)
         for item_index, item in enumerate(items)
     )
-    if enforce_addon_caps and (total_count > KIT_ITEM_LIMIT or len(items) > KIT_ITEM_LIMIT):
+    if enforce_addon_caps and (
+        total_count > KIT_ITEM_LIMIT or len(items) > KIT_ITEM_LIMIT
+    ):
         add_diag(
             diags,
             "ERR_DESTINY_KIT_INVALID",
@@ -421,7 +453,9 @@ def check_destiny_starter_kits(
     """校验 custom_starter_kits 列表中的所有自定义套件。"""
     kits = normalize_named_items(destiny_data.get("custom_starter_kits"), "kit_id")
     for index, kit in enumerate(kits):
-        check_single_starter_kit(kit, index, rel_name, diags, enforce_addon_caps=enforce_addon_caps)
+        check_single_starter_kit(
+            kit, index, rel_name, diags, enforce_addon_caps=enforce_addon_caps
+        )
 
 
 def check_destiny_custom_routing_rules(
@@ -434,12 +468,18 @@ def check_destiny_custom_routing_rules(
     raw_rules = destiny_data.get("custom_routing_rules")
     if not raw_rules:
         return
-    rules = extract_rules_list(raw_rules) if not isinstance(raw_rules, list) else [
-        rule for rule in raw_rules if isinstance(rule, dict)
-    ]
+    rules = (
+        extract_rules_list(raw_rules)
+        if not isinstance(raw_rules, list)
+        else [rule for rule in raw_rules if isinstance(rule, dict)]
+    )
     for index, rule in enumerate(rules):
         target = rule.get("target_dag_id")
-        if not target or not isinstance(target, str) or target.strip() not in valid_dags:
+        if (
+            not target
+            or not isinstance(target, str)
+            or target.strip() not in valid_dags
+        ):
             add_diag(
                 diags,
                 "ERR_DESTINY_UNKNOWN_DAG_REF",
@@ -501,6 +541,8 @@ def check_destinies_file(
     )
     if enforce_addon_caps or data.get("paired_presets") is not None:
         check_destiny_causality_traits(data, rel_name, diags)
-    check_destiny_starter_kits(data, rel_name, diags, enforce_addon_caps=enforce_addon_caps)
+    check_destiny_starter_kits(
+        data, rel_name, diags, enforce_addon_caps=enforce_addon_caps
+    )
     check_destiny_custom_routing_rules(data, rel_name, valid_dags, diags)
     return data

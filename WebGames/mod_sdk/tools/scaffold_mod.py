@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -52,7 +53,9 @@ TIER_ENUM_MAP: dict[int, str] = {
 }
 
 
-def _build_manifest_dict(pack_id: str, pack_name: str, effective_tier: int = 2) -> dict[str, Any]:
+def _build_manifest_dict(
+    pack_id: str, pack_name: str, effective_tier: int = 2
+) -> dict[str, Any]:
     """构建 pack.json 强类型清单结构。"""
     return {
         "pack_id": pack_id,
@@ -72,17 +75,13 @@ def _build_manifest_dict(pack_id: str, pack_name: str, effective_tier: int = 2) 
 def _build_routing_dict(race_id: str, dag_id: str) -> dict[str, Any]:
     """构建 routing_rules.json 路由结构。"""
     return {
-        "routing_rules": [
+        "prologue_routing_rules": [
             {
-                "match_condition": {
-                    "race_id": race_id.upper(),
-                },
+                "race_id": race_id.upper(),
                 "target_dag_id": dag_id,
             },
             {
-                "match_condition": {
-                    "is_default": True,
-                },
+                "is_default": True,
                 "target_dag_id": dag_id,
             },
         ]
@@ -149,12 +148,20 @@ def _build_dag_dict(
     }
 
     if with_assets:
-        nodes[entry_nid]["background_asset"] = "mod://assets/textures/background_sample.png"
+        nodes[entry_nid]["background_asset"] = (
+            "mod://assets/textures/background_sample.png"
+        )
 
     if inline_text:
-        nodes[entry_nid]["inline_text"] = f"在《{label}》的初始启蒙点，{{player_name}} 缓缓苏醒。"
-        nodes[step_nid]["inline_text"] = f"四周微光浮动，{{player_name}} 握紧武器迈出坚实步伐。"
-        nodes[exit_nid]["inline_text"] = f"完成试炼，{{player_name}} 准备启程探索《{label}》广袤天地。"
+        nodes[entry_nid]["inline_text"] = (
+            f"在《{label}》的初始启蒙点，{{player_name}} 缓缓苏醒。"
+        )
+        nodes[step_nid]["inline_text"] = (
+            f"四周微光浮动，{{player_name}} 握紧武器迈出坚实步伐。"
+        )
+        nodes[exit_nid]["inline_text"] = (
+            f"完成试炼，{{player_name}} 准备启程探索《{label}》广袤天地。"
+        )
 
     return {
         "dag_id": dag_id,
@@ -299,7 +306,10 @@ def scaffold_mod(
     """执行模组脚手架骨架生成。"""
     _ensure_utf8_stdout()
     if not pack_id or not re.match(r"^[A-Za-z0-9_]+$", pack_id):
-        print(f"❌ 错误: pack_id 格式不合法 (仅允许字母数字下划线): '{pack_id}'", file=sys.stderr)
+        print(
+            f"❌ 错误: pack_id 格式不合法 (仅允许字母数字下划线): '{pack_id}'",
+            file=sys.stderr,
+        )
         return 1
 
     if not pack_name.strip():
@@ -329,7 +339,13 @@ def scaffold_mod(
     dag_id = _normalize_dag_id(pack_id)
     manifest_data = _build_manifest_dict(pack_id, pack_name, effective_tier)
     routing_data = _build_routing_dict(race_id, dag_id)
-    dag_data = _build_dag_dict(dag_id, pack_id, inline_text=inline_text, pack_name=pack_name, with_assets=with_assets)
+    dag_data = _build_dag_dict(
+        dag_id,
+        pack_id,
+        inline_text=inline_text,
+        pack_name=pack_name,
+        with_assets=with_assets,
+    )
     i18n_data = _build_i18n_dict(pack_id, pack_name)
 
     out_dir = out_dir.resolve()
@@ -376,15 +392,21 @@ def scaffold_mod(
     }
     tier_desc = tier_labels.get(effective_tier, f"Tier {effective_tier}")
 
-    print("==============================================================================")
+    print(
+        "=============================================================================="
+    )
     print("✨ MOD 骨架生成成功！")
     print(f"  • MOD 标识符 : {pack_id}")
     print(f"  • MOD 呈现名 : {pack_name}")
     print(f"  • 架构层级   : {tier_desc}")
     print(f"  • 匹配种族   : {race_id.upper()}")
     print(f"  • 根目录     : {out_dir}")
-    print(f"  • 内联文本   : {'开启 (inline_text)' if inline_text else '关闭 (外部 i18n)'}")
-    print("------------------------------------------------------------------------------")
+    print(
+        f"  • 内联文本   : {'开启 (inline_text)' if inline_text else '关闭 (外部 i18n)'}"
+    )
+    print(
+        "------------------------------------------------------------------------------"
+    )
     print(f"  [1] 清单定义 : {manifest_file.name}")
     print(f"  [2] 路由规则 : {routing_file.name}")
     print(f"  [3] 因果图元 : dag_graphs/{dag_file.name}")
@@ -396,7 +418,9 @@ def scaffold_mod(
         print("  [6] 富媒体库 : assets/textures/background_sample.png & manifest.json")
     if with_content:
         print("  [7] 魔改实体 : content/custom_entities.json")
-    print("==============================================================================")
+    print(
+        "=============================================================================="
+    )
     return 0
 
 
@@ -407,10 +431,24 @@ def main() -> None:
         description="纯净世界引擎 MOD 骨架生成器 (Scaffold Tool)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--id", required=True, dest="pack_id", help="MOD 包唯一标识符 (如 mod_elf_story)")
-    parser.add_argument("--name", required=True, dest="pack_name", help="MOD 人类可读名称")
-    parser.add_argument("--race", default="HUMAN", dest="race_id", help="默认绑定的角色种族 (默认: HUMAN)")
-    parser.add_argument("--output-dir", required=True, dest="output_dir", help="生成的目标目录路径")
+    parser.add_argument(
+        "--id",
+        required=True,
+        dest="pack_id",
+        help="MOD 包唯一标识符 (如 mod_elf_story)",
+    )
+    parser.add_argument(
+        "--name", required=True, dest="pack_name", help="MOD 人类可读名称"
+    )
+    parser.add_argument(
+        "--race",
+        default="HUMAN",
+        dest="race_id",
+        help="默认绑定的角色种族 (默认: HUMAN)",
+    )
+    parser.add_argument(
+        "--output-dir", required=True, dest="output_dir", help="生成的目标目录路径"
+    )
     parser.add_argument(
         "--tier",
         type=int,

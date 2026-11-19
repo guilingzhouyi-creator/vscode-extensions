@@ -27,6 +27,7 @@ from play_mod_character import (
     build_character_context,
     resolve_character_sheet,
 )
+
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -38,15 +39,23 @@ try:
         validate_multi_mods,
     )
 except ImportError:
+
     class DiagnosticItem:  # type: ignore[no-redef]
-        def __init__(self, code: str, file_path: str, detail: str, fix_suggestion: str) -> None:
+        def __init__(
+            self, code: str, file_path: str, detail: str, fix_suggestion: str
+        ) -> None:
             self.code = code
             self.file = file_path
             self.detail = detail
             self.fix_suggestion = fix_suggestion
 
         def to_dict(self) -> dict[str, str]:
-            return {"code": self.code, "file": self.file, "detail": self.detail, "fix_suggestion": self.fix_suggestion}
+            return {
+                "code": self.code,
+                "file": self.file,
+                "detail": self.detail,
+                "fix_suggestion": self.fix_suggestion,
+            }
 
     def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:  # type: ignore[no-redef]
         return True, []
@@ -110,20 +119,20 @@ def normalize_items(raw_val: Any, id_key: str) -> list[dict[str, Any]]:
 
 
 def extract_rules(routing_rules_data: Any) -> list[dict[str, Any]]:
-    """提取扁平路由规则列表。"""
+    """提取规范扁平路由规则列表。"""
     if isinstance(routing_rules_data, list):
         return [r for r in routing_rules_data if isinstance(r, dict)]
     if not isinstance(routing_rules_data, dict):
         return []
-    for key in ("routing_rules", "rules", "prologue_routing_rules"):
-        val = routing_rules_data.get(key)
-        if isinstance(val, list):
-            return [r for r in val if isinstance(r, dict)]
+    val = routing_rules_data.get("prologue_routing_rules")
+    if isinstance(val, list):
+        return [r for r in val if isinstance(r, dict)]
     return []
 
 
 def hydrate(template: str, context: dict[str, Any]) -> str:
     """替换文案模板中的大小写占位符。"""
+
     def _repl(match: re.Match[str]) -> str:
         key = match.group(1)
         if key in context:
@@ -133,10 +142,13 @@ def hydrate(template: str, context: dict[str, Any]) -> str:
         if key.upper() in context:
             return str(context[key.upper()])
         return f"{{{key}}}"
+
     return PARAM_REGEX.sub(_repl, template)
 
 
-def resolve_node_text(node_data: dict[str, Any], i18n_catalog: dict[str, str]) -> tuple[str, str]:
+def resolve_node_text(
+    node_data: dict[str, Any], i18n_catalog: dict[str, str]
+) -> tuple[str, str]:
     """解析节点文本模板与来源类型 ('i18n' 或 'inline_text')。"""
     nkey = str(node_data.get("narrative_key") or "")
     if nkey and nkey in i18n_catalog:
@@ -184,16 +196,15 @@ def parse_dag_topology(
 
 def score_rule(rule: dict[str, Any], race_u: str, origin_id: str) -> int:
     """计算路由规则匹配优先级权重 (4: 双匹配, 3: 仅身世, 2: 仅种族, 1: 默认回退)。"""
-    cond = rule.get("match_condition", rule) if isinstance(rule.get("match_condition"), dict) else rule
-    r = str(cond.get("race_id") or "").upper()
-    o = str(cond.get("origin_id") or "")
+    r = str(rule.get("race_id") or "").upper()
+    o = str(rule.get("origin_id") or "")
     if r == race_u and o == origin_id:
         return 4
     if o == origin_id and not r:
         return 3
     if r == race_u and not o:
         return 2
-    if cond.get("is_default") is True:
+    if rule.get("is_default") is True:
         return 1
     return 0
 
@@ -257,14 +268,24 @@ def merge_destinies_from_mod(dest_data: dict[str, Any], state: dict[str, Any]) -
         if "allow_attribute_reroll" in ui_cap:
             state["ui_reroll"] = bool(ui_cap["allow_attribute_reroll"])
 
-    state["custom_origins"].extend(normalize_items(dest_data.get("custom_origins"), "origin_id"))
-    state["custom_traits"].extend(normalize_items(dest_data.get("custom_traits"), "trait_id"))
-    state["paired_presets"].extend(normalize_items(dest_data.get("paired_presets"), "preset_id"))
-    state["custom_kits"].extend(normalize_items(dest_data.get("custom_starter_kits"), "kit_id"))
+    state["custom_origins"].extend(
+        normalize_items(dest_data.get("custom_origins"), "origin_id")
+    )
+    state["custom_traits"].extend(
+        normalize_items(dest_data.get("custom_traits"), "trait_id")
+    )
+    state["paired_presets"].extend(
+        normalize_items(dest_data.get("paired_presets"), "preset_id")
+    )
+    state["custom_kits"].extend(
+        normalize_items(dest_data.get("custom_starter_kits"), "kit_id")
+    )
     state["custom_rules"].extend(extract_rules(dest_data.get("custom_routing_rules")))
 
 
-def merge_dag_and_i18n(mod_dir: Path, dags: dict[str, Any], i18n_cat: dict[str, str]) -> None:
+def merge_dag_and_i18n(
+    mod_dir: Path, dags: dict[str, Any], i18n_cat: dict[str, str]
+) -> None:
     """读取单个 MOD 的 dag_graphs 与 i18n 目录并归集。"""
     dag_dir = mod_dir / "dag_graphs"
     if dag_dir.is_dir():
@@ -314,18 +335,36 @@ def load_and_merge_assets(mod_paths: list[Path]) -> dict[str, Any]:
         merge_dag_and_i18n(mod_dir, state["dag_graphs"], state["i18n_catalog"])
 
     use_builtin_defaults = not (has_total_conversion and state["custom_origins"])
-    all_origins = state["custom_origins"] + (BUILTIN_ORIGINS if use_builtin_defaults else [])
-    all_traits = state["custom_traits"] + (BUILTIN_TRAITS if not (has_total_conversion and state["custom_traits"]) else [])
-    all_presets = state["paired_presets"] + (BUILTIN_PAIRED_PRESETS if not (has_total_conversion and state["paired_presets"]) else [])
-    all_kits = state["custom_kits"] + (BUILTIN_STARTER_KITS if not (has_total_conversion and state["custom_kits"]) else [])
+    all_origins = state["custom_origins"] + (
+        BUILTIN_ORIGINS if use_builtin_defaults else []
+    )
+    all_traits = state["custom_traits"] + (
+        BUILTIN_TRAITS if not (has_total_conversion and state["custom_traits"]) else []
+    )
+    all_presets = state["paired_presets"] + (
+        BUILTIN_PAIRED_PRESETS
+        if not (has_total_conversion and state["paired_presets"])
+        else []
+    )
+    all_kits = state["custom_kits"] + (
+        BUILTIN_STARTER_KITS
+        if not (has_total_conversion and state["custom_kits"])
+        else []
+    )
 
     creation_ui_snapshot = {
         "origin_selection_mode": state["ui_origin_mode"],
         "trait_selection_mode": state["ui_trait_mode"],
         "allow_attribute_reroll": state["ui_reroll"],
-        "available_origins": [str(o.get("origin_id") or o.get("id")) for o in all_origins],
-        "available_trait_pairs": [str(p.get("preset_id") or p.get("id")) for p in all_presets],
-        "available_starter_kits": [str(k.get("kit_id") or k.get("id")) for k in all_kits],
+        "available_origins": [
+            str(o.get("origin_id") or o.get("id")) for o in all_origins
+        ],
+        "available_trait_pairs": [
+            str(p.get("preset_id") or p.get("id")) for p in all_presets
+        ],
+        "available_starter_kits": [
+            str(k.get("kit_id") or k.get("id")) for k in all_kits
+        ],
         "custom_origin_count": len(state["custom_origins"]),
         "custom_trait_count": len(state["custom_traits"]),
         "custom_kit_count": len(state["custom_kits"]),
@@ -359,13 +398,8 @@ class SessionConfig:
     choice_strategy: str = "first"
 
 
-def prepare_session(
-    cfg: SessionConfig | None = None,
-    **kwargs: Any,
-) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+def prepare_session(cfg: SessionConfig) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """准备推演环境、执行静态预检、合并资产、解算创角与解析 DAG 路由。"""
-    if cfg is None:
-        cfg = SessionConfig(**kwargs)
 
     if len(cfg.mod_paths) > 1:
         is_valid, diags = validate_multi_mods(cfg.mod_paths)
@@ -419,7 +453,11 @@ def prepare_session(
     char_sheet = resolve_character_sheet(sheet_opts)
 
     selected_orig = next(
-        (o for o in all_origins if str(o.get("origin_id") or o.get("id")) == char_sheet["origin_id"]),
+        (
+            o
+            for o in all_origins
+            if str(o.get("origin_id") or o.get("id")) == char_sheet["origin_id"]
+        ),
         all_origins[0],
     )
     target_dag_id, routing_source = resolve_dag_routing(
@@ -448,7 +486,10 @@ def prepare_session(
             "character_sheet": char_sheet,
             "dag_routing": dag_routing,
             "transcript_steps": [],
-            "final_state": {"reached_terminal": False, "error": f"目标 DAG 图元不存在: {target_dag_id}"},
+            "final_state": {
+                "reached_terminal": False,
+                "error": f"目标 DAG 图元不存在: {target_dag_id}",
+            },
         }
         return None, fail_transcript
 

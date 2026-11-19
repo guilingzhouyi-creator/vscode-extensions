@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 import hashlib
+
 BUILTIN_ORIGINS: list[dict[str, Any]] = [
     {
         "origin_id": "IMPERIAL_NOBLE",
@@ -165,7 +166,10 @@ BUILTIN_DAG_TEMPLATES: dict[str, dict[str, Any]] = {
                 "inline_text": "城门徐徐拉起，{PLAYER_NAME} 迈入广袤世界大舞台。",
                 "required_prerequisites": ["NODE_CAPITAL_GATE"],
                 "mutations_on_complete": [
-                    {"type": "PrologueCompleted", "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"}
+                    {
+                        "type": "PrologueCompleted",
+                        "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+                    }
                 ],
             },
         },
@@ -197,13 +201,22 @@ BUILTIN_DAG_TEMPLATES: dict[str, dict[str, Any]] = {
                 "inline_text": "走出林冠结界，{PLAYER_NAME} 踏入大千凡尘。",
                 "required_prerequisites": ["NODE_SANCTUARY_STEP"],
                 "mutations_on_complete": [
-                    {"type": "PrologueCompleted", "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"}
+                    {
+                        "type": "PrologueCompleted",
+                        "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY",
+                    }
                 ],
             },
         },
         "edges": [
-            {"from_node_id": "NODE_SANCTUARY_WAKE", "to_node_id": "NODE_SANCTUARY_STEP"},
-            {"from_node_id": "NODE_SANCTUARY_STEP", "to_node_id": "NODE_SANCTUARY_EXIT"},
+            {
+                "from_node_id": "NODE_SANCTUARY_WAKE",
+                "to_node_id": "NODE_SANCTUARY_STEP",
+            },
+            {
+                "from_node_id": "NODE_SANCTUARY_STEP",
+                "to_node_id": "NODE_SANCTUARY_EXIT",
+            },
         ],
     },
 }
@@ -236,7 +249,9 @@ def generate_base_attributes(seed: str, reroll_nonce: int) -> dict[str, int]:
     return {k: vals[idx] for idx, k in enumerate(keys)}
 
 
-def pick_origin(all_origins: list[dict[str, Any]], origin_id_param: str | None) -> dict[str, Any]:
+def pick_origin(
+    all_origins: list[dict[str, Any]], origin_id_param: str | None
+) -> dict[str, Any]:
     """从身世列表中选取目标身世配置。"""
     if not origin_id_param:
         return all_origins[0]
@@ -262,10 +277,22 @@ def pick_trait_pair(
                 selected_preset = p
                 break
 
-    pos_id = str(selected_preset.get("positive") or selected_preset.get("positive_trait") or "PRIMORDIAL_RESONANCE")
-    neg_id = str(selected_preset.get("negative") or selected_preset.get("negative_trait") or "HEART_CORE_FISSURE")
-    pos_obj = trait_map.get(pos_id, {"trait_id": pos_id, "name": pos_id, "cost": 2, "type": "POSITIVE"})
-    neg_obj = trait_map.get(neg_id, {"trait_id": neg_id, "name": neg_id, "cost": -2, "type": "NEGATIVE"})
+    pos_id = str(
+        selected_preset.get("positive")
+        or selected_preset.get("positive_trait")
+        or "PRIMORDIAL_RESONANCE"
+    )
+    neg_id = str(
+        selected_preset.get("negative")
+        or selected_preset.get("negative_trait")
+        or "HEART_CORE_FISSURE"
+    )
+    pos_obj = trait_map.get(
+        pos_id, {"trait_id": pos_id, "name": pos_id, "cost": 2, "type": "POSITIVE"}
+    )
+    neg_obj = trait_map.get(
+        neg_id, {"trait_id": neg_id, "name": neg_id, "cost": -2, "type": "NEGATIVE"}
+    )
     pos_name = str(pos_obj.get("name") or pos_id)
     neg_name = str(neg_obj.get("name") or neg_id)
     return selected_preset, [pos_obj, neg_obj], f"{pos_name} / {neg_name}"
@@ -301,20 +328,19 @@ class CharacterSheetOptions:
     all_kits: list[dict[str, Any]] = field(default_factory=list)
 
 
-def resolve_character_sheet(
-    opts: CharacterSheetOptions | None = None,
-    **kwargs: Any,
-) -> dict[str, Any]:
+def resolve_character_sheet(opts: CharacterSheetOptions) -> dict[str, Any]:
     """解算角色全量面板数据（六维基底 21 点、身世修正、HP/MP/负重、因果天赋与初始行囊）。"""
-    if opts is None:
-        opts = CharacterSheetOptions(**kwargs)
 
     base_attrs = generate_base_attributes(opts.seed, opts.reroll_nonce)
     selected_origin = pick_origin(opts.all_origins, opts.origin_id_param)
     origin_id = str(selected_origin.get("origin_id") or "ORIGIN_DEFAULT")
     origin_name = str(selected_origin.get("name") or origin_id)
     birth_region = str(selected_origin.get("birth_region") or "FRONTIER_REALM")
-    origin_bonus = selected_origin.get("attribute_bonus") if isinstance(selected_origin.get("attribute_bonus"), dict) else {}
+    origin_bonus = (
+        selected_origin.get("attribute_bonus")
+        if isinstance(selected_origin.get("attribute_bonus"), dict)
+        else {}
+    )
 
     final_attrs = {
         k: base_attrs[k] + int(origin_bonus.get(k, 0))
@@ -334,7 +360,9 @@ def resolve_character_sheet(
         "max_weight": carry_weight,
     }
 
-    selected_preset, traits_list, trait_summary = pick_trait_pair(opts.all_presets, opts.all_traits, opts.trait_pair_param)
+    selected_preset, traits_list, trait_summary = pick_trait_pair(
+        opts.all_presets, opts.all_traits, opts.trait_pair_param
+    )
     pos_obj, neg_obj = traits_list[0], traits_list[1]
     selected_kit = pick_starter_kit(opts.all_kits, selected_origin)
 
@@ -342,7 +370,11 @@ def resolve_character_sheet(
     kit_gold = int(selected_kit.get("initial_gold", 0))
     initial_gold = orig_gold if orig_gold > 0 else max(kit_gold, 50)
     kit_name = str(selected_kit.get("name") or selected_kit.get("kit_id") or "标准行囊")
-    initial_equip = str(selected_kit.get("display_weapon") or selected_origin.get("display_weapon") or "STARTER_WEAPON")
+    initial_equip = str(
+        selected_kit.get("display_weapon")
+        or selected_origin.get("display_weapon")
+        or "STARTER_WEAPON"
+    )
     initial_items = list(selected_kit.get("initial_items", []))
 
     return {
