@@ -95,12 +95,8 @@ func init_bulletin_board() -> void:
 	for tab_key in BULLETIN_TAB_KEYS:
 		host_view._bulletin_tab_bar.add_tab(UIIntermediary.text(tab_key))
 
-	bulletin_data = [
-		{"id": "B001", "category": 0, "title_key": "ui.fe14.bulletin.mock.b001.title", "priority": 1, "time": "09-01 00:00", "content_key": "ui.fe14.bulletin.mock.b001.content"},
-		{"id": "B002", "category": 1, "title_key": "ui.fe14.bulletin.mock.b002.title", "priority": 0, "time": "08-31 18:00", "content_key": "ui.fe14.bulletin.mock.b002.content"},
-		{"id": "B003", "category": 2, "title_key": "ui.fe14.bulletin.mock.b003.title", "priority": 2, "time": "08-30 14:00", "content_key": "ui.fe14.bulletin.mock.b003.content"},
-		{"id": "B004", "category": 3, "title_key": "ui.fe14.bulletin.mock.b004.title", "priority": 1, "time": "08-28 10:00", "content_key": "ui.fe14.bulletin.mock.b004.content"},
-	]
+	var notif_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("notification")
+	bulletin_data = FrontendSnapshot.read_array(notif_snapshot, "bulletins") if notif_snapshot.has("bulletins") else []
 	refresh_bulletin_list()
 
 ## 按当前分类筛选重新填充公告板列表项。

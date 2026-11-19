@@ -136,16 +136,15 @@ func _ready() -> void:
 	_apply_theme()
 
 	# 2. 初始化静态文案（i18n 注入）
-	_init_static_text()
+	var tabs: Variant = _get_tabs()
+	tabs.init_static_text()
 
 	# 3. 初始化通知中心
 	_init_notification_center()
 
-	# 4. 初始化公告板
-	_init_bulletin_board()
-
-	# 5. 初始化红点树
-	_init_red_dot_tree()
+	# 4. 初始化公告板与红点树
+	tabs.init_bulletin_board()
+	tabs.init_red_dot_tree()
 
 	# 6. 绑定信号（仅本地 UI 交互反馈）
 	_connect_signals()
@@ -157,19 +156,10 @@ func _ready() -> void:
 # 主题应用
 # ==============================================================================
 
-## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
 	var theme_manager := ThemeManager.get_instance()
 	if theme_manager.theme != null:
 		theme = theme_manager.theme
-
-# ==============================================================================
-# 静态文案初始化（i18n 注入）
-# ==============================================================================
-
-## 初始化全部静态文案：顶栏/三 Tab 标题/分类与提示/详情空态/Toast·Modal 测试台（i18n 全驱动）
-func _init_static_text() -> void:
-	_get_tabs().init_static_text()
 
 # ==============================================================================
 
@@ -182,15 +172,8 @@ func _init_notification_center() -> void:
 		UIIntermediary.resolve_item(_notification_category_list, category_key)
 	_notification_category_list.select(0)
 
-	# 预设通知数据（标题和内容使用 i18n key）
-	_notification_entries = [
-		{"id": "N001", "category": 0, "title_key": "ui.fe14.notification.mock.n001.title", "content_key": "ui.fe14.notification.mock.n001.content", "time": "09-01 10:00", "read": false, "jump_target": ""},
-		{"id": "N002", "category": 1, "title_key": "ui.fe14.notification.mock.n002.title", "content_key": "ui.fe14.notification.mock.n002.content", "time": "09-01 09:32", "read": false, "jump_target": "world_map"},
-		{"id": "N003", "category": 2, "title_key": "ui.fe14.notification.mock.n003.title", "content_key": "ui.fe14.notification.mock.n003.content", "time": "09-01 08:15", "read": false, "jump_target": "guild_social"},
-		{"id": "N004", "category": 3, "title_key": "ui.fe14.notification.mock.n004.title", "content_key": "ui.fe14.notification.mock.n004.content", "time": "09-01 06:00", "read": true, "jump_target": "quest_causality"},
-		{"id": "N005", "category": 4, "title_key": "ui.fe14.notification.mock.n005.title", "content_key": "ui.fe14.notification.mock.n005.content", "time": "08-31 23:59", "read": true, "jump_target": ""},
-		{"id": "N006", "category": 5, "title_key": "ui.fe14.notification.mock.n006.title", "content_key": "ui.fe14.notification.mock.n006.content", "time": "08-31 20:30", "read": true, "jump_target": "character_progression"},
-	]
+	var notif_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("notification")
+	_notification_entries = FrontendSnapshot.read_array(notif_snapshot, "notifications") if notif_snapshot.has("notifications") else []
 	_refresh_notif_list()
 	_refresh_notif_unread_count()
 
@@ -241,38 +224,10 @@ func _refresh_notif_detail() -> void:
 	_jump_target_button.disabled = jump_target.is_empty()
 
 # ==============================================================================
-# Tab 2: 公告板
-# ==============================================================================
-# Tab 1 & 2 委托给 NotificationBulletinTabs
+# 信号绑定
 # ==============================================================================
 
-func _init_bulletin_board() -> void:
-	_get_tabs().init_bulletin_board()
-
-func _refresh_bulletin_list() -> void:
-	_get_tabs().refresh_bulletin_list()
-
-func _refresh_bulletin_detail() -> void:
-	_get_tabs().refresh_bulletin_detail()
-
-func _priority_name(priority_value: int) -> String:
-	return _get_tabs().priority_name(priority_value)
-
-func _init_red_dot_tree() -> void:
-	_get_tabs().init_red_dot_tree()
-
-func _refresh_red_dot_total() -> void:
-	_get_tabs().refresh_red_dot_total()
-
-func _show_toast(toast_type: String, message: String) -> void:
-	_get_tabs().show_toast(toast_type, message)
-
-func _show_modal(modal_type: String, message: String) -> void:
-	_get_tabs().show_modal(modal_type, message)
-
-# ==============================================================================
-
-## 绑定本地 UI 交互信号（通知/公告/红点树/Toast·Modal 测试台的本地响应）
+## 绑定本地 UI 交互信号（通知/公告/红点树/Toast·Modal 测试按钮）
 func _connect_signals() -> void:
 	# 返回按钮
 	connect_managed(_back_button.pressed, _on_back_btn_pressed)
@@ -287,24 +242,23 @@ func _connect_signals() -> void:
 	connect_managed(_mark_all_read_button.pressed, _on_mark_all_read_pressed)
 	connect_managed(_clear_notifications_button.pressed, _on_clear_notif_pressed)
 
-	# 公告板
-	connect_managed(_bulletin_tab_bar.tab_changed, _on_bulletin_tab_changed)
-	connect_managed(_bulletin_item_list.item_selected, _on_bulletin_item_selected)
-
-	# 红点树
-	connect_managed(_clear_all_red_dots_button.pressed, _on_clear_all_red_dots_pressed)
-	connect_managed(_red_dot_tree.item_activated, _on_red_dot_item_activated)
+	# 公告板与红点树
+	var tabs: Variant = _get_tabs()
+	connect_managed(_bulletin_tab_bar.tab_changed, tabs.on_bulletin_tab_changed)
+	connect_managed(_bulletin_item_list.item_selected, tabs.on_bulletin_item_selected)
+	connect_managed(_clear_all_red_dots_button.pressed, tabs.on_clear_all_red_dots_pressed)
+	connect_managed(_red_dot_tree.item_activated, tabs.on_red_dot_item_activated)
 
 	# Toast 测试
-	connect_managed(_toast_info_button.pressed, func(): _show_toast("INFO", UIIntermediary.text("ui.fe14.toast.test.info")))
-	connect_managed(_toast_success_button.pressed, func(): _show_toast("SUCCESS", UIIntermediary.text("ui.fe14.toast.test.success")))
-	connect_managed(_toast_warning_button.pressed, func(): _show_toast("WARNING", UIIntermediary.text("ui.fe14.toast.test.warning")))
-	connect_managed(_toast_error_button.pressed, func(): _show_toast("ERROR", UIIntermediary.text("ui.fe14.toast.test.error")))
+	connect_managed(_toast_info_button.pressed, func(): tabs.show_toast("INFO", UIIntermediary.text("ui.fe14.toast.test.info")))
+	connect_managed(_toast_success_button.pressed, func(): tabs.show_toast("SUCCESS", UIIntermediary.text("ui.fe14.toast.test.success")))
+	connect_managed(_toast_warning_button.pressed, func(): tabs.show_toast("WARNING", UIIntermediary.text("ui.fe14.toast.test.warning")))
+	connect_managed(_toast_error_button.pressed, func(): tabs.show_toast("ERROR", UIIntermediary.text("ui.fe14.toast.test.error")))
 
 	# Modal 测试
-	connect_managed(_modal_confirm_button.pressed, func(): _show_modal("CONFIRM", UIIntermediary.text("ui.fe14.modal.test.confirm")))
-	connect_managed(_modal_yes_no_button.pressed, func(): _show_modal("YES_NO", UIIntermediary.text("ui.fe14.modal.test.yes_no")))
-	connect_managed(_modal_input_button.pressed, func(): _show_modal("INPUT", UIIntermediary.text("ui.fe14.modal.test.input")))
+	connect_managed(_modal_confirm_button.pressed, func(): tabs.show_modal("CONFIRM", UIIntermediary.text("ui.fe14.modal.test.confirm")))
+	connect_managed(_modal_yes_no_button.pressed, func(): tabs.show_modal("YES_NO", UIIntermediary.text("ui.fe14.modal.test.yes_no")))
+	connect_managed(_modal_input_button.pressed, func(): tabs.show_modal("INPUT", UIIntermediary.text("ui.fe14.modal.test.input")))
 
 # ==============================================================================
 # 信号回调
@@ -372,23 +326,6 @@ func _on_clear_notif_pressed() -> void:
 	_refresh_notif_unread_count()
 	_refresh_notif_detail()
 	UIIntermediary.resolve(_label_test_status, "ui.fe14.notification.clear_read_status")
-
-# --- 公告板与红点树（委托给 NotificationBulletinTabs）---
-
-func _on_bulletin_tab_changed(tab_index: int) -> void:
-	_get_tabs().on_bulletin_tab_changed(tab_index)
-
-func _on_bulletin_item_selected(item_index: int) -> void:
-	_get_tabs().on_bulletin_item_selected(item_index)
-
-func _on_clear_all_red_dots_pressed() -> void:
-	_get_tabs().on_clear_all_red_dots_pressed()
-
-func _clear_red_dot_recursive(tree_item: TreeItem) -> void:
-	_get_tabs().clear_red_dot_recursive(tree_item)
-
-func _on_red_dot_item_activated() -> void:
-	_get_tabs().on_red_dot_item_activated()
 
 # ==============================================================================
 # 外部接口（供测试与上层消息驱动）

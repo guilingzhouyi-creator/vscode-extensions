@@ -20,11 +20,7 @@ const MonsterEcologyTabsClass = preload("res://frontend/views/monster_ecology/mo
 const FRONTEND_VOLUME_CODE := "fe11"
 const BESTIARY_CARD_MIN_EXTENTS := Vector2(100, 80)
 
-const ELEMENT_FIRE: String = "ui.fe11.bestiary.element.fire"
-const ELEMENT_ICE: String = "ui.fe11.bestiary.element.ice"
-const ELEMENT_THUNDER: String = "ui.fe11.bestiary.element.thunder"
-
-## 图鉴分类 i18n key（9种，与 Mock 数据 category 索引一致）
+## 图鉴分类 i18n key（9种，与怪物数据 category 索引一致）
 const CATEGORY_KEYS := [
 	"ui.fe11.bestiary.category.dragon",
 	"ui.fe11.bestiary.category.undead",
@@ -86,30 +82,10 @@ const CATEGORY_KEYS := [
 var _tabs: Variant = null
 
 # ==============================================================================
-# Mock 数据与状态
+# 生态图鉴状态（由 snapshot_data 统一装配）
 # ==============================================================================
 
-# --- 怪物图鉴数据（18，每分类2只） ---
-var _monsters: Array = [
-	{"id": "MON_001", "name_key": "ui.fe11.bestiary.monster.mon001_name", "level": 15, "category": 0, "habitat_key": "ui.fe11.bestiary.monster.mon001_habitat", "desc_key": "ui.fe11.bestiary.monster.mon001_desc", "drop_keys": ["ui.fe11.bestiary.drop.dragon_scale_2", "ui.fe11.bestiary.drop.fire_crystal_1"], "weakness_keys": [ELEMENT_ICE, "ui.fe11.bestiary.element.water"], "discovered": true},
-	{"id": "MON_002", "name_key": "ui.fe11.bestiary.monster.mon002_name", "level": 45, "category": 0, "habitat_key": "ui.fe11.bestiary.monster.mon002_habitat", "desc_key": "ui.fe11.bestiary.monster.mon002_desc", "drop_keys": ["ui.fe11.bestiary.drop.ice_dragon_crystal_3", "ui.fe11.bestiary.drop.frost_heart_1"], "weakness_keys": [ELEMENT_FIRE, ELEMENT_THUNDER], "discovered": false},
-	{"id": "MON_003", "name_key": "ui.fe11.bestiary.monster.mon003_name", "level": 8, "category": 1, "habitat_key": "ui.fe11.bestiary.monster.mon003_habitat", "desc_key": "ui.fe11.bestiary.monster.mon003_desc", "drop_keys": ["ui.fe11.bestiary.drop.bone_fragment_5", "ui.fe11.bestiary.drop.rusty_sword_1"], "weakness_keys": [ELEMENT_FIRE, "ui.fe11.bestiary.element.holy"], "discovered": true},
-	{"id": "MON_004", "name_key": "ui.fe11.bestiary.monster.mon004_name", "level": 40, "category": 1, "habitat_key": "ui.fe11.bestiary.monster.mon004_habitat", "desc_key": "ui.fe11.bestiary.monster.mon004_desc", "drop_keys": ["ui.fe11.bestiary.drop.lich_crown_1", "ui.fe11.bestiary.drop.curse_scroll_2"], "weakness_keys": ["ui.fe11.bestiary.element.holy", ELEMENT_FIRE], "discovered": false},
-	{"id": "MON_005", "name_key": "ui.fe11.bestiary.monster.mon005_name", "level": 12, "category": 2, "habitat_key": "ui.fe11.bestiary.monster.mon005_habitat", "desc_key": "ui.fe11.bestiary.monster.mon005_desc", "drop_keys": ["ui.fe11.bestiary.drop.wolf_pelt_2", "ui.fe11.bestiary.drop.sharp_tooth_1"], "weakness_keys": [ELEMENT_FIRE, ELEMENT_THUNDER], "discovered": true},
-	{"id": "MON_006", "name_key": "ui.fe11.bestiary.monster.mon006_name", "level": 25, "category": 2, "habitat_key": "ui.fe11.bestiary.monster.mon006_habitat", "desc_key": "ui.fe11.bestiary.monster.mon006_desc", "drop_keys": ["ui.fe11.bestiary.drop.snake_lizard_scale_3", "ui.fe11.bestiary.drop.poison_sac_1"], "weakness_keys": [ELEMENT_ICE, ELEMENT_THUNDER], "discovered": false},
-	{"id": "MON_007", "name_key": "ui.fe11.bestiary.monster.mon007_name", "level": 6, "category": 3, "habitat_key": "ui.fe11.bestiary.monster.mon007_habitat", "desc_key": "ui.fe11.bestiary.monster.mon007_desc", "drop_keys": ["ui.fe11.bestiary.drop.beeswax_3", "ui.fe11.bestiary.drop.poison_needle_1"], "weakness_keys": [ELEMENT_FIRE, ELEMENT_ICE], "discovered": true},
-	{"id": "MON_008", "name_key": "ui.fe11.bestiary.monster.mon008_name", "level": 30, "category": 3, "habitat_key": "ui.fe11.bestiary.monster.mon008_habitat", "desc_key": "ui.fe11.bestiary.monster.mon008_desc", "drop_keys": ["ui.fe11.bestiary.drop.spider_silk_5", "ui.fe11.bestiary.drop.spider_queen_venom_1"], "weakness_keys": [ELEMENT_FIRE, ELEMENT_THUNDER], "discovered": false},
-	{"id": "MON_009", "name_key": "ui.fe11.bestiary.monster.mon009_name", "level": 10, "category": 4, "habitat_key": "ui.fe11.bestiary.monster.mon009_habitat", "desc_key": "ui.fe11.bestiary.monster.mon009_desc", "drop_keys": ["ui.fe11.bestiary.drop.nectar_2", "ui.fe11.bestiary.drop.vine_3"], "weakness_keys": [ELEMENT_FIRE, ELEMENT_ICE], "discovered": true},
-	{"id": "MON_010", "name_key": "ui.fe11.bestiary.monster.mon010_name", "level": 28, "category": 4, "habitat_key": "ui.fe11.bestiary.monster.mon010_habitat", "desc_key": "ui.fe11.bestiary.monster.mon010_desc", "drop_keys": ["ui.fe11.bestiary.drop.living_wood_3", "ui.fe11.bestiary.drop.tree_heart_1"], "weakness_keys": [ELEMENT_FIRE, "ui.fe11.bestiary.element.dark"], "discovered": false},
-	{"id": "MON_011", "name_key": "ui.fe11.bestiary.monster.mon011_name", "level": 18, "category": 5, "habitat_key": "ui.fe11.bestiary.monster.mon011_habitat", "desc_key": "ui.fe11.bestiary.monster.mon011_desc", "drop_keys": ["ui.fe11.bestiary.drop.fire_crystal_1", "ui.fe11.bestiary.drop.element_core_1"], "weakness_keys": ["ui.fe11.bestiary.element.water", ELEMENT_ICE], "discovered": true},
-	{"id": "MON_012", "name_key": "ui.fe11.bestiary.monster.mon012_name", "level": 20, "category": 5, "habitat_key": "ui.fe11.bestiary.monster.mon012_habitat", "desc_key": "ui.fe11.bestiary.monster.mon012_desc", "drop_keys": ["ui.fe11.bestiary.drop.wind_crystal_2", "ui.fe11.bestiary.drop.element_core_1"], "weakness_keys": [ELEMENT_THUNDER, "ui.fe11.bestiary.element.earth"], "discovered": false},
-	{"id": "MON_013", "name_key": "ui.fe11.bestiary.monster.mon013_name", "level": 5, "category": 6, "habitat_key": "ui.fe11.bestiary.monster.mon013_habitat", "desc_key": "ui.fe11.bestiary.monster.mon013_desc", "drop_keys": ["ui.fe11.bestiary.drop.copper_coin_10", "ui.fe11.bestiary.drop.rusty_dagger_1"], "weakness_keys": [ELEMENT_FIRE, ELEMENT_THUNDER], "discovered": true},
-	{"id": "MON_014", "name_key": "ui.fe11.bestiary.monster.mon014_name", "level": 22, "category": 6, "habitat_key": "ui.fe11.bestiary.monster.mon014_habitat", "desc_key": "ui.fe11.bestiary.monster.mon014_desc", "drop_keys": ["ui.fe11.bestiary.drop.magic_scroll_1", "ui.fe11.bestiary.drop.ogre_tooth_2"], "weakness_keys": [ELEMENT_ICE, "ui.fe11.bestiary.element.holy"], "discovered": false},
-	{"id": "MON_015", "name_key": "ui.fe11.bestiary.monster.mon015_name", "level": 8, "category": 7, "habitat_key": "ui.fe11.bestiary.monster.mon015_habitat", "desc_key": "ui.fe11.bestiary.monster.mon015_desc", "drop_keys": ["ui.fe11.bestiary.drop.fish_scale_3", "ui.fe11.bestiary.drop.sawtooth_1"], "weakness_keys": [ELEMENT_THUNDER, ELEMENT_FIRE], "discovered": true},
-	{"id": "MON_016", "name_key": "ui.fe11.bestiary.monster.mon016_name", "level": 35, "category": 7, "habitat_key": "ui.fe11.bestiary.monster.mon016_habitat", "desc_key": "ui.fe11.bestiary.monster.mon016_desc", "drop_keys": ["ui.fe11.bestiary.drop.octopus_ink_3", "ui.fe11.bestiary.drop.tentacle_2"], "weakness_keys": [ELEMENT_THUNDER, ELEMENT_FIRE], "discovered": false},
-	{"id": "MON_017", "name_key": "ui.fe11.bestiary.monster.mon017_name", "level": 16, "category": 8, "habitat_key": "ui.fe11.bestiary.monster.mon017_habitat", "desc_key": "ui.fe11.bestiary.monster.mon017_desc", "drop_keys": ["ui.fe11.bestiary.drop.magic_stone_2", "ui.fe11.bestiary.drop.stone_block_5"], "weakness_keys": [ELEMENT_THUNDER, "ui.fe11.bestiary.element.water"], "discovered": true},
-	{"id": "MON_018", "name_key": "ui.fe11.bestiary.monster.mon018_name", "level": 38, "category": 8, "habitat_key": "ui.fe11.bestiary.monster.mon018_habitat", "desc_key": "ui.fe11.bestiary.monster.mon018_desc", "drop_keys": ["ui.fe11.bestiary.drop.fine_iron_3", "ui.fe11.bestiary.drop.golem_core_1"], "weakness_keys": [ELEMENT_THUNDER, "ui.fe11.bestiary.element.water"], "discovered": false},
-]
+var _monsters: Array = []
 
 # 选中状态
 var _selected_category_index: int = 0
@@ -134,16 +110,12 @@ func _get_tabs():
 # 外部视图契约兼容方法
 # ==============================================================================
 
-## 兼容快照注入入口：更新怪物图鉴条目列表。
-func set_bestiary_snapshot(entries: Array) -> void:
-	apply_snapshot({"bestiary": entries})
-
 ## 按怪物编号选中图鉴条目，返回选中状态与条目数据。
 func select_monster_entry(monster_id: String) -> Dictionary:
 	selected_monster_id = monster_id
 	for entry_index in range(bestiary_entries.size()):
 		var monster_entry: Dictionary = bestiary_entries[entry_index]
-		if str(monster_entry.get("monster_id", "")) == monster_id or str(monster_entry.get("id", "")) == monster_id:
+		if str(monster_entry.get("monster_id", "")) == monster_id:
 			_selected_monster_index = entry_index
 			return {"success": true, "entry": monster_entry}
 	return {"success": true, "entry": {}}
@@ -157,6 +129,8 @@ func _render_from_snapshot() -> void:
 	if snapshot.has("bestiary"):
 		bestiary_entries = FrontendSnapshot.read_array(snapshot, "bestiary")
 		_monsters = bestiary_entries.duplicate(true)
+	elif snapshot.has("monsters"):
+		_monsters = FrontendSnapshot.read_array(snapshot, "monsters")
 	if snapshot.has("beast_tide_risk"):
 		beast_tide_risk_percentage = clampf(float(snapshot.get("beast_tide_risk", 0.0)), 0.0, 100.0)
 	if is_inside_tree():
@@ -172,8 +146,10 @@ func _ready() -> void:
 	var tabs: Variant = _get_tabs()
 	var theme_manager := ThemeManager.get_instance()
 	theme = theme_manager.theme
-	if ServiceLocator.get_mode() != "mock":
-		_monsters = []
+	var ecology_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("monster_ecology")
+	if not ecology_snapshot.is_empty():
+		apply_snapshot(ecology_snapshot)
+	else:
 		ServiceLocator.get_instance().world().dispatch_world_directive("monster_ecology", "GET_ECOLOGY_STATUS", {})
 
 	_populate_category_buttons()
@@ -359,37 +335,6 @@ func _refresh_monster_detail() -> void:
 func _on_monster_card_pressed(monster_index: int) -> void:
 	_selected_monster_index = monster_index
 	_refresh_monster_detail()
-
-# ==============================================================================
-# 子面板委托转发（向后兼容外部调用契约）
-# ==============================================================================
-
-func _populate_boss_cards() -> void:
-	_get_tabs()._populate_boss_cards()
-
-func _refresh_boss_detail() -> void:
-	_get_tabs()._refresh_boss_detail()
-
-func _on_boss_challenge_pressed() -> void:
-	_get_tabs()._on_boss_challenge_pressed()
-
-func _refresh_beast_tide_status() -> void:
-	_get_tabs()._refresh_beast_tide_status()
-
-func _populate_wave_list() -> void:
-	_get_tabs()._populate_wave_list()
-
-func _refresh_tide_rewards() -> void:
-	_get_tabs()._refresh_tide_rewards()
-
-func _on_tide_join_pressed() -> void:
-	_get_tabs()._on_tide_join_pressed()
-
-func _on_tide_leave_pressed() -> void:
-	_get_tabs()._on_tide_leave_pressed()
-
-func _format_countdown(seconds: int) -> String:
-	return _get_tabs()._format_countdown(seconds)
 
 func _on_back_pressed() -> void:
 	self.back()

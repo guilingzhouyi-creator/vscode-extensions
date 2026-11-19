@@ -214,14 +214,9 @@ func refresh_quest_tracker() -> void:
 			else:
 				slot_container.visible = false
 		return
-	if ServiceLocator.get_mode() == "mock":
-		set_quest_entry(_view.quest_entry_1, "ui.fe02.quest.main_title", "ui.fe02.quest.main_desc", 0.15)
-		set_quest_entry(_view.quest_entry_2, "ui.fe02.quest.side_title", "ui.fe02.quest.side_desc", 0.30)
-		set_quest_entry(_view.quest_entry_3, "ui.fe02.quest.daily_title", "ui.fe02.quest.daily_desc", 1.0)
-	else:
-		for slot_container in quest_slots:
-			if slot_container != null:
-				slot_container.visible = false
+	for slot_container in quest_slots:
+		if slot_container != null:
+			slot_container.visible = false
 
 ## 更新单个任务追踪条目的标题、描述及进度条。
 func set_quest_entry(quest_entry: VBoxContainer, title_key: String, description_key: String, progress: float) -> void:

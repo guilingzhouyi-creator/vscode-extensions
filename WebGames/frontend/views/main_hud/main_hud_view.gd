@@ -77,7 +77,6 @@ var current_session_token: String = ""
 var hud_clock_display: String = ""
 var minimap_coords: Vector2i = Vector2i.ZERO
 var hud_quests: Array = []
-var _hud_channel_tokens: Array = []
 
 # --- 快捷栏动作槽位 (1~8) ---
 
@@ -134,41 +133,19 @@ func _ready() -> void:
 	stat_hp_current = 100.0; stat_hp_max = 100.0
 	stat_mp_current = 50.0; stat_mp_max = 50.0
 	stat_ap_current = 10.0; stat_ap_max = 10.0
-	var is_mock_mode := (ServiceLocator.get_mode() == "mock")
-	if is_mock_mode:
-		wallet_gold = 12580; wallet_mana_crystals = 5
-		character_name = UIIntermediary.text("ui.fe02.mock.char_name")
-		minimap_coords = Vector2i(320, 180)
-	else:
-		wallet_gold = 0; wallet_mana_crystals = 0
-		character_name = ""
-		minimap_coords = Vector2i.ZERO
+	wallet_gold = 0; wallet_mana_crystals = 0
+	character_name = ""
+	minimap_coords = Vector2i.ZERO
 	_init_hud_text()
-	_refresh_status_bars(); _refresh_wallet(); _refresh_clock(); _refresh_character_name()
-	_get_subpanels().refresh_minimap_coords()
-	_get_subpanels().init_action_bar()
+	var hud_domain_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("hud_snapshot")
+	if not hud_domain_snapshot.is_empty():
+		apply_snapshot(hud_domain_snapshot)
+	else:
+		_get_subpanels().refresh_status_bars(stat_hp_current, stat_hp_max, stat_mp_current, stat_mp_max, stat_ap_current, stat_ap_max); _refresh_wallet(); _refresh_clock(); _refresh_character_name()
+		_get_subpanels().refresh_minimap_coords()
+		_get_subpanels().init_action_bar()
 	UIIntermediary.resolve_placeholder(_chat_input, "ui.fe02.chat.input_placeholder")
 	_get_subpanels().refresh_chat_view()
-	if is_mock_mode:
-		append_terminal_log("SYSTEM", UIIntermediary.text("ui.fe02.chat.mock.welcome"))
-		append_terminal_log("WORLD", UIIntermediary.text("ui.fe02.chat.mock.world_msg", {"name": character_name}))
-		append_terminal_log("GUILD", UIIntermediary.text("ui.fe02.chat.mock.guild_msg", {"name": UIIntermediary.text("ui.fe02.mock.name_meryl")}))
-		append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit", {"damage": 128}))
-		append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit_back", {"damage": 15}))
-		append_battle_log("LOOT", UIIntermediary.text("ui.fe02.battle_log.mock.loot"))
-	else:
-		var hud_service := ServiceLocator.get_instance().hud_sync()
-		_hud_channel_tokens = hud_service.subscribe_hud_channels({
-			"on_snapshot": func(payload: Dictionary) -> void: apply_snapshot(payload),
-			"on_wallet": func(payload: Dictionary) -> void: apply_snapshot(payload),
-			"on_stat_mutated": func(payload: Dictionary) -> void: apply_snapshot(payload),
-			"on_clock_advanced": func(payload: Dictionary) -> void: apply_snapshot(payload),
-		})
-		hud_service.pull_authoritative_snapshot_async(current_account_id, current_session_token, "", func(sync_reply: Dictionary) -> void:
-			var snapshot_table: Dictionary = sync_reply.get("data", sync_reply) as Dictionary
-			if bool(sync_reply.get("success", false)) and not snapshot_table.is_empty():
-				apply_snapshot(snapshot_table)
-		)
 	_get_subpanels().refresh_quest_tracker()
 	completion_visible = false; _completion_panel.visible = false
 	main_menu_visible = false; _main_menu_panel.visible = false
@@ -178,9 +155,6 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 func _on_predelete_cleanup() -> void:
-	if not _hud_channel_tokens.is_empty():
-		ServiceLocator.get_instance().hud_sync().unsubscribe_hud_channels(_hud_channel_tokens)
-		_hud_channel_tokens.clear()
 	HudEventBridge.get_instance().detach_hud()
 	_subpanels = null
 
@@ -232,8 +206,26 @@ func update_status_snapshot(health_points: float, health_points_max: float, mana
 	stat_mp_current = mana_points; stat_mp_max = mana_points_max
 	stat_ap_current = action_points; stat_ap_max = action_points_max
 	wallet_gold = gold_amount; wallet_mana_crystals = crystal_amount
-	_refresh_status_bars()
+	_get_subpanels().refresh_status_bars(stat_hp_current, stat_hp_max, stat_mp_current, stat_mp_max, stat_ap_current, stat_ap_max)
 	_refresh_wallet()
+
+func _apply_hud_snapshot_logs() -> void:
+	if snapshot.get("terminal_logs") is Array:
+		for log_item in (snapshot.get("terminal_logs") as Array):
+			if not log_item is Dictionary:
+				continue
+			var terminal_arguments := {}
+			if bool(log_item.get("use_char_name", false)):
+				terminal_arguments["name"] = character_name
+			elif log_item.has("name_key"):
+				terminal_arguments["name"] = UIIntermediary.text(str(log_item.get("name_key", "")))
+			append_terminal_log(str(log_item.get("channel", "SYSTEM")), UIIntermediary.text(str(log_item.get("key", "")), terminal_arguments))
+	if snapshot.get("battle_logs") is Array:
+		for battle_item in (snapshot.get("battle_logs") as Array):
+			if not battle_item is Dictionary:
+				continue
+			var battle_arguments: Dictionary = battle_item.get("params", {}) if battle_item.get("params") is Dictionary else {}
+			append_battle_log(str(battle_item.get("channel", "COMBAT")), UIIntermediary.text(str(battle_item.get("key", "")), battle_arguments))
 
 ## 统一快照渲染映射：只做快照字段 → 节点映射，不做任何业务计算
 func _render_from_snapshot() -> void:
@@ -245,8 +237,10 @@ func _render_from_snapshot() -> void:
 	stat_ap_current = hud_snapshot.ap_current
 	stat_ap_max = hud_snapshot.ap_max
 	wallet_gold = hud_snapshot.gold
-	wallet_mana_crystals = hud_snapshot.mana_monocrystals
-	if snapshot.has("character_name"):
+	wallet_mana_crystals = int(snapshot.get("wallet_mana_crystals", hud_snapshot.mana_monocrystals))
+	if snapshot.has("char_name_key"):
+		character_name = UIIntermediary.text(str(snapshot.get("char_name_key", "")))
+	elif snapshot.has("character_name"):
 		character_name = hud_snapshot.character_name
 	if snapshot.has("clock_display"):
 		hud_clock_display = str(snapshot.get("clock_display", ""))
@@ -259,16 +253,13 @@ func _render_from_snapshot() -> void:
 	if snapshot.get("action_bar_slots") is Array:
 		action_bar_slots = (snapshot.get("action_bar_slots") as Array).duplicate(true)
 		_get_subpanels().init_action_bar()
-	_refresh_status_bars()
+	_apply_hud_snapshot_logs()
+	_get_subpanels().refresh_status_bars(stat_hp_current, stat_hp_max, stat_mp_current, stat_mp_max, stat_ap_current, stat_ap_max)
 	_refresh_wallet()
 	_refresh_clock()
 	_refresh_character_name()
 	# 快照渲染完成 → 五态容器切换就绪态
 	show_ready_state()
-
-## 刷新顶栏状态条（HP/MP/AP 数值与进度）
-func _refresh_status_bars() -> void:
-	_get_subpanels().refresh_status_bars(stat_hp_current, stat_hp_max, stat_mp_current, stat_mp_max, stat_ap_current, stat_ap_max)
 
 func _refresh_wallet() -> void:
 	if _gold_label: UIIntermediary.resolve(_gold_label, "ui.fe02.status_bar.gold", {"gold": wallet_gold, "crystals": wallet_mana_crystals})
@@ -291,7 +282,7 @@ func trigger_action_slot(slot_index: int) -> Dictionary:
 			if slot_entry.cd_remain > 0.0:
 				return {"success": false, "reason": "COOLDOWN_ACTIVE", "remain": slot_entry.cd_remain}
 			var skill_identifier := str(slot_entry.get("skill_id", ""))
-			if ServiceLocator.get_mode() != "mock" and not skill_identifier.is_empty():
+			if not skill_identifier.is_empty():
 				ServiceLocator.get_instance().combat().cast_skill_async(skill_identifier, "ACTIVE_TARGET", func(_cast_reply: Dictionary) -> void:
 					pass
 				)
