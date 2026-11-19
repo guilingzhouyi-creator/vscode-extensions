@@ -11,7 +11,7 @@
 class_name RealProtocolBridge
 extends RefCounted
 
-## 构造人类 UI 请求信封并分发至后端统一协议调度器
+## 构造人类 UI 请求信封并分发至后端统一协议调度器（借用并立即归还请求信封以消除同步热路径堆分配）
 static func dispatch_human(
 	domain: String,
 	action_type: String,
@@ -23,8 +23,12 @@ static func dispatch_human(
 	var effective_account_id := account_id if not account_id.is_empty() else WorldSessionRuntimeService.get_active_account_id()
 	var effective_token := token if not token.is_empty() else WorldSessionRuntimeService.get_active_session_token()
 	var effective_character_id := character_id if not character_id.is_empty() else WorldSessionRuntimeService.get_active_character_id()
-	var request_envelope := UnifiedProtocolFactory.create_human_request(domain, action_type, request_payload, effective_token, effective_account_id, effective_character_id)
-	return UnifiedProtocolDispatcher.dispatch_request(request_envelope)
+	var request_envelope := UnifiedProtocolFactory.borrow_human_request(
+		domain, action_type, request_payload, effective_token, effective_account_id, effective_character_id, false
+	)
+	var response_envelope := UnifiedProtocolDispatcher.dispatch_request(request_envelope)
+	UnifiedProtocolFactory.recycle_request_envelope(request_envelope)
+	return response_envelope
 
 ## 基于显式凭证分发协议请求并按规范结构触发异步回调
 static func dispatch_and_reply(
@@ -41,6 +45,7 @@ static func dispatch_and_reply(
 	var safe_payload: Dictionary = request_payload if request_payload != null else {}
 	var service_response := dispatch_human(domain, action_type, safe_payload, account_id, token, character_id)
 	reply_callback(result_callback, service_response, result_key, fallback_value)
+	UnifiedProtocolFactory.recycle_response_envelope(service_response)
 
 ## 自动读取当前活跃会话凭证（Account/Token/Character）分发动作用信封
 static func dispatch_active_session(
@@ -57,6 +62,7 @@ static func dispatch_active_session(
 		session_payload.merge(extra_payload, true)
 	var service_response := dispatch_human(domain, action_type, session_payload, account_id, WorldSessionRuntimeService.get_active_session_token())
 	reply_callback(result_callback, service_response, result_key, fallback_value)
+	UnifiedProtocolFactory.recycle_response_envelope(service_response)
 
 ## 将后端 UnifiedResponseEnvelopeDTO 统一解包为前端领域边界回调字典
 static func reply_callback(
@@ -96,8 +102,9 @@ static func dispatch_flat(domain: String, action_type: String, request_payload: 
 	var service_response := dispatch_human(domain, action_type, request_payload, "", "", "")
 	if service_response == null:
 		return {"success": false, "error_code": "ERR_PROTOCOL_NULL_RESPONSE"}
-	var flattened: Dictionary = service_response.data.duplicate(true) if service_response.data is Dictionary else {}
+	var flattened: Dictionary = (service_response.data as Dictionary).duplicate(true) if (service_response.data is Dictionary and not (service_response.data as Dictionary).is_empty()) else {}
 	flattened["success"] = service_response.success
 	flattened["error_code"] = str(service_response.error_code)
 	flattened["message"] = str(service_response.error_message)
+	UnifiedProtocolFactory.recycle_response_envelope(service_response)
 	return flattened

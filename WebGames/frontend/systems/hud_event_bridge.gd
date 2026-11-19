@@ -151,15 +151,17 @@ func pull_hud_snapshot_async(result_callback: Callable = Callable()) -> void:
 	var token := WorldSessionRuntimeService.get_active_session_token()
 	var account_id := WorldSessionRuntimeService.get_active_account_id()
 	var character_id := WorldSessionRuntimeService.get_active_character_id()
-	var request_envelope := UnifiedProtocolFactory.create_human_request(
+	var request_envelope := UnifiedProtocolFactory.borrow_human_request(
 		"world_state",
 		"PULL_HUD_SNAPSHOT",
 		{},
 		token,
 		account_id,
-		character_id
+		character_id,
+		false
 	)
 	var service_response := UnifiedProtocolDispatcher.dispatch_request(request_envelope)
+	UnifiedProtocolFactory.recycle_request_envelope(request_envelope)
 	if service_response.success and service_response.data is Dictionary:
 		var hud_view: MainHUDView = _get_view()
 		if hud_view != null:
@@ -168,9 +170,11 @@ func pull_hud_snapshot_async(result_callback: Callable = Callable()) -> void:
 			hud_view.apply_snapshot(_build_hud_snapshot_dict(snapshot_payload))
 		if result_callback.is_valid():
 			result_callback.call({"success": true, "data": service_response.data})
+		UnifiedProtocolFactory.recycle_response_envelope(service_response)
 		return
 	if result_callback.is_valid():
 		result_callback.call({"success": false, "error_code": service_response.error_code, "message": service_response.error_message})
+	UnifiedProtocolFactory.recycle_response_envelope(service_response)
 
 func _resolve_active_view_payload(event_packet: Variant, out_payload: Dictionary, unwrap_nested: bool = true, require_non_empty: bool = true) -> MainHUDView:
 	var hud_view: MainHUDView = _get_view()
@@ -183,35 +187,39 @@ func _resolve_active_view_payload(event_packet: Variant, out_payload: Dictionary
 	return hud_view
 
 func _on_stat_mutated(event_packet: Variant) -> void:
+	var hud_view: MainHUDView = _get_view()
+	if hud_view == null or event_packet == null:
+		return
+	if not (event_packet is Dictionary) and event_packet.get("payload_dto") is HudMutationEventsDTO.StatMutation:
+		var stat_dto: HudMutationEventsDTO.StatMutation = event_packet.get("payload_dto") as HudMutationEventsDTO.StatMutation
+		hud_view.apply_stat_delta_direct(stat_dto.stat_name.strip_edges().to_lower(), stat_dto.new_value)
+		return
 	var event_payload: Dictionary = {}
-	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload)
-	if hud_view == null:
+	if _resolve_active_view_payload(event_packet, event_payload) == null:
 		return
 	var stat_name := str(event_payload.get("stat_name", "")).strip_edges().to_lower()
-	var new_value := float(event_payload.get("new_value", 0.0))
-	var patch_snapshot: Dictionary = {}
-	match stat_name:
-		"hp", "hp_current":
-			patch_snapshot["hp_current"] = new_value
-		"mp", "mp_current":
-			patch_snapshot["mp_current"] = new_value
-		"ap", "ap_current":
-			patch_snapshot["ap_current"] = new_value
-		"gold", "wallet_gold":
-			patch_snapshot["gold"] = int(new_value)
-		"mana_monocrystals", "wallet_mana_monocrystals":
-			patch_snapshot["mana_monocrystals"] = int(new_value)
-	if not patch_snapshot.is_empty():
-		_apply_partial_snapshot(hud_view, patch_snapshot)
+	hud_view.apply_stat_delta_direct(stat_name, float(event_payload.get("new_value", 0.0)))
 
 func _on_clock_advanced(event_packet: Variant) -> void:
+	var hud_view: MainHUDView = _get_view()
+	if hud_view == null or event_packet == null:
+		return
+	if not (event_packet is Dictionary) and event_packet.get("payload_dto") is WorldCalendarEnvironmentDTO:
+		var environment_dto: WorldCalendarEnvironmentDTO = event_packet.get("payload_dto") as WorldCalendarEnvironmentDTO
+		var direct_clock := "Y%d-M%02d-D%02d %02d:00 (%s)" % [
+			environment_dto.calendar_years,
+			environment_dto.calendar_months,
+			environment_dto.calendar_days,
+			environment_dto.travel_hours % 24,
+			environment_dto.day_phase_key
+		]
+		hud_view.apply_clock_display_direct(direct_clock)
+		return
 	var event_payload: Dictionary = {}
-	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload, true, false)
-	if hud_view == null:
+	if _resolve_active_view_payload(event_packet, event_payload, true, false) == null:
 		return
 	var clock_text := _format_clock_display(event_payload)
-	if not clock_text.is_empty():
-		_apply_partial_snapshot(hud_view, {"clock_display": clock_text})
+	hud_view.apply_clock_display_direct(clock_text)
 
 func _on_authoritative_snapshot_received(event_packet: Variant) -> void:
 	var event_payload: Dictionary = {}
@@ -224,9 +232,22 @@ func _on_authoritative_snapshot_received(event_packet: Variant) -> void:
 	hud_view.apply_snapshot(next_snapshot)
 
 func _on_wallet_mutated(event_packet: Variant) -> void:
+	var hud_view: MainHUDView = _get_view()
+	if hud_view == null or event_packet == null:
+		return
+	if not (event_packet is Dictionary) and event_packet.get("payload_dto") is HudMutationEventsDTO.WalletMutation:
+		var wallet_dto: HudMutationEventsDTO.WalletMutation = event_packet.get("payload_dto") as HudMutationEventsDTO.WalletMutation
+		var direct_gold: int = hud_view.wallet_gold
+		var direct_crystals: int = hud_view.wallet_mana_crystals
+		var normalized_currency: String = wallet_dto.currency_type.strip_edges()
+		if normalized_currency == "gold":
+			direct_gold = wallet_dto.new_amount
+		elif normalized_currency == "mana_monocrystals":
+			direct_crystals = wallet_dto.new_amount
+		hud_view.apply_wallet_direct(direct_gold, direct_crystals)
+		return
 	var event_payload: Dictionary = {}
-	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload, true, false)
-	if hud_view == null:
+	if _resolve_active_view_payload(event_packet, event_payload, true, false) == null:
 		return
 	var gold: int = int(event_payload.get("wallet_gold", hud_view.wallet_gold))
 	var crystals: int = int(event_payload.get("wallet_mana_monocrystals", hud_view.wallet_mana_crystals))
@@ -235,10 +256,7 @@ func _on_wallet_mutated(event_packet: Variant) -> void:
 		gold = int(event_payload.get("new_amount", gold))
 	elif currency_type == "mana_monocrystals" and event_payload.has("new_amount"):
 		crystals = int(event_payload.get("new_amount", crystals))
-	_apply_partial_snapshot(hud_view, {
-		"gold": gold,
-		"mana_monocrystals": crystals
-	})
+	hud_view.apply_wallet_direct(gold, crystals)
 
 func _on_prologue_advanced(event_packet: Variant) -> void:
 	var hud_view: MainHUDView = _get_view()

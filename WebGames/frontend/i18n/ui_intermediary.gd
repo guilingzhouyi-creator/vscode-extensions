@@ -11,29 +11,40 @@
 class_name UIIntermediary
 extends RefCounted
 
+const MOD_I18N_EVENT_CHANNELS: Array[String] = [
+	"localization_i18n.updated",
+	"config.mod_overlay_applied",
+	"config.mod_overlay_cleared",
+	"lifecycle.teardown_completed",
+]
+
 ## 单例
 static var _instance: UIIntermediary
-static var _mod_i18n_bus_token: EventBusSubscriptionToken = null
+static var _mod_i18n_bus_tokens: Array[EventBusSubscriptionToken] = []
 ## 获取 UI 中间体门面全局单例
 static func get_instance() -> UIIntermediary:
 	if _instance == null:
 		_instance = UIIntermediary.new()
 	return _instance
 
-## 懒注册领域事件监听：在后端应用/卸载 MOD 多语言包时实时刷新活跃 UI 绑定
+## 懒注册领域事件监听：按精准事件信道挂接，在应用/卸载 MOD 多语言包与反装配时实时响应
 static func ensure_mod_i18n_subscription() -> void:
-	if _mod_i18n_bus_token != null:
+	if not _mod_i18n_bus_tokens.is_empty():
 		return
 	var bus := EventBusCore.get_instance()
 	if bus == null:
 		return
-	_mod_i18n_bus_token = bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_mod_i18n_domain_packet)
+	for target_channel in MOD_I18N_EVENT_CHANNELS:
+		var token := bus.on_channel(target_channel, _on_mod_i18n_domain_packet)
+		if token != null:
+			_mod_i18n_bus_tokens.append(token)
 
 ## 显式解绑静态事件总线监听并清理单例缓存（供测试生命周期无泄漏退出调用）
 static func teardown_for_tests() -> void:
-	if _mod_i18n_bus_token != null:
-		_mod_i18n_bus_token.unbind()
-		_mod_i18n_bus_token = null
+	for token in _mod_i18n_bus_tokens:
+		if token != null:
+			token.unbind()
+	_mod_i18n_bus_tokens.clear()
 	_instance = null
 
 static func _on_mod_i18n_domain_packet(domain_packet: Variant) -> void:
@@ -42,8 +53,6 @@ static func _on_mod_i18n_domain_packet(domain_packet: Variant) -> void:
 	if channel == "lifecycle.teardown_completed":
 		UITextResolver.get_instance().clear_mod_translations()
 		teardown_for_tests()
-		return
-	if channel != "localization_i18n.updated" and channel != "config.mod_overlay_applied" and channel != "config.mod_overlay_cleared":
 		return
 	UITextResolver.get_instance().sync_mod_dictionaries_from_config()
 	refresh_active_bindings()

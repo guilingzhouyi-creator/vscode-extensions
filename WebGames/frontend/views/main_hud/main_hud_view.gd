@@ -209,6 +209,58 @@ func update_status_snapshot(health_points: float, health_points_max: float, mana
 	_get_subpanels().refresh_status_bars(stat_hp_current, stat_hp_max, stat_mp_current, stat_mp_max, stat_ap_current, stat_ap_max)
 	_refresh_wallet()
 
+## 增量更新单项生命/法力/行动力或货币指标并直刷对应 HUD 控件，免全量快照重构与深拷贝
+func apply_stat_delta_direct(stat_name: String, new_value: float) -> void:
+	if not (snapshot is Dictionary):
+		snapshot = {}
+	var matched_currency: bool = false
+	var matched_bar: bool = false
+	match stat_name:
+		"hp", "hp_current":
+			stat_hp_current = new_value
+			snapshot["hp_current"] = new_value
+			matched_bar = true
+		"mp", "mp_current":
+			stat_mp_current = new_value
+			snapshot["mp_current"] = new_value
+			matched_bar = true
+		"ap", "ap_current":
+			stat_ap_current = new_value
+			snapshot["ap_current"] = new_value
+			matched_bar = true
+		"gold", "wallet_gold":
+			wallet_gold = int(new_value)
+			snapshot["gold"] = wallet_gold
+			matched_currency = true
+		"mana_monocrystals", "wallet_mana_monocrystals":
+			wallet_mana_crystals = int(new_value)
+			snapshot["mana_monocrystals"] = wallet_mana_crystals
+			matched_currency = true
+	if matched_bar:
+		_get_subpanels().refresh_status_bars(stat_hp_current, stat_hp_max, stat_mp_current, stat_mp_max, stat_ap_current, stat_ap_max)
+	if matched_currency:
+		_refresh_wallet()
+
+## 增量更新钱包双币种展示并同步快照字段
+func apply_wallet_direct(gold_amount: int, crystal_amount: int) -> void:
+	if not (snapshot is Dictionary):
+		snapshot = {}
+	wallet_gold = gold_amount
+	wallet_mana_crystals = crystal_amount
+	snapshot["gold"] = gold_amount
+	snapshot["mana_monocrystals"] = crystal_amount
+	_refresh_wallet()
+
+## 增量更新世界历法时钟展示并同步快照字段
+func apply_clock_display_direct(clock_text: String) -> void:
+	if clock_text.is_empty():
+		return
+	if not (snapshot is Dictionary):
+		snapshot = {}
+	hud_clock_display = clock_text
+	snapshot["clock_display"] = clock_text
+	_refresh_clock()
+
 func _apply_hud_snapshot_logs() -> void:
 	if snapshot.get("terminal_logs") is Array:
 		for log_item in (snapshot.get("terminal_logs") as Array):

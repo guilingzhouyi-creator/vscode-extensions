@@ -17,6 +17,16 @@ static func compute_layer_depths(entry_node_id: String, edge_records: Array[Dict
 	var depth_map: Dictionary = {}
 	if entry_node_id.is_empty():
 		return depth_map
+	var adjacency: Dictionary = {}
+	for edge_entry in edge_records:
+		var source_id: String = str(edge_entry.get("from_node_id", ""))
+		var target_id: String = str(edge_entry.get("to_node_id", ""))
+		if source_id.is_empty() or target_id.is_empty():
+			continue
+		if not adjacency.has(source_id):
+			var empty_neighbors: Array[String] = []
+			adjacency[source_id] = empty_neighbors
+		(adjacency[source_id] as Array[String]).append(target_id)
 	var frontier: Array[String] = [entry_node_id]
 	depth_map[entry_node_id] = 0
 	var cursor: int = 0
@@ -24,12 +34,12 @@ static func compute_layer_depths(entry_node_id: String, edge_records: Array[Dict
 		var current_node_id: String = frontier[cursor]
 		cursor += 1
 		var current_depth: int = int(depth_map.get(current_node_id, 0))
-		for edge_entry in edge_records:
-			if str(edge_entry.get("from_node_id", "")) == current_node_id:
-				var neighbor_id: String = str(edge_entry.get("to_node_id", ""))
-				if not depth_map.has(neighbor_id):
-					depth_map[neighbor_id] = current_depth + 1
-					frontier.append(neighbor_id)
+		if not adjacency.has(current_node_id):
+			continue
+		for neighbor_id in adjacency[current_node_id] as Array[String]:
+			if not depth_map.has(neighbor_id):
+				depth_map[neighbor_id] = current_depth + 1
+				frontier.append(neighbor_id)
 	return depth_map
 
 

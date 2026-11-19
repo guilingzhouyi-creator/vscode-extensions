@@ -33,9 +33,15 @@ var _mod_dictionaries: Dictionary = {} # locale -> { key -> text }
 var _synced_mod_i18n_version: int = -1
 
 func _init() -> void:
-	_load_locale_dict("zh_CN", "res://config/i18n/zh_CN.json", "i18n.zh_CN")
-	_load_locale_dict("en_US", "res://config/i18n/en_US.json", "i18n.en_US")
+	_ensure_locale_loaded(current_locale)
 	sync_mod_dictionaries_from_config()
+
+func _ensure_locale_loaded(locale: String) -> void:
+	if locale.is_empty() or _dictionaries.has(locale):
+		return
+	var file_path: String = "res://config/i18n/" + locale + ".json"
+	var fallback_table: String = "i18n." + locale
+	_load_locale_dict(locale, file_path, fallback_table)
 
 ## 从 GameConfig 模组本地化覆盖层全量同步各语言字典（不污染静态基座词典）
 func sync_mod_dictionaries_from_config() -> void:
@@ -61,8 +67,13 @@ func apply_mod_translations(locale: String, translations: Dictionary) -> void:
 func clear_mod_translations() -> void:
 	_mod_dictionaries.clear()
 
-## 加载本地化字典（开发期优先 JSON，发行态 res://config/ 剔除后回退 GameConfig/config.kdat）
+## 加载本地化字典（GameConfig 已加载时优先复用零拷贝缓存表；否则按需读取 JSON 并缓存，避免冷启动双倍磁盘与解析）
 func _load_locale_dict(locale: String, path: String, fallback_table: String = "") -> void:
+	if not fallback_table.is_empty() and GameConfig.is_loaded() and GameConfig.has_table(fallback_table):
+		var cached_payload: Variant = GameConfig.get_table(fallback_table, {})
+		if cached_payload is Dictionary and not (cached_payload as Dictionary).is_empty():
+			_dictionaries[locale] = cached_payload
+			return
 	if FileAccess.file_exists(path):
 		var file := FileAccess.open(path, FileAccess.READ)
 		if file == null:
@@ -78,7 +89,7 @@ func _load_locale_dict(locale: String, path: String, fallback_table: String = ""
 	if not fallback_table.is_empty() and GameConfig.has_table(fallback_table):
 		var table_payload: Variant = GameConfig.get_table(fallback_table, {})
 		if table_payload is Dictionary and not (table_payload as Dictionary).is_empty():
-			_dictionaries[locale] = (table_payload as Dictionary).duplicate(true)
+			_dictionaries[locale] = table_payload
 
 ## 核心翻译函数: resolve(i18n_key, template_payload) → 翻译后模板字符串（已填充参数）
 ## 单引擎模板解析收敛：本函数只负责提取模板，参数填充唯一由 PlaceholderFiller 承担，
@@ -98,9 +109,10 @@ static func resolve(i18n_key: String, template_payload: Dictionary = {}) -> Stri
 
 	return PlaceholderFiller.fill(template_text, template_payload)
 
-## 原始文案检索 (当前语言 MOD -> 基础 -> 回退语言 MOD -> 基础)
+## 原始文案检索 (当前语言 MOD -> 基础 -> 回退语言 MOD -> 惰性加载回退基础)
 func _get_raw_text(i18n_key: String) -> String:
 	_sync_mod_dictionaries_if_stale()
+	_ensure_locale_loaded(current_locale)
 	var mod_locale_table: Dictionary = _mod_dictionaries.get(current_locale, {})
 	if mod_locale_table.has(i18n_key):
 		return str(mod_locale_table[i18n_key])
@@ -113,6 +125,7 @@ func _get_raw_text(i18n_key: String) -> String:
 	if mod_fallback_table.has(i18n_key):
 		return str(mod_fallback_table[i18n_key])
 
+	_ensure_locale_loaded(fallback_locale)
 	var fallback_dictionary: Dictionary = _dictionaries.get(fallback_locale, {})
 	if fallback_dictionary.has(i18n_key):
 		return str(fallback_dictionary[i18n_key])

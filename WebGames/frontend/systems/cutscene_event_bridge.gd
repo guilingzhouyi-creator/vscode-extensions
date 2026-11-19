@@ -14,6 +14,12 @@ class_name CutsceneEventBridge
 extends RefCounted
 
 const CutscenePlayerViewClass = preload("res://frontend/views/cutscene_player/cutscene_player_view.gd")
+const CUTSCENE_SUBSCRIBED_CHANNELS: Array[String] = [
+	"cutscene.started",
+	"cutscene.playback_progress",
+	"cutscene.finished",
+	"cutscene.skipped",
+]
 
 signal presentation_started(cutscene_id: String, is_placeholder: bool)
 signal presentation_progress(current_time: float, progress: float, subtitle: String)
@@ -43,6 +49,7 @@ func trigger_cutscene_preview(cutscene_id: String, title_text: String = "", subt
 	if bus == null:
 		return
 	bus.emit_domain_event("cutscene.started", {
+		"category_key": "system",
 		"cutscene_id": clean_id,
 		"is_placeholder": true,
 		"placeholder_title": title_text if not title_text.is_empty() else clean_id,
@@ -166,8 +173,10 @@ func _setup_bus_subscriptions() -> void:
 	if bus == null:
 		return
 
-	var token := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_domain_packet)
-	_bus_tokens.append(token)
+	for cutscene_channel in CUTSCENE_SUBSCRIBED_CHANNELS:
+		var token := bus.on_channel(cutscene_channel, _on_domain_packet)
+		if token != null:
+			_bus_tokens.append(token)
 
 func _on_domain_packet(domain_packet: Variant) -> void:
 	var wrapper: Dictionary = domain_packet.payload_data if domain_packet != null and domain_packet.get("payload_data") is Dictionary else {}
