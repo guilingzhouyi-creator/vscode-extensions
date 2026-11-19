@@ -23,6 +23,7 @@
 5. 架构分层契约（领域层倒置、越层渗透）守卫；
 6. 严格工程化退出语义与报告格式（text/json/markdown/sarif/badge）导出。
 """
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,7 @@ from lib.refactor_report_formats import (
     persist_latest_snapshot,
     render_markdown_report,
 )
+
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -70,9 +72,7 @@ class RefactorAuditOptions:
     update_baseline: str = ""
     analyzers: str = ""
     config_path: str = ""
-    maturity_tier: str = ""
     security_level: str = ""
-    classify_literals: bool = False
     cli_path: str = ""
 
 
@@ -104,57 +104,15 @@ def find_node_executable() -> str:
             # where.exe 探测失败时记录调试信息并回退至标准固定安装路径扫描
             sys.stderr.write(f"[DEBUG] where.exe node 探测跳过: {exc}\n")
     win_paths = [
-        Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "nodejs" / "node.exe",
+        Path(os.environ.get("ProgramFiles", "C:\\Program Files"))
+        / "nodejs"
+        / "node.exe",
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "node" / "node.exe",
     ]
     for p in win_paths:
         if p.exists():
             return str(p)
     return ""
-
-
-def _next_string_state(ch: str, esc: bool) -> tuple[bool, bool]:
-    """计算字符串字面量内部的转义与闭合状态 (in_str, esc)。"""
-    if esc:
-        return True, False
-    if ch == "\\":
-        return True, True
-    if ch == '"':
-        return False, False
-    return True, False
-
-
-def _parse_json_dict_candidate(text: str) -> dict[str, Any] | None:
-    """尝试将截取的 JSON 文本切片解析为字典对象。"""
-    try:
-        result = json.loads(text)
-        return result if isinstance(result, dict) else None
-    except Exception:
-        return None
-
-
-def _extract_json_object(raw: str) -> dict[str, Any] | None:
-    """括号计数法从 stdout 中截取首个完整 JSON 对象（容忍上游 reporters.ts 转义缺陷/尾随杂讯）。"""
-    start = raw.find("{")
-    if start < 0:
-        return None
-    depth = 0
-    in_str = False
-    esc = False
-    for i in range(start, len(raw)):
-        ch = raw[i]
-        if in_str:
-            in_str, esc = _next_string_state(ch, esc)
-            continue
-        if ch == '"':
-            in_str = True
-        elif ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return _parse_json_dict_candidate(raw[start:i + 1])
-    return None
 
 
 def _warn_threshold_divergence(config_path: str) -> None:
@@ -193,7 +151,9 @@ def _render_quality_score_card(qs: dict[str, Any], show_detailed: bool = False) 
     rationales = qs.get("rationales", [])
 
     print("📊 工程化十维质量评估看板 (10-Dimension Quality Score Card):")
-    print(f"  🏆 综合评分: [{_format_score_bar(composite)}] {composite}/100 | 等级: {grade} | 置信度: {confidence:.2f}")
+    print(
+        f"  🏆 综合评分: [{_format_score_bar(composite)}] {composite}/100 | 等级: {grade} | 置信度: {confidence:.2f}"
+    )
 
     dim_labels: dict[str, str] = {
         "architectureConsistency": "架构一致性 (Arch Consistency)",
@@ -210,7 +170,9 @@ def _render_quality_score_card(qs: dict[str, Any], show_detailed: bool = False) 
 
     if show_detailed or composite < DETAILED_SCORE_THRESHOLD:
         print("  ┌" + BORDER_HORIZ * 46 + "┬" + BORDER_HORIZ * 28 + "┐")
-        print("  │ 评估维度                                     │ 指标得分                   │")
+        print(
+            "  │ 评估维度                                     │ 指标得分                   │"
+        )
         print("  ├" + BORDER_HORIZ * 46 + "┼" + BORDER_HORIZ * 28 + "┤")
         for dim_key, dim_title in dim_labels.items():
             val = indices.get(dim_key, 100)
@@ -238,11 +200,16 @@ def _resolve_output_format(opts: RefactorAuditOptions) -> str:
 
 def _is_machine_output(opts: RefactorAuditOptions) -> bool:
     """判断当前是否处于机器输出或精简评分模式（须抑制 stdout 横幅与提示语）。"""
-    return opts.json_output or opts.score_only or opts.report_format in (
-        "json",
-        "sarif",
-        "markdown",
-        "badge",
+    return (
+        opts.json_output
+        or opts.score_only
+        or opts.report_format
+        in (
+            "json",
+            "sarif",
+            "markdown",
+            "badge",
+        )
     )
 
 
@@ -253,11 +220,16 @@ def _resolve_audit_config(opts: RefactorAuditOptions) -> str | None:
         _warn_threshold_divergence(resolved)
         return resolved
     if opts.config_path:
-        print(f"【WARN】指定的 --config 不存在: {opts.config_path}，回退引擎默认阈值。", file=sys.stderr)
+        print(
+            f"【WARN】指定的 --config 不存在: {opts.config_path}，回退引擎默认阈值。",
+            file=sys.stderr,
+        )
     return None
 
 
-def _append_engine_flags(cmd: list[str], opts: RefactorAuditOptions, resolved_config: str | None) -> None:
+def _append_engine_flags(
+    cmd: list[str], opts: RefactorAuditOptions, resolved_config: str | None
+) -> None:
     """按选项追加 auto-refactor CLI 运行参数。"""
     if resolved_config:
         cmd.extend(["--config", resolved_config])
@@ -266,50 +238,32 @@ def _append_engine_flags(cmd: list[str], opts: RefactorAuditOptions, resolved_co
     if opts.diff_mode:
         cmd.extend([ARG_ENGINE_ARG, "--diff"])
     if opts.security_level:
-        cmd.extend([ARG_ENGINE_ARG, "--security-level", ARG_ENGINE_ARG, opts.security_level])
+        cmd.extend(
+            [ARG_ENGINE_ARG, "--security-level", ARG_ENGINE_ARG, opts.security_level]
+        )
     if opts.baseline:
         cmd.extend(["--baseline", opts.baseline])
     if opts.update_baseline:
         cmd.extend(["--update-baseline", opts.update_baseline])
 
 
-def _build_refactor_cmd(
-    ctx: RefactorCommandContext | None = None,
-    **kwargs: Any,
-) -> list[str]:
+def _build_refactor_cmd(ctx: RefactorCommandContext) -> list[str]:
     """组装底层 auto-refactor CLI 调用命令行数组 (GOV-DAT-001)。"""
-    if ctx is None:
-        ctx = RefactorCommandContext(
-            node_bin=kwargs.get("node_bin", "node"),
-            runner=kwargs.get("runner", Path(".")),
-            target_root=kwargs.get("target_root", Path(".")),
-            cli_format=kwargs.get("cli_format", "json"),
-            report_path=kwargs.get("report_path", Path(".")),
-            opts=kwargs.get("opts", RefactorAuditOptions()),
-        )
     opts = ctx.opts
     resolved_config = _resolve_audit_config(opts)
-    if not _is_machine_output(opts):
-        if opts.maturity_tier:
-            print(
-                "【提示】--maturity-tier 由项目配置 maturityTier 承载（引擎 CLI 无此开关），本次按配置执行。",
-                file=sys.stderr,
-            )
-        if opts.classify_literals:
-            print(
-                "【提示】--classify-literals 由项目配置 classifyLiterals 承载（引擎 CLI 无此开关），本次按配置执行。",
-                file=sys.stderr,
-            )
-
     cli_target = Path(opts.cli_path).resolve() if opts.cli_path else AUTO_REFACTOR_CLI
     engine_dir = cli_target.parent.parent if opts.cli_path else AUTO_REFACTOR_DIR
     cmd = [
         ctx.node_bin,
         str(ctx.runner),
-        "--engine", str(engine_dir),
-        "--root", str(ctx.target_root),
-        "--format", ctx.cli_format,
-        "--out", str(ctx.report_path),
+        "--engine",
+        str(engine_dir),
+        "--root",
+        str(ctx.target_root),
+        "--format",
+        ctx.cli_format,
+        "--out",
+        str(ctx.report_path),
         "--report-only",
         "--quiet",
     ]
@@ -317,7 +271,9 @@ def _build_refactor_cmd(
     return cmd
 
 
-def _render_category_issues(title: str, issues: list[dict[str, Any]], tag: str, limit: int = DEFAULT_TOP_LIMIT) -> None:
+def _render_category_issues(
+    title: str, issues: list[dict[str, Any]], tag: str, limit: int = DEFAULT_TOP_LIMIT
+) -> None:
     """渲染特定分析器分类下的问题列表。"""
     if not issues:
         return
@@ -325,7 +281,7 @@ def _render_category_issues(title: str, issues: list[dict[str, Any]], tag: str, 
     for iss in issues[:limit]:
         loc = iss.get("location", {})
         file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-        rule_tag = f"{tag}/{iss.get('rule', '')}" if iss.get('rule') else tag
+        rule_tag = f"{tag}/{iss.get('rule', '')}" if iss.get("rule") else tag
         print(f"  ⚠️ [{rule_tag}] {file_loc} — {iss.get('message', '')}")
         if iss.get("suggestion"):
             print(f"     💡 建议: {iss.get('suggestion')}")
@@ -341,9 +297,15 @@ def _render_summary_stats(summary: dict[str, Any]) -> None:
     duration_ms = summary.get("durationMs", 0)
     suppressed = summary.get("suppressedCount", 0)
 
-    print(f"  • 扫描源文件数: {files_scanned} 个 | 引擎耗时: {duration_ms} ms | 规则抑制: {suppressed} 处")
-    print(f"  • 待优化项总计: {issues_total} 处 (ERROR {by_sev.get('error', 0)} / WARN {by_sev.get('warning', 0)} / INFO {by_sev.get('info', 0)})")
-    analyzer_stats = " | ".join(f"{k}({v})" for k, v in sorted(by_analyzer.items()) if v > 0)
+    print(
+        f"  • 扫描源文件数: {files_scanned} 个 | 引擎耗时: {duration_ms} ms | 规则抑制: {suppressed} 处"
+    )
+    print(
+        f"  • 待优化项总计: {issues_total} 处 (ERROR {by_sev.get('error', 0)} / WARN {by_sev.get('warning', 0)} / INFO {by_sev.get('info', 0)})"
+    )
+    analyzer_stats = " | ".join(
+        f"{k}({v})" for k, v in sorted(by_analyzer.items()) if v > 0
+    )
     if analyzer_stats:
         print(f"  • 分析器发现: {analyzer_stats}")
     print(MINUS_CHAR * LINE_WIDTH)
@@ -366,7 +328,9 @@ def _render_duplicate_literals(issues: list[dict[str, Any]]) -> None:
     print(MINUS_CHAR * LINE_WIDTH)
 
 
-def _partition_issues(issues: list[dict[str, Any]]) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+def _partition_issues(
+    issues: list[dict[str, Any]],
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
     """单趟聚合分析器与重复字面量发现，消除列表推导复杂度 (ADV-PRF-002)。"""
     by_an: dict[str, list[dict[str, Any]]] = {}
     dups: list[dict[str, Any]] = []
@@ -384,15 +348,27 @@ def _partition_issues(issues: list[dict[str, Any]]) -> tuple[dict[str, list[dict
 def _render_all_issue_categories(issues: list[dict[str, Any]]) -> None:
     """分流渲染各领域分析器发现。"""
     by_an, dups = _partition_issues(issues)
-    _render_category_issues("🧠 单函数高圈复杂度发现", by_an.get("complexity", []), "complexity", 5)
-    _render_category_issues("📦 超大文件拆分候选", by_an.get("large-file", []), "large-file")
+    _render_category_issues(
+        "🧠 单函数高圈复杂度发现", by_an.get("complexity", []), "complexity", 5
+    )
+    _render_category_issues(
+        "📦 超大文件拆分候选", by_an.get("large-file", []), "large-file"
+    )
     _render_duplicate_literals(dups)
-    _render_category_issues("⚡ 性能与高承压热点隐患", by_an.get("performance", []), "performance")
-    _render_category_issues("🏗️ 架构分层契约守卫发现", by_an.get("architecture", []), "architecture")
+    _render_category_issues(
+        "⚡ 性能与高承压热点隐患", by_an.get("performance", []), "performance"
+    )
+    _render_category_issues(
+        "🏗️ 架构分层契约守卫发现", by_an.get("architecture", []), "architecture"
+    )
     security_issues = by_an.get("security", []) + by_an.get("secrets", [])
     _render_category_issues("🛡️ 安全合规与凭据合规发现", security_issues, "security")
-    _render_category_issues("🏛️ 治理规范与静态类型发现", by_an.get("governance", []), "governance")
-    _render_category_issues("🧹 代码卫生与工程整洁度发现", by_an.get("hygiene", []), "hygiene")
+    _render_category_issues(
+        "🏛️ 治理规范与静态类型发现", by_an.get("governance", []), "governance"
+    )
+    _render_category_issues(
+        "🧹 代码卫生与工程整洁度发现", by_an.get("hygiene", []), "hygiene"
+    )
 
 
 def _evaluate_strict_gate(
@@ -410,11 +386,15 @@ def _evaluate_strict_gate(
         return True, f"存在 {errors} 处 error 级发现"
     arbitration = summary.get("arbitration") or {}
     governance = report.get("governance") or {}
-    gate_verdict = str(
-        arbitration.get("gateVerdict", governance.get("gateVerdict", ""))
-    ).strip().lower()
+    gate_verdict = (
+        str(arbitration.get("gateVerdict", governance.get("gateVerdict", "")))
+        .strip()
+        .lower()
+    )
     if gate_verdict == "blocked":
-        blocking_count = arbitration.get("blockingCount", governance.get("blockingCount", 0))
+        blocking_count = arbitration.get(
+            "blockingCount", governance.get("blockingCount", 0)
+        )
         return True, f"arbitration gateVerdict=blocked, blockingCount={blocking_count}"
     return False, ""
 
@@ -442,20 +422,35 @@ def _render_audit_console_report(
     return 0
 
 
-def _resolve_audit_runtime(opts: RefactorAuditOptions | None = None) -> tuple[str, Path] | None:
+def _resolve_audit_runtime(
+    opts: RefactorAuditOptions | None = None,
+) -> tuple[str, Path] | None:
     """验证并定位 Node.js 运行时及通用 runner 路径（缺失即 fail-closed 阻断）。"""
     node_bin = find_node_executable()
     if not node_bin:
-        print("【ERROR】未检测到 Node.js 运行时环境，auto-refactor 门禁阻断（fail-closed）。", file=sys.stderr)
+        print(
+            "【ERROR】未检测到 Node.js 运行时环境，auto-refactor 门禁阻断（fail-closed）。",
+            file=sys.stderr,
+        )
         return None
-    cli_target = Path(opts.cli_path).resolve() if (opts and opts.cli_path) else AUTO_REFACTOR_CLI
+    cli_target = (
+        Path(opts.cli_path).resolve() if (opts and opts.cli_path) else AUTO_REFACTOR_CLI
+    )
     if not cli_target.exists():
-        print(f"【ERROR】auto-refactor CLI 入口不存在 ({cli_target})，门禁阻断（fail-closed）。", file=sys.stderr)
+        print(
+            f"【ERROR】auto-refactor CLI 入口不存在 ({cli_target})，门禁阻断（fail-closed）。",
+            file=sys.stderr,
+        )
         return None
-    engine_dir = cli_target.parent.parent if (opts and opts.cli_path) else AUTO_REFACTOR_DIR
+    engine_dir = (
+        cli_target.parent.parent if (opts and opts.cli_path) else AUTO_REFACTOR_DIR
+    )
     runner = engine_dir / "templates" / "consumer" / "run.mjs"
     if not runner.exists():
-        print(f"【ERROR】引擎未提供通用 runner ({runner})，门禁阻断（fail-closed）。", file=sys.stderr)
+        print(
+            f"【ERROR】引擎未提供通用 runner ({runner})，门禁阻断（fail-closed）。",
+            file=sys.stderr,
+        )
         return None
     return node_bin, runner
 
@@ -473,20 +468,27 @@ def _execute_refactor_process(cmd: list[str]) -> tuple[int, str, str]:
         )
         return r.returncode, r.stdout, r.stderr
     except Exception as exc:
-        print(f"【ERROR】调用 auto-refactor 执行异常: {exc}，审查阻断（fail-closed）。", file=sys.stderr)
+        print(
+            f"【ERROR】调用 auto-refactor 执行异常: {exc}，审查阻断（fail-closed）。",
+            file=sys.stderr,
+        )
         return 2, "", str(exc)
 
 
 def _parse_report_payload(raw_output: str, stderr: str) -> dict[str, Any] | None:
-    """从原始字符串解析 JSON 报告数据结构。"""
+    """从原始字符串解析 JSON 报告数据结构（严格要求合法 JSON 对象，拒绝容错截断恢复）。"""
     try:
-        return json.loads(raw_output)
+        parsed = json.loads(raw_output)
+        if isinstance(parsed, dict):
+            return parsed
     except Exception:
-        parsed = _extract_json_object(raw_output or "")
-        if parsed is None:
-            print("【ERROR】auto-refactor 输出无法解析为 JSON，审查阻断（fail-closed）：", file=sys.stderr)
-            print((raw_output or stderr or "无输出")[:800], file=sys.stderr)
-        return parsed
+        pass
+    print(
+        "【ERROR】auto-refactor 输出无法解析为合法 JSON 对象，审查阻断（fail-closed）：",
+        file=sys.stderr,
+    )
+    print((raw_output or stderr or "无输出")[:800], file=sys.stderr)
+    return None
 
 
 def _resolve_target_root(slice_name: str | None) -> Path:
@@ -535,16 +537,26 @@ def _dispatch_audit_output(
         print(render_markdown_report(report, strict_failed, fail_reason))
         return exit_code
     if fmt == "badge":
-        print(json.dumps(build_badge_payload(report, strict_failed), ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                build_badge_payload(report, strict_failed), ensure_ascii=False, indent=2
+            )
+        )
         return exit_code
-    return _render_audit_console_report(report, opts, process_returncode=process_returncode)
+    return _render_audit_console_report(
+        report, opts, process_returncode=process_returncode
+    )
 
 
-def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) -> int:
+def run_refactor_audit(opts: RefactorAuditOptions) -> int:
     """执行 auto-refactor 审查流水线。"""
-    active_opts = opts if opts is not None else RefactorAuditOptions(**kwargs)
+    active_opts = opts
     if not _is_machine_output(active_opts):
-        mode_tag = "动态增量极速审查 (Dynamic Diff Mode)" if active_opts.diff_mode else "全量静态深度审查 (Full Static Mode)"
+        mode_tag = (
+            "动态增量极速审查 (Dynamic Diff Mode)"
+            if active_opts.diff_mode
+            else "全量静态深度审查 (Full Static Mode)"
+        )
         print("=" * LINE_WIDTH)
         print(f"🔭 卡拉尔世界引擎：auto-refactor {mode_tag}")
         print("=" * LINE_WIDTH)
@@ -556,12 +568,20 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
 
     target_root = _resolve_target_root(active_opts.slice_name)
     cli_format = _resolve_cli_format(active_opts)
-    report_path = Path(tempfile.gettempdir()) / f"webgames-auto-refactor-{os.getpid()}.json"
+    report_path = (
+        Path(tempfile.gettempdir()) / f"webgames-auto-refactor-{os.getpid()}.json"
+    )
 
-    cmd = _build_refactor_cmd(RefactorCommandContext(
-        node_bin=node_bin, runner=runner, target_root=target_root,
-        cli_format=cli_format, report_path=report_path, opts=active_opts,
-    ))
+    cmd = _build_refactor_cmd(
+        RefactorCommandContext(
+            node_bin=node_bin,
+            runner=runner,
+            target_root=target_root,
+            cli_format=cli_format,
+            report_path=report_path,
+            opts=active_opts,
+        )
+    )
 
     ret_code, stdout, stderr = _execute_refactor_process(cmd)
     if ret_code not in (0, 1):
@@ -574,8 +594,13 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
     raw_output = _read_temp_report(report_path)
     if raw_output is None:
         diag = (stderr or stdout or "").strip()[:600]
-        detail = f"（exit={ret_code}，stderr: {diag}）" if diag else f"（exit={ret_code}）"
-        print(f"【ERROR】auto-refactor 未产出报告文件{detail}，审查阻断（fail-closed）。", file=sys.stderr)
+        detail = (
+            f"（exit={ret_code}，stderr: {diag}）" if diag else f"（exit={ret_code}）"
+        )
+        print(
+            f"【ERROR】auto-refactor 未产出报告文件{detail}，审查阻断（fail-closed）。",
+            file=sys.stderr,
+        )
         return 2
 
     report = _parse_report_payload(raw_output, stderr)
@@ -586,8 +611,12 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
 
 def main() -> int:
     """CLI 入口与参数解析。"""
-    ap = argparse.ArgumentParser(description="auto-refactor 静态复杂度与多维代码健康度分析门禁")
-    ap.add_argument("--strict", action="store_true", help="当存在 error 级发现时阻断门禁 (exit 1)")
+    ap = argparse.ArgumentParser(
+        description="auto-refactor 静态复杂度与多维代码健康度分析门禁"
+    )
+    ap.add_argument(
+        "--strict", action="store_true", help="当存在 error 级发现时阻断门禁 (exit 1)"
+    )
     ap.add_argument("--json", action="store_true", help="输出完整 JSON 格式聚合报告")
     ap.add_argument("--score", action="store_true", help="打印完整十维质量评估明细看板")
     ap.add_argument(
@@ -601,15 +630,17 @@ def main() -> int:
     ap.add_argument("--diff", action="store_true", help="仅审查 Git 增量变更文件")
     ap.add_argument("--baseline", type=str, default="", help="基线文件路径")
     ap.add_argument("--update-baseline", type=str, default="", help="更新基线文件路径")
-    ap.add_argument("--analyzers", type=str, default="", help="透传 auto-refactor 分析器子集（逗号分隔）")
-    ap.add_argument("--config", type=str, default="", help="透传 auto-refactor 配置文件路径")
-    ap.add_argument("--cli-path", type=str, default="", help="覆盖 auto-refactor CLI 入口路径")
     ap.add_argument(
-        "--maturity-tier",
+        "--analyzers",
         type=str,
         default="",
-        choices=["", "demo", "prototype", "production", "industrial"],
-        help="指定项目成熟度层级，动态调整审查严格度",
+        help="透传 auto-refactor 分析器子集（逗号分隔）",
+    )
+    ap.add_argument(
+        "--config", type=str, default="", help="透传 auto-refactor 配置文件路径"
+    )
+    ap.add_argument(
+        "--cli-path", type=str, default="", help="覆盖 auto-refactor CLI 入口路径"
     )
     ap.add_argument(
         "--security-level",
@@ -617,11 +648,6 @@ def main() -> int:
         default="",
         choices=["", "off", "basic", "full"],
         help="安全扫描级别 (off, basic, full)",
-    )
-    ap.add_argument(
-        "--classify-literals",
-        action="store_true",
-        help="开启高阶语义字面量识别分类 (URL, 端口, 路径, 时间等)",
     )
     args = ap.parse_args()
 
@@ -636,9 +662,7 @@ def main() -> int:
         update_baseline=args.update_baseline,
         analyzers=args.analyzers,
         config_path=args.config,
-        maturity_tier=args.maturity_tier,
         security_level=args.security_level,
-        classify_literals=args.classify_literals,
         cli_path=args.cli_path,
     )
     return run_refactor_audit(opts)
