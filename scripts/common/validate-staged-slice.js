@@ -6,7 +6,8 @@
  *   - Function cyclomatic complexity (> 15 base, elastic bonus up to 18 for low blast radius, up to 25 for flat dispatchers)
  *   - Control flow nesting depth (> 4)
  *   - Code dilution / noise index (kappa_noise > 4.0)
- * Dependencies & Triggers: Invoked by pre-commit-gate scripts (sh / ps1) and CI hygiene jobs.
+ * Dependencies & Triggers: Invoked by pre-commit-gate scripts (sh / ps1) and CI hygiene jobs;
+ *   delegates AST traversal and complexity computation to lib/staged-slice-analyzers.js.
  * Responsibilities: Enforce CC <= 15 (elastic), depth <= 4, and noise ratio on staged slices.
  * Exit Semantics & Design Rationale: 0 = PASS (clean AST slice), 1 = FAIL on violations.
  */
@@ -15,38 +16,14 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync, execFileSync } = require("child_process");
-const { getSafeGitEnv, readStagedBuffersBatch, getStagedFiles: queryStagedFiles } = require("./git-env");
+const {
+  getSafeGitEnv,
+  readStagedBuffersBatch,
+  getStagedFiles: queryStagedFiles,
+} = require("./git-env");
 const analyzers = require("./lib/staged-slice-analyzers");
-const { isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName, analyzeFunction } = analyzers;
 
-let ts;
 const REPO_ROOT = path.resolve(__dirname, "../..");
-
-const candidatePaths = [
-  "typescript",
-  path.resolve(REPO_ROOT, "auto-refactor/node_modules/typescript"),
-  path.resolve(REPO_ROOT, "workspace-timing/node_modules/typescript"),
-  path.resolve(REPO_ROOT, "node_modules/typescript"),
-];
-
-for (const p of candidatePaths) {
-  try {
-    ts = require(p);
-    if (ts) break;
-  } catch (requireErr) {
-    // Best-effort candidate discovery: ignore probe failures and try next candidate
-    void requireErr;
-  }
-}
-
-if (!ts) {
-  console.error(
-    '✖ BLOCK  TypeScript runtime is required for AST slice review but was not resolvable.\n' +
-      '   Remediation: npm ci --prefix auto-refactor (or npm install --prefix workspace-timing).\n' +
-      '   Fail-closed policy: a skipped complexity gate is treated as a failed complexity gate.',
-  );
-  process.exit(1);
-}
 
 /** Default baseline configuration contract. */
 const DEFAULT_CONFIG = Object.freeze({
@@ -65,6 +42,19 @@ const DEFAULT_CONFIG = Object.freeze({
   testMaxComplexity: 20,
 });
 
+const CONFIG_OVERRIDE_FIELDS = [
+  ["maxFunctionComplexity", "number"],
+  ["maxNestingDepth", "number"],
+  ["maxNoiseRatio", "number"],
+  ["minFunctionNameLength", "number"],
+  ["maxFunctionNameLength", "number"],
+  ["flatDispatcherBonus", "boolean"],
+  ["flatDispatcherMaxComplexity", "number"],
+  ["lowBlastRadiusBonus", "boolean"],
+  ["lowBlastRadiusMaxComplexity", "number"],
+  ["lowBlastRadiusMaxDepth", "number"],
+];
+
 function readJsonSafe(filePath) {
   if (!fs.existsSync(filePath)) return null;
   try {
@@ -76,6 +66,9 @@ function readJsonSafe(filePath) {
 
 /**
  * Searches upwards for project configuration files with complexity overrides.
+ *
+ * @param {string} filePath - Target source file path
+ * @returns {Record<string, any>|null} Discovered threshold overrides or null
  */
 function findProjectConfig(filePath) {
   let curr = path.dirname(path.resolve(filePath));
@@ -97,66 +90,37 @@ function findProjectConfig(filePath) {
 
 /**
  * Applies complexity configuration overrides from a given config source.
+ *
+ * @param {Record<string, any>} cfg - Mutable configuration object
+ * @param {Record<string, any>|null} source - Override source object
  */
 function applyConfigOverrides(cfg, source) {
   if (!source) return;
-  if (typeof source.maxFunctionComplexity === "number") {
-    cfg.maxFunctionComplexity = source.maxFunctionComplexity;
-  }
-  if (typeof source.maxNestingDepth === "number") {
-    cfg.maxNestingDepth = source.maxNestingDepth;
-  }
-  if (typeof source.maxNoiseRatio === "number") {
-    cfg.maxNoiseRatio = source.maxNoiseRatio;
-  }
-  if (typeof source.minFunctionNameLength === "number") {
-    cfg.minFunctionNameLength = source.minFunctionNameLength;
-  }
-  if (typeof source.maxFunctionNameLength === "number") {
-    cfg.maxFunctionNameLength = source.maxFunctionNameLength;
-  }
-  if (typeof source.flatDispatcherBonus === "boolean") {
-    cfg.flatDispatcherBonus = source.flatDispatcherBonus;
-  }
-  if (typeof source.flatDispatcherMaxComplexity === "number") {
-    cfg.flatDispatcherMaxComplexity = source.flatDispatcherMaxComplexity;
-  }
-  if (typeof source.lowBlastRadiusBonus === "boolean") {
-    cfg.lowBlastRadiusBonus = source.lowBlastRadiusBonus;
-  }
-  if (typeof source.lowBlastRadiusMaxComplexity === "number") {
-    cfg.lowBlastRadiusMaxComplexity = source.lowBlastRadiusMaxComplexity;
-  }
-  if (typeof source.lowBlastRadiusMaxDepth === "number") {
-    cfg.lowBlastRadiusMaxDepth = source.lowBlastRadiusMaxDepth;
+  for (const [field, expectedType] of CONFIG_OVERRIDE_FIELDS) {
+    if (typeof source[field] === expectedType) {
+      cfg[field] = source[field];
+    }
   }
 }
 
 /**
  * Resolves effective complexity configuration for a specific target file.
+ *
+ * @param {string} filePath - Target source file path
+ * @param {Record<string, any>} [overrides] - Explicit override flags
+ * @returns {Record<string, any>} Effective configuration
  */
 function resolveConfig(filePath, overrides = {}) {
   const cfg = { ...DEFAULT_CONFIG };
   applyConfigOverrides(cfg, findProjectConfig(filePath));
 
   const normalized = filePath.replace(/\\/g, "/");
-  const isProbe = /(?:archetype|parser|scanner|detector|lexer|tokenizer)/i.test(
-    normalized,
-  );
-  const isTest =
-    /(?:\.test\.|\.spec\.|scripts\/(?:common\/)?validate-|tests\/)/i.test(
-      normalized,
-    );
+  const isProbe = /(?:archetype|parser|scanner|detector|lexer|tokenizer)/i.test(normalized);
+  const isTest = /(?:\.test\.|\.spec\.|scripts\/(?:common\/)?validate-|tests\/)/i.test(normalized);
   if (isProbe) {
-    cfg.maxFunctionComplexity = Math.max(
-      cfg.maxFunctionComplexity,
-      cfg.probeMaxComplexity,
-    );
+    cfg.maxFunctionComplexity = Math.max(cfg.maxFunctionComplexity, cfg.probeMaxComplexity);
   } else if (isTest) {
-    cfg.maxFunctionComplexity = Math.max(
-      cfg.maxFunctionComplexity,
-      cfg.testMaxComplexity,
-    );
+    cfg.maxFunctionComplexity = Math.max(cfg.maxFunctionComplexity, cfg.testMaxComplexity);
   }
 
   applyConfigOverrides(cfg, overrides);
@@ -170,6 +134,8 @@ function resolveConfig(filePath, overrides = {}) {
  * @param {Record<string, any>} flags - Parsed flag collection
  * @param {string[]} explicitFiles - Target file list accumulator
  */
+const { ts, isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName, analyzeFunction } = analyzers;
+
 function parseSingleFlag(arg, flags, explicitFiles) {
   if (arg.startsWith("--max-cc=")) {
     flags.maxFunctionComplexity = parseInt(arg.slice(9), 10);
