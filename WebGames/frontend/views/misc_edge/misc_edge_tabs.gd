@@ -70,13 +70,13 @@ func init_mutation() -> void:
 	if _view == null:
 		return
 	_view.mutation_entries = [
-		{ "id": "MUT_001", "name_key": "ui.fe17.mock.mutation.bloodlust_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.bloodlust_effect", "source_key": "ui.fe17.mock.mutation.source_wolf_king", "state": "available" },
-		{ "id": "MUT_002", "name_key": "ui.fe17.mock.mutation.elemental_affinity_name", "quality": 3, "effect_key": "ui.fe17.mock.mutation.elemental_affinity_effect", "source_key": "ui.fe17.mock.mutation.source_elemental_core", "state": "available" },
-		{ "id": "MUT_003", "name_key": "ui.fe17.mock.mutation.iron_body_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.iron_body_effect", "source_key": "ui.fe17.mock.mutation.source_iron_crystal", "state": "available" },
-		{ "id": "MUT_004", "name_key": "ui.fe17.mock.mutation.shadow_stealth_name", "quality": 4, "effect_key": "ui.fe17.mock.mutation.shadow_stealth_effect", "source_key": "ui.fe17.mock.mutation.source_shadow_scale", "state": "locked" },
-		{ "id": "MUT_005", "name_key": "ui.fe17.mock.mutation.dragon_blood_name", "quality": 4, "effect_key": "ui.fe17.mock.mutation.dragon_blood_effect", "source_key": "ui.fe17.mock.mutation.source_dragon_heart", "state": "locked" },
+		{"id": "MUT_001", "name_key": "ui.fe17.mock.mutation.bloodlust_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.bloodlust_effect", "source_key": "ui.fe17.mock.mutation.source_wolf_king", "state": "available"},
+		{"id": "MUT_002", "name_key": "ui.fe17.mock.mutation.elemental_affinity_name", "quality": 3, "effect_key": "ui.fe17.mock.mutation.elemental_affinity_effect", "source_key": "ui.fe17.mock.mutation.source_elemental_core", "state": "available"},
+		{"id": "MUT_003", "name_key": "ui.fe17.mock.mutation.iron_body_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.iron_body_effect", "source_key": "ui.fe17.mock.mutation.source_iron_crystal", "state": "available"},
+		{"id": "MUT_004", "name_key": "ui.fe17.mock.mutation.shadow_stealth_name", "quality": 4, "effect_key": "ui.fe17.mock.mutation.shadow_stealth_effect", "source_key": "ui.fe17.mock.mutation.source_shadow_scale", "state": "locked"},
+		{"id": "MUT_005", "name_key": "ui.fe17.mock.mutation.dragon_blood_name", "quality": 4, "effect_key": "ui.fe17.mock.mutation.dragon_blood_effect", "source_key": "ui.fe17.mock.mutation.source_dragon_heart", "state": "locked"},
 	]
-	_view.active_mutations = [{ "id": "MUT_001", "name_key": "ui.fe17.mock.mutation.bloodlust_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.bloodlust_effect", "source_key": "ui.fe17.mock.mutation.source_wolf_king", "state": "active" }]
+	_view.active_mutations = [ {"id": "MUT_001", "name_key": "ui.fe17.mock.mutation.bloodlust_name", "quality": 2, "effect_key": "ui.fe17.mock.mutation.bloodlust_effect", "source_key": "ui.fe17.mock.mutation.source_wolf_king", "state": "active"}]
 	refresh_mutation_list()
 	refresh_mutation_combo_preview()
 
@@ -187,13 +187,8 @@ func init_name_registry() -> void:
 	_view.name_type_option.select(0)
 	refresh_name_fee()
 
-	if ServiceLocator.get_mode() == "mock":
-		_view.name_history = [
-			{ "type": 0, "name_key": "ui.fe17.mock.char.real_name", "time": "2026-08-01 10:00", "success": true },
-			{ "type": 2, "name_key": "ui.fe17.mock.guild.dawn_wing", "time": "2026-08-15 14:30", "success": true },
-		]
-	else:
-		_view.name_history = []
+	var misc_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("misc_edge")
+	_view.name_history = FrontendSnapshot.read_array(misc_snapshot, "name_history") if misc_snapshot.has("name_history") else []
 	refresh_name_history()
 
 ## 依据当前选中的命名类型刷新注册手续费展示。
@@ -248,7 +243,7 @@ func _on_name_register_pressed() -> void:
 	var register_reply := ServiceLocator.get_instance().misc_edge().dispatch_misc_action("REGISTER_NAME", {"name": candidate_name, "type": name_type_index})
 	var is_register_succeeded := bool(register_reply.get("success", true))
 	var timestamp_text := Time.get_datetime_string_from_system(false, true)
-	_view.name_history.append({ "type": name_type_index, "name_key": "", "custom_name": candidate_name, "time": timestamp_text, "success": is_register_succeeded })
+	_view.name_history.append({"type": name_type_index, "name_key": "", "custom_name": candidate_name, "time": timestamp_text, "success": is_register_succeeded})
 	refresh_name_history()
 	if is_register_succeeded:
 		UIIntermediary.resolve(_view.name_check_result_label, "ui.fe17.name_registry.register_success", {"name": candidate_name})

@@ -158,7 +158,7 @@ func init_sovereignty_tab() -> void:
 	if _view == null:
 		return
 	_view.sovereignty_territory_list.clear()
-	for territory_entry in _view._mock_territories:
+	for territory_entry in _view._territories:
 		_view.sovereignty_territory_list.add_item(UIIntermediary.text(territory_entry.get("name", "")))
 	refresh_sovereignty_info()
 
@@ -167,33 +167,27 @@ func refresh_sovereignty_info() -> void:
 	if _view == null:
 		return
 	if _view.sovereignty_nation_name_label:
-		var nation_key: String = _view._mock_sovereignty.get("nation_name", "ui.fe10.sov.nation_name_none")
+		var nation_key: String = _view._sovereignty.get("nation_name", "ui.fe10.sov.nation_name_none")
 		_view.sovereignty_nation_name_label.text = UIIntermediary.text(nation_key)
 	if _view.sovereignty_monarch_label:
-		var monarch_name := UIIntermediary.text(_view._mock_sovereignty.get("monarch", ""))
+		var monarch_name := UIIntermediary.text(_view._sovereignty.get("monarch", ""))
 		UIIntermediary.resolve(_view.sovereignty_monarch_label, "ui.fe10.sov.monarch", {"name": monarch_name})
 	if _view.sovereignty_population_label:
-		UIIntermediary.resolve(_view.sovereignty_population_label, "ui.fe10.sov.population", {"count": _view._mock_sovereignty.get("population", 0)})
+		UIIntermediary.resolve(_view.sovereignty_population_label, "ui.fe10.sov.population", {"count": _view._sovereignty.get("population", 0)})
 	if _view.sovereignty_territory_count_label:
-		UIIntermediary.resolve(_view.sovereignty_territory_count_label, "ui.fe10.sov.territory_count", {"count": _view._mock_sovereignty.get("territory_count", 0)})
+		UIIntermediary.resolve(_view.sovereignty_territory_count_label, "ui.fe10.sov.territory_count", {"count": _view._sovereignty.get("territory_count", 0)})
 	if _view.sovereignty_level_label:
-		var level_name := UIIntermediary.text(_view._mock_sovereignty.get("level", "ui.fe10.sov.level_none"))
+		var level_name := UIIntermediary.text(_view._sovereignty.get("level", "ui.fe10.sov.level_none"))
 		UIIntermediary.resolve(_view.sovereignty_level_label, "ui.fe10.sov.level", {"level": level_name})
 
 func _on_sov_establish() -> void:
 	if _view == null:
 		return
-	ServiceLocator.get_instance().world().dispatch_world_directive("world_navigation", "ESTABLISH_SOVEREIGNTY", {"territory_count": _view._mock_territories.size()})
-	if ServiceLocator.get_mode() == "mock":
-		_view._mock_sovereignty = {
-			"nation_name": "ui.fe10.mock.sov.nation_name",
-			"monarch": "ui.fe10.mock.sov.monarch",
-			"population": 1200,
-			"territory_count": _view._mock_territories.size(),
-			"level": "ui.fe10.mock.sov.level"
-		}
+	var establish_reply := ServiceLocator.get_instance().world().dispatch_world_directive("world_navigation", "ESTABLISH_SOVEREIGNTY", {"territory_count": _view._territories.size()})
+	if establish_reply.get("sovereignty") is Dictionary:
+		_view._sovereignty = (establish_reply.get("sovereignty") as Dictionary).duplicate(true)
 	else:
-		_view._mock_sovereignty["territory_count"] = _view._mock_territories.size()
+		_view._sovereignty["territory_count"] = _view._territories.size()
 	refresh_sovereignty_info()
 	_view.sovereignty_establish_button.disabled = true
 	UIIntermediary.resolve(_view.sovereignty_establish_button, "ui.fe10.sov.established")
@@ -207,10 +201,10 @@ func init_territory_tab() -> void:
 	if _view == null:
 		return
 	_view.territory_list.clear()
-	for territory_entry in _view._mock_territories:
+	for territory_entry in _view._territories:
 		_view.territory_list.add_item(UIIntermediary.text(territory_entry.get("name", "")))
-	if _view._mock_territories.size() > 0:
-		show_territory_detail(_view._mock_territories[0])
+	if _view._territories.size() > 0:
+		show_territory_detail(_view._territories[0])
 
 ## 展示指定领地的资源产出、建设进度与驻防人数
 func show_territory_detail(territory_entry: Dictionary) -> void:
@@ -226,18 +220,18 @@ func show_territory_detail(territory_entry: Dictionary) -> void:
 		UIIntermediary.resolve(_view.territory_garrison_label, "ui.fe10.terr.garrison", {"count": territory_entry.get("garrison", 0)})
 
 func _on_territory_selected(territory_index: int) -> void:
-	if _view and territory_index >= 0 and territory_index < _view._mock_territories.size():
-		show_territory_detail(_view._mock_territories[territory_index])
+	if _view and territory_index >= 0 and territory_index < _view._territories.size():
+		show_territory_detail(_view._territories[territory_index])
 
 func _on_terr_upgrade() -> void:
 	if _view == null:
 		return
 	var selected_indices := _view.territory_list.get_selected_items()
-	if selected_indices.size() > 0 and selected_indices[0] < _view._mock_territories.size():
-		var upgrade_outcome := ServiceLocator.get_instance().world().upgrade_territory(_view._mock_territories[selected_indices[0]])
+	if selected_indices.size() > 0 and selected_indices[0] < _view._territories.size():
+		var upgrade_outcome := ServiceLocator.get_instance().world().upgrade_territory(_view._territories[selected_indices[0]])
 		if bool(upgrade_outcome.get("success", false)):
-			_view._mock_territories[selected_indices[0]] = upgrade_outcome.get("territory", _view._mock_territories[selected_indices[0]])
-			show_territory_detail(_view._mock_territories[selected_indices[0]])
+			_view._territories[selected_indices[0]] = upgrade_outcome.get("territory", _view._territories[selected_indices[0]])
+			show_territory_detail(_view._territories[selected_indices[0]])
 
 # ==============================================================================
 # Tab 5: 寻路规划 (PATHFINDING)
@@ -294,8 +288,8 @@ func _on_pf_auto() -> void:
 
 ## 设施条目选中：渲染设施名称与描述详情
 func on_town_facility_selected(facility_index: int) -> void:
-	if _view and facility_index >= 0 and facility_index < _view._mock_town_facilities.size():
-		var facility_entry: Dictionary = _view._mock_town_facilities[facility_index]
+	if _view and facility_index >= 0 and facility_index < _view._town_facilities.size():
+		var facility_entry: Dictionary = _view._town_facilities[facility_index]
 		if _view._town_facility_detail_label:
 			var facility_name := UIIntermediary.text(facility_entry.get("name", ""))
 			var facility_description := UIIntermediary.text(facility_entry.get("desc", ""))
@@ -303,8 +297,8 @@ func on_town_facility_selected(facility_index: int) -> void:
 
 ## NPC 条目选中：渲染 NPC 名称与描述详情
 func on_town_npc_selected(resident_index: int) -> void:
-	if _view and resident_index >= 0 and resident_index < _view._mock_town_npcs.size():
-		var resident_entry: Dictionary = _view._mock_town_npcs[resident_index]
+	if _view and resident_index >= 0 and resident_index < _view._town_npcs.size():
+		var resident_entry: Dictionary = _view._town_npcs[resident_index]
 		if _view._town_facility_detail_label:
 			var resident_name := UIIntermediary.text(resident_entry.get("name", ""))
 			var resident_description := UIIntermediary.text(resident_entry.get("desc", ""))

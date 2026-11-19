@@ -414,22 +414,12 @@ func _on_pickup_all_pressed() -> void:
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
 
-# --- 命名注册委托 ---
-func _on_name_type_selected(name_type_index: int) -> void: _get_tabs()._on_name_type_selected(name_type_index)
-func _on_name_check_pressed() -> void: _get_tabs()._on_name_check_pressed()
-func _on_name_register_pressed() -> void: _get_tabs()._on_name_register_pressed()
-func _on_name_input_submitted(text: String) -> void: _get_tabs()._on_name_input_submitted(text)
-
 ## 应用指定伪装面具编码与假名展示并同步伪装协议状态。
 func apply_disguise_mask(mask_id: String, fake_name: String) -> void:
 	current_disguise_mask_id = mask_id
 	var default_name: String = UIIntermediary.text("ui.fe17.mock.char.real_name")
 	displayed_character_name = fake_name if mask_id != "" else default_name
 	ServiceLocator.get_instance().misc_edge().dispatch_misc_action("APPLY_DISGUISE", {"mask_id": mask_id, "fake_name": fake_name})
-
-## 兼容快照注入入口：更新地面邻近掉落物列表。
-func set_ground_nearby_loot_snapshot(loot_items: Array) -> void:
-	apply_snapshot({"ground_loot": loot_items})
 
 func _render_from_snapshot() -> void:
 	if snapshot.has("ground_loot"):

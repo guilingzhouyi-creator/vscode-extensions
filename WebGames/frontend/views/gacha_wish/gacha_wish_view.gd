@@ -125,11 +125,11 @@ var result_overlay_visible: bool = false
 ## 切换当前卡池并刷新封面与切换按钮态
 func switch_banner(banner_id: String) -> void:
 	current_banner_id = banner_id
-	_refresh_banner_display()
-	_refresh_banner_switch_buttons()
+	_get_tabs().refresh_banner_display()
+	_get_tabs().refresh_banner_switch_buttons()
 
 ## 执行抽卡预演（服务结算掉落与保底统计，视图只更新展示态与动画）
-func execute_pull_preview(pull_count: int, mock_drops: Array) -> Dictionary:
+func execute_pull_preview(pull_count: int, preview_drops: Array) -> Dictionary:
 	anim_state = WishAnimationState.PULLING_ANIM
 	var service := _gacha_service()
 	if service == null:
@@ -141,7 +141,7 @@ func execute_pull_preview(pull_count: int, mock_drops: Array) -> Dictionary:
 		"pity_4star": pity_4star,
 		"total_pull_count": total_pull_count,
 		"rarity_counts": _rarity_counts,
-	}, pull_count, mock_drops)
+	}, pull_count, preview_drops)
 	if not bool(outcome.get("success", false)):
 		anim_state = WishAnimationState.IDLE
 		return {"success": false, "error_code": str(outcome.get("error_code", "PULL_FAILED"))}
@@ -173,25 +173,19 @@ func _get_tabs():
 	return _tabs
 
 func _ready() -> void:
-	if ServiceLocator.get_mode() != "mock":
-		current_pity_counter = 0
-		pity_5star = 0
-		pity_4star = 0
-		var economy_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("economy")
-		var wallet_table: Dictionary = economy_snapshot.get("wallet", {}) as Dictionary
-		currency_primogems = int(wallet_table.get("mana_monocrystals", 0))
+	var tabs: Variant = _get_tabs()
 	_apply_theme()
-	_load_mock_data()
-	_init_static_text()
-	_init_banner_switch()
-	_refresh_banner_display()
-	_refresh_up_items()
+	tabs.load_domain_snapshot()
+	tabs.init_static_text()
+	tabs.init_banner_switch()
+	tabs.refresh_banner_display()
+	tabs.refresh_up_items()
 	_refresh_pity_bars()
 	_refresh_currency()
 	_refresh_probability_label()
-	_init_history_panel()
+	tabs.init_history_panel()
 	_init_result_overlay()
-	_connect_signals()
+	tabs.connect_signals()
 	UIIntermediary.adapt_view(self)
 
 ## 应用 ThemeManager 单例主题（null 安全）
@@ -201,48 +195,24 @@ func _apply_theme() -> void:
 		theme = theme_manager.theme
 
 # ==============================================================================
-# 静态文案初始化（非 unique_name 节点通过路径访问，unique_name 节点直接引用）
+# 快照渲染映射
 # ==============================================================================
 
-## 初始化全部静态文案（非 unique_name 节点经路径访问，i18n 全驱动）
-func _init_static_text() -> void:
-	_get_tabs().init_static_text()
-
-func _load_mock_data() -> void:
-	_get_tabs().load_mock_data()
-
 func _render_from_snapshot() -> void:
+	if snapshot.has("pity_5star"):
+		pity_5star = int(snapshot.get("pity_5star", pity_5star))
+		current_pity_counter = pity_5star
+	if snapshot.has("pity_4star"):
+		pity_4star = int(snapshot.get("pity_4star", pity_4star))
+	if snapshot.has("currency_primogems"):
+		currency_primogems = int(snapshot.get("currency_primogems", currency_primogems))
 	if snapshot.has("banners"):
 		_banners = FrontendSnapshot.read_array(snapshot, "banners")
 	if snapshot.has("pull_rules"):
 		_pull_rules = FrontendSnapshot.read_dict(snapshot, "pull_rules")
 
-# ==============================================================================
-
-## 绑定本地 UI 交互信号（历史开关/抽卡/结果弹窗控件本地响应）
-func _connect_signals() -> void:
-	_get_tabs().connect_signals()
-
-
-# ==============================================================================
-
-func _init_banner_switch() -> void:
-	_get_tabs().init_banner_switch()
-
 func _on_banner_switch_pressed(banner_id: String) -> void:
 	switch_banner(banner_id)
-
-func _refresh_banner_switch_buttons() -> void:
-	_get_tabs().refresh_banner_switch_buttons()
-
-func _get_current_banner() -> Dictionary:
-	return _get_tabs().get_current_banner()
-
-func _refresh_banner_display() -> void:
-	_get_tabs().refresh_banner_display()
-
-func _refresh_up_items() -> void:
-	_get_tabs().refresh_up_items()
 
 
 # ==============================================================================
@@ -287,27 +257,6 @@ func _refresh_probability_label() -> void:
 		})
 
 # ==============================================================================
-# PITY_HISTORY: 保底与历史侧面板
-# ==============================================================================
-# PITY_HISTORY: 委托给 GachaWishTabs
-# ==============================================================================
-
-func _init_history_panel() -> void:
-	_get_tabs().init_history_panel()
-
-func _on_toggle_history_pressed() -> void:
-	_get_tabs().on_toggle_history_pressed()
-
-func _on_history_close_pressed() -> void:
-	_get_tabs().on_history_close_pressed()
-
-func _refresh_history_stats() -> void:
-	_get_tabs().refresh_history_stats()
-
-func _refresh_history_list() -> void:
-	_get_tabs().refresh_history_list()
-
-# ==============================================================================
 # WISH_MAIN: 抽卡执行（本地快照驱动）
 # ==============================================================================
 
@@ -326,9 +275,10 @@ func _on_single_pull_pressed() -> void:
 	execute_pull_preview(1, drops)
 	_refresh_currency()
 	_refresh_pity_bars()
-	_refresh_history_stats()
-	_refresh_history_list()
-	_populate_result_grid(drops)
+	var tabs: Variant = _get_tabs()
+	tabs.refresh_history_stats()
+	tabs.refresh_history_list()
+	tabs.populate_result_grid(drops)
 	UIIntermediary.resolve(_label_result_title, "ui.fe06.result.title")
 	_show_result_overlay()
 
@@ -347,9 +297,10 @@ func _on_ten_pull_pressed() -> void:
 	execute_pull_preview(10, drops)
 	_refresh_currency()
 	_refresh_pity_bars()
-	_refresh_history_stats()
-	_refresh_history_list()
-	_populate_result_grid(drops)
+	var tabs: Variant = _get_tabs()
+	tabs.refresh_history_stats()
+	tabs.refresh_history_list()
+	tabs.populate_result_grid(drops)
 	UIIntermediary.resolve(_label_result_title, "ui.fe06.result.title_ten")
 	_show_result_overlay()
 
@@ -374,19 +325,6 @@ func _hide_result_overlay() -> void:
 	result_overlay_visible = false
 	_result_overlay.visible = false
 	anim_state = WishAnimationState.IDLE
-
-## 重建结果网格：按掉落生成细胞并设置数量提示
-func _populate_result_grid(drops: Array) -> void:
-	_get_tabs().populate_result_grid(drops)
-
-func _on_result_skip_pressed() -> void:
-	_get_tabs().on_result_skip_pressed()
-
-func _on_result_detail_pressed() -> void:
-	_get_tabs().on_result_detail_pressed()
-
-func _on_result_pull_again_pressed() -> void:
-	_get_tabs().on_result_pull_again_pressed()
 
 # ==============================================================================
 

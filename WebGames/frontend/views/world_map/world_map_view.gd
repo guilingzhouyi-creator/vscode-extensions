@@ -112,10 +112,10 @@ var selected_landmark_id: String = ""
 var selected_town_id: String = "" # 当前选中城镇标识
 
 # 城镇设施、NPC、领地与主权数据（经 ServiceLocator 领域边界服务按需加载）
-var _mock_town_facilities: Array = []
-var _mock_town_npcs: Array = []
-var _mock_territories: Array = []
-var _mock_sovereignty: Dictionary = {}
+var _town_facilities: Array = []
+var _town_npcs: Array = []
+var _territories: Array = []
+var _sovereignty: Dictionary = {}
 
 # 行军队伍状态（本地交互模拟）
 var marching_active: bool = false
@@ -135,20 +135,27 @@ func select_town(town_id: String) -> Dictionary:
 	selected_town_id = town_id
 	return {"success": true, "town_id": town_id}
 
-## 注入行军路线列表快照并触发视图刷新
-func set_marching_route_snapshot(routes: Array) -> void:
-	apply_snapshot({"marching_routes": routes})
-
 ## 统一快照渲染映射：行军路线与拓扑快照 → 视图状态并刷新控件
 func _render_from_snapshot() -> void:
 	if snapshot.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(snapshot, "marching_routes")
 	if snapshot.has("landmarks"):
 		town_landmarks = FrontendSnapshot.read_array(snapshot, "landmarks")
+		for landmark_entry in town_landmarks:
+			var landmark_id: String = str(landmark_entry.get("id", ""))
+			var name_key: String = str(landmark_entry.get("name_key", ""))
+			if not name_key.is_empty():
+				landmark_entry["name"] = name_key
+			elif str(landmark_entry.get("name", "")).is_empty():
+				landmark_entry["name"] = landmark_id
+	if snapshot.has("town_facilities"):
+		_town_facilities = FrontendSnapshot.read_array(snapshot, "town_facilities")
+	if snapshot.has("town_npcs"):
+		_town_npcs = FrontendSnapshot.read_array(snapshot, "town_npcs")
 	if snapshot.has("territories"):
-		_mock_territories = FrontendSnapshot.read_array(snapshot, "territories")
+		_territories = FrontendSnapshot.read_array(snapshot, "territories")
 	if snapshot.has("sovereignty") and snapshot.get("sovereignty") is Dictionary:
-		_mock_sovereignty = (snapshot.get("sovereignty") as Dictionary).duplicate(true)
+		_sovereignty = (snapshot.get("sovereignty") as Dictionary).duplicate(true)
 	if is_inside_tree() and _tabs != null:
 		_tabs.refresh_march_preview()
 		_tabs.refresh_sovereignty_info()
@@ -168,7 +175,7 @@ func _ready() -> void:
 	theme = theme_manager.theme
 
 	# 2. 加载快照数据
-	_load_mock_snapshot()
+	_load_domain_snapshot()
 
 	# 3. 设置 Tab 标题
 	_setup_tab_titles()
@@ -177,12 +184,13 @@ func _ready() -> void:
 	_init_static_text()
 
 	# 5. 初始化各子界面
+	var tabs: Variant = _get_tabs()
 	_init_world_map_tab()
 	_init_town_view_tab()
-	_init_marching_tab()
-	_init_sovereignty_tab()
-	_init_territory_tab()
-	_init_pathfinding_tab()
+	tabs.init_marching_tab()
+	tabs.init_sovereignty_tab()
+	tabs.init_territory_tab()
+	tabs.init_pathfinding_tab()
 
 	# 6. 绑定信号（本地 UI 交互绑定）
 	_connect_signals()
@@ -191,34 +199,14 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 # ==============================================================================
-# Mock 数据加载
+# 领域快照加载
 # ==============================================================================
 
-## 从 domain_boundary 快照服务加载世界地图域快照（地标 i18n 键替换/行军路线）
-func _load_mock_snapshot() -> void:
+## 从 domain_boundary 快照服务加载世界地图域快照并注入视图
+func _load_domain_snapshot() -> void:
 	var world_map := ServiceLocator.get_instance().snapshot_data().load_snapshot("world_map")
-	if world_map.is_empty():
-		return
-	if world_map.has("landmarks"):
-		town_landmarks = FrontendSnapshot.read_array(world_map, "landmarks")
-		# 保留快照传入的 i18n name_key 或直接透传地标展示名
-		for landmark_entry in town_landmarks:
-			var landmark_id: String = str(landmark_entry.get("id", ""))
-			var name_key: String = str(landmark_entry.get("name_key", ""))
-			if not name_key.is_empty():
-				landmark_entry["name"] = name_key
-			elif str(landmark_entry.get("name", "")).is_empty():
-				landmark_entry["name"] = landmark_id
-	if world_map.has("marching_routes"):
-		marching_routes = FrontendSnapshot.read_array(world_map, "marching_routes")
-	if world_map.has("town_facilities"):
-		_mock_town_facilities = FrontendSnapshot.read_array(world_map, "town_facilities")
-	if world_map.has("town_npcs"):
-		_mock_town_npcs = FrontendSnapshot.read_array(world_map, "town_npcs")
-	if world_map.has("territories"):
-		_mock_territories = FrontendSnapshot.read_array(world_map, "territories")
-	if world_map.has("sovereignty"):
-		_mock_sovereignty = (world_map.get("sovereignty", {}) as Dictionary).duplicate(true)
+	if not world_map.is_empty():
+		apply_snapshot(world_map)
 
 # ==============================================================================
 # Tab 标题设置
@@ -335,11 +323,11 @@ func _refresh_wmap_coord() -> void:
 func _init_town_view_tab() -> void:
 	# 填充设施列表
 	_town_facility_list.clear()
-	for facility_entry in _mock_town_facilities:
+	for facility_entry in _town_facilities:
 		_town_facility_list.add_item(UIIntermediary.text(facility_entry.get("name", "")))
 	# 填充 NPC 列表
 	_town_npc_list.clear()
-	for resident_entry in _mock_town_npcs:
+	for resident_entry in _town_npcs:
 		_town_npc_list.add_item(UIIntermediary.text(resident_entry.get("name", "")))
 	# 默认选中第一个地标
 	if town_landmarks.size() > 0:
@@ -354,20 +342,6 @@ func _show_town(landmark_entry: Dictionary) -> void:
 		UIIntermediary.resolve(_town_type_label, "ui.fe10.town.type_label", {"type": type_name})
 	if _town_facility_detail_label:
 		UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.detail_placeholder")
-
-# ==============================================================================
-# Tab 2~5 委托给 WorldMapTabs
-# ==============================================================================
-
-func _init_marching_tab() -> void: _get_tabs().init_marching_tab()
-func _refresh_march_preview() -> void: _get_tabs().refresh_march_preview()
-func _terrain_key(terrain_code: String) -> String: return _get_tabs()._terrain_key(terrain_code)
-func _refresh_march_party_status() -> void: _get_tabs().refresh_march_party_status()
-func _init_sovereignty_tab() -> void: _get_tabs().init_sovereignty_tab()
-func _refresh_sovereignty_info() -> void: _get_tabs().refresh_sovereignty_info()
-func _init_territory_tab() -> void: _get_tabs().init_territory_tab()
-func _show_territory_detail(territory_entry: Dictionary) -> void: _get_tabs().show_territory_detail(territory_entry)
-func _init_pathfinding_tab() -> void: _get_tabs().init_pathfinding_tab()
 
 # ==============================================================================
 # 信号绑定（本地 UI 交互绑定）

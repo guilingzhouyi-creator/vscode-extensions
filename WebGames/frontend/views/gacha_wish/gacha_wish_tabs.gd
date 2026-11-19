@@ -336,47 +336,15 @@ func on_result_pull_again_pressed() -> void:
 	_view._on_ten_pull_pressed()
 
 ## 注入初始卡池快照与抽卡规则参数
-func load_mock_data() -> void:
+func load_domain_snapshot() -> void:
 	var service: Variant = _view._gacha_service()
 	var rules: Dictionary = service.get_rules() if service != null else {}
-	var banners: Array = []
-	if ServiceLocator.get_mode() == "mock":
-		banners = [
-			{
-				"banner_id": "BANNER_LIMITED_WARRIOR",
-				"title": "ui.fe06.mock.banner.limited_warrior.title",
-				"subtitle": "ui.fe06.mock.banner.limited_warrior.subtitle",
-				"remaining_time": "ui.fe06.mock.banner.limited_warrior.remaining",
-				"up_items": [
-					{"name": "ui.fe06.mock.item.flame_knight", "rarity": "5", "is_recently_added": true},
-					{"name": "ui.fe06.mock.item.dragon_spine_greatsword", "rarity": "5", "is_recently_added": false},
-					{"name": "ui.fe06.mock.item.wind_shortbow", "rarity": "4", "is_recently_added": false},
-				],
-			},
-			{
-				"banner_id": "BANNER_PERMANENT",
-				"title": "ui.fe06.mock.banner.permanent.title",
-				"subtitle": "ui.fe06.mock.banner.permanent.subtitle",
-				"remaining_time": "ui.fe06.mock.banner.permanent.remaining",
-				"up_items": [
-					{"name": "ui.fe06.mock.item.mithril_guardian", "rarity": "5", "is_recently_added": false},
-					{"name": "ui.fe06.mock.item.arcane_staff", "rarity": "4", "is_recently_added": true},
-					{"name": "ui.fe06.mock.item.healing_potion_l", "rarity": "3", "is_recently_added": false},
-				],
-			},
-		]
-	else:
-		var banner_defaults: Dictionary = GameConfig.get_dict("domains.gacha", "banner_defaults", {})
-		var default_id := str(banner_defaults.get("banner_id", "BANNER_STANDARD_DEFAULT"))
-		banners = [{
-			"banner_id": default_id,
-			"title": str(banner_defaults.get("banner_title", default_id)),
-			"subtitle": str(banner_defaults.get("fallback_title", "")),
-			"remaining_time": "-",
-			"up_items": [],
-		}]
-		_view.current_banner_id = default_id
-	_view.apply_snapshot({"banners": banners, "pull_rules": rules})
+	var gacha_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("gacha")
+	if gacha_snapshot.has("default_banner_id"):
+		_view.current_banner_id = str(gacha_snapshot.get("default_banner_id", _view.current_banner_id))
+	var payload := gacha_snapshot.duplicate(true)
+	payload["pull_rules"] = rules
+	_view.apply_snapshot(payload)
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
