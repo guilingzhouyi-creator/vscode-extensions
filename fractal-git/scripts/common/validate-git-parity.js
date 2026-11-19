@@ -4,7 +4,7 @@
  * Architecture Role: Proves that Fractal Git's object framing, canonical tree ordering, and SHA-1
  *   computation match the system Git binary, using Git itself as the reference baseline rather than a second
  *   hand-written expectation.
- * Dependencies & Triggers: Node.js standard library plus the system git binary; invoked by
+ * Dependencies & Triggers: Node.js standard library, ./lib/git-parity-vectors, plus the system git binary; invoked by
  *   scripts/ps1/audit-taxis.ps1, npm run gate:parity, and the CI fractal-git job.
  * Responsibilities:
  *   1. Encode blob, tree, commit, and tag objects with the canonical Git byte layout.
@@ -27,6 +27,15 @@ const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const { execFileSync } = require('child_process');
+
+const {
+    buildBlobVectors,
+    buildTreeVectors,
+    buildCommitVectors,
+    buildTagVectors,
+    buildParentCommitFields,
+    buildTagFixture,
+} = require('./lib/git-parity-vectors');
 
 const NUL = String.fromCharCode(0);
 const MAX_REPORTED_VIOLATIONS = 40;
@@ -333,203 +342,6 @@ function plumbingListTreeLines(runner, treeOid) {
 }
 
 /**
- * Builds blob vectors: empty, text, binary, non-ASCII, control characters, and large payloads.
- *
- * @returns {Array<{ label: string, payload: Buffer }>} Blob vectors.
- */
-function blobVectors() {
-    const longLine = Buffer.from('a'.repeat(4096) + '\n', 'utf8');
-    return [
-        { label: 'empty blob', payload: Buffer.alloc(0) },
-        { label: 'plain text with newline', payload: Buffer.from('hello world\n', 'utf8') },
-        { label: 'plain text without newline', payload: Buffer.from('hello world', 'utf8') },
-        { label: 'binary payload', payload: Buffer.from([0x00, 0xff, 0xfe, 0x01, 0x7f]) },
-        { label: 'carriage return line feed', payload: Buffer.from('line\r\nline\r\n', 'utf8') },
-        { label: 'tab separated columns', payload: Buffer.from('a\tb\tc\n', 'utf8') },
-        { label: 'latin accented text', payload: Buffer.from('École très fréquentée\n', 'utf8') },
-        { label: 'emoji text', payload: Buffer.from('阶段完成 🚀\n', 'utf8') },
-        { label: 'invalid utf-8 bytes', payload: Buffer.from([0xff, 0xfe, 0x80, 0x81]) },
-        { label: 'single newline', payload: Buffer.from('\n', 'utf8') },
-        { label: 'four kilobyte line', payload: longLine },
-        { label: 'all zero bytes', payload: Buffer.alloc(256, 0) },
-        { label: 'embedded nul byte', payload: Buffer.from([0x61, 0x00, 0x62]) },
-        { label: 'repeated deterministic noise', payload: Buffer.from(Array.from({ length: 512 }, (_v, i) => (i * 37) % 256)) },
-    ];
-}
-
-/**
- * Returns nested tree fixtures used by both the encoder and the reference baseline.
- *
- * @returns {Array<{ label: string, spec: Array<object> }>} Tree fixtures.
- */
-function treeVectors() {
-    return [
-        { label: 'empty tree', spec: [] },
-        { label: 'single regular file', spec: [{ name: 'a.txt', mode: '100644', content: 'a\n' }] },
-        {
-            label: 'mixed case names',
-            spec: [
-                { name: 'Zebra.txt', mode: '100644', content: 'z\n' },
-                { name: 'apple.txt', mode: '100644', content: 'a\n' },
-            ],
-        },
-        {
-            label: 'latin accented names',
-            spec: [
-                { name: 'École.txt', mode: '100644', content: 'e\n' },
-                { name: 'ecole.txt', mode: '100644', content: 'e\n' },
-            ],
-        },
-        {
-            label: 'same prefix file and directory',
-            spec: [
-                { name: 'foo', mode: '40000', children: [{ name: 'inside.txt', mode: '100644', content: 'i\n' }] },
-                { name: 'foo-bar', mode: '100644', content: 'd\n' },
-                { name: 'foo.c', mode: '100644', content: 'c\n' },
-            ],
-        },
-        {
-            label: 'executable and symlink modes',
-            spec: [
-                { name: 'run.sh', mode: '100755', content: '#!/bin/sh\n' },
-                { name: 'link', mode: '120000', content: 'target.txt' },
-            ],
-        },
-        { label: 'space inside name', spec: [{ name: 'with space.txt', mode: '100644', content: 's\n' }] },
-        {
-            label: 'nested directories',
-            spec: [{
-                name: 'src',
-                mode: '40000',
-                children: [{
-                    name: 'core',
-                    mode: '40000',
-                    children: [{ name: 'main.rs', mode: '100644', content: 'fn main() {}\n' }],
-                }],
-            }],
-        },
-        {
-            label: 'directory name and dotted file',
-            spec: [
-                { name: 'docs', mode: '40000', children: [{ name: 'readme.md', mode: '100644', content: '# docs\n' }] },
-                { name: 'docs.md', mode: '100644', content: '# file\n' },
-            ],
-        },
-        {
-            label: 'gitlink entry',
-            spec: [{ name: 'vendor', mode: '160000', oid: '1234567890123456789012345678901234567890' }],
-        },
-        {
-            label: 'many entries across categories',
-            spec: [
-                { name: 'A.txt', mode: '100644', content: 'upper\n' },
-                { name: '_under.txt', mode: '100644', content: 'under\n' },
-                { name: 'a.txt', mode: '100644', content: 'lower\n' },
-                { name: 'b-dash.txt', mode: '100644', content: 'dash\n' },
-                { name: 'b.dot.txt', mode: '100644', content: 'dot\n' },
-                { name: 'b', mode: '40000', children: [{ name: 'child.txt', mode: '100644', content: 'child\n' }] },
-                { name: '阶段.md', mode: '100644', content: '阶段\n' },
-            ],
-        },
-        {
-            label: 'deep tree with directories at two levels',
-            spec: [{
-                name: 'packages',
-                mode: '40000',
-                children: [
-                    { name: 'alpha', mode: '40000', children: [{ name: 'index.ts', mode: '100644', content: 'export {};\n' }] },
-                    { name: 'beta', mode: '40000', children: [{ name: 'index.ts', mode: '100644', content: 'export {};\n' }] },
-                ],
-            }],
-        },
-    ];
-}
-
-/**
- * Creates a fixed signature for baseline validation calls.
- *
- * @param {string} name - Person name.
- * @param {string} tz - Time zone offset text.
- * @param {number} timestamp - Seconds since the epoch.
- * @returns {{ name: string, email: string, timestamp: number, tz: string }} Signature.
- */
-function signature(name, tz, timestamp) {
-    return { name, email: 'parity@example.com', timestamp, tz };
-}
-
-/**
- * Builds commit vectors that vary parent count, message shape, and time zone.
- *
- * @param {string} treeOid - Tree object id to embed.
- * @param {Array<string>} parentOids - Parent object ids available for octopus commits.
- * @returns {Array<object>} Commit fixtures with expected fields.
- */
-function commitVectors(treeOid, parentOids) {
-    const author = signature('Parity Author', '+0800', 1700000000);
-    const committer = signature('Parity Committer', '+0800', 1700000000);
-    const variants = [
-        { label: 'root commit without parents', parents: [], message: 'initial commit\n' },
-        { label: 'single parent merge-free commit', parents: [parentOids[0]], message: 'second commit\n' },
-        { label: 'two parent merge commit', parents: [parentOids[0], parentOids[1]], message: 'Merge branch \'feature/x\'\n' },
-        { label: 'three parent octopus commit', parents: [parentOids[0], parentOids[1], parentOids[2]], message: 'octopus\n' },
-        { label: 'message without trailing newline', parents: [], message: 'no newline at end' },
-        { label: 'multi line message', parents: [], message: 'subject line\n\nbody paragraph one\nbody paragraph two\n' },
-        { label: 'leading blank line in message', parents: [], message: '\nmessage after blank line\n' },
-        { label: 'non ascii message', parents: [], message: '阶段交付完成 🚀\n' },
-        { label: 'tab inside message', parents: [], message: 'col1\tcol2\n' },
-        { label: 'carriage return inside message', parents: [], message: 'line one\r\nline two\n' },
-    ];
-    const zones = ['-0500', '+0000', '+0530'];
-    const zoned = zones.map((tz, index) => ({
-        label: 'time zone ' + tz + ' commit',
-        parents: [],
-        message: 'zone variant ' + String(index) + '\n',
-        author: signature('Parity Author', tz, 1700000000 + index),
-        committer: signature('Parity Committer', tz, 1700000000 + index),
-    }));
-    return variants.concat(zoned).map((vector) => Object.assign({ tree: treeOid, author, committer }, vector));
-}
-
-/**
- * Builds annotated tag vectors for every target kind plus tagger-presence variants.
- *
- * @param {object} targets - blob, tree, commit, and tag ids.
- * @returns {Array<object>} Tag fixtures.
- */
-function tagVectors(targets) {
-    const tagger = signature('Parity Tagger', '+0800', 1700000000);
-    const messages = ['tag message\n', 'tag message without newline', '阶段标签\n', 'multi line\ntag body\n'];
-    const kinds = [
-        { kind: 'commit', object: targets.commit },
-        { kind: 'tree', object: targets.tree },
-        { kind: 'blob', object: targets.blob },
-        { kind: 'tag', object: targets.tag },
-    ];
-    const vectors = [];
-    kinds.forEach((entry, kindIndex) => {
-        messages.forEach((message, messageIndex) => {
-            vectors.push({
-                label: 'tag over ' + entry.kind + ' message ' + String(messageIndex),
-                object: entry.object,
-                kind: entry.kind,
-                tag: 'v0.' + String(kindIndex) + '.' + String(messageIndex),
-                tagger,
-                message,
-            });
-        });
-    });
-    vectors.push({
-        label: 'tag with alternate time zone',
-        object: targets.commit,
-        kind: 'commit',
-        tag: 'zoned-tag',
-        tagger: signature('Parity Tagger', '-0800', 1700000200),
-        message: 'zoned tag message\n',
-    });
-    return vectors;
-}
-
-/**
  * Records a divergence in the shared report.
  *
  * @param {Array<string>} violations - Collected violation messages.
@@ -632,7 +444,7 @@ function verifyTreeSpec(gitRunner, taxisRunner, spec, label, violations) {
  * @returns {number} Verified vector count.
  */
 function verifyBlobVectors(gitRunner, taxisRunner, violations) {
-    const vectors = blobVectors();
+    const vectors = buildBlobVectors();
     vectors.forEach((vector) => {
         const engineOid = computeBlobOid(vector.payload);
         const gitOid = plumbingWriteBlob(gitRunner, vector.payload);
@@ -663,7 +475,7 @@ function verifyBlobVectors(gitRunner, taxisRunner, violations) {
  * @returns {{ count: number, firstTreeOid: string }} Vector count and a reusable tree id.
  */
 function verifyTreeVectors(gitRunner, taxisRunner, violations) {
-    const vectors = treeVectors();
+    const vectors = buildTreeVectors();
     let firstTreeOid = '';
     vectors.forEach((vector) => {
         const tree = verifyTreeSpec(gitRunner, taxisRunner, vector.spec, vector.label, violations);
@@ -683,7 +495,7 @@ function verifyTreeVectors(gitRunner, taxisRunner, violations) {
  * @returns {number} Number of verified vectors.
  */
 function verifyCommitVectors(gitRunner, taxisRunner, treeOid, parentOids, violations) {
-    const vectors = commitVectors(treeOid, parentOids);
+    const vectors = buildCommitVectors(treeOid, parentOids);
     vectors.forEach((fields) => {
         const engineOid = computeObjectOid('commit', encodeCommit(fields));
         const gitOid = plumbingWriteCommit(gitRunner, fields);
@@ -712,7 +524,7 @@ function verifyCommitVectors(gitRunner, taxisRunner, treeOid, parentOids, violat
  * @returns {number} Number of verified vectors.
  */
 function verifyTagVectors(gitRunner, taxisRunner, targets, violations) {
-    const vectors = tagVectors(targets);
+    const vectors = buildTagVectors(targets);
     let firstTagOid = '';
     const checkOneTag = (fields, tagLabel) => {
         const engineOid = computeObjectOid('tag', encodeTag(fields));
@@ -735,13 +547,10 @@ function verifyTagVectors(gitRunner, taxisRunner, targets, violations) {
         if (firstTagOid.length === 0) firstTagOid = oid;
     });
     if (firstTagOid.length > 0) {
-        checkOneTag({
-            object: firstTagOid,
-            kind: 'tag',
-            tag: 'nested-tag',
-            tagger: signature('Parity Tagger', '+0000', 1700000100),
-            message: 'nested tag message\n',
-        }, 'tag-of-tag parity failure');
+        checkOneTag(
+            buildTagFixture(firstTagOid, 'tag', 'nested-tag', 'nested tag message\n', 1700000100),
+            'tag-of-tag parity failure',
+        );
     }
     return vectors.length + 1;
 }
@@ -759,13 +568,7 @@ function verifyTagVectors(gitRunner, taxisRunner, targets, violations) {
 function bootstrapParentCommits(gitRunner, taxisRunner, treeOid, count, violations) {
     const parents = [];
     for (let index = 0; index < count; index += 1) {
-        const fields = {
-            tree: treeOid,
-            parents: [],
-            author: signature('Parity Parent', '+0000', 1600000000 + index),
-            committer: signature('Parity Parent', '+0000', 1600000000 + index),
-            message: 'parent ' + String(index) + '\n',
-        };
+        const fields = buildParentCommitFields(treeOid, index);
         const gitOid = plumbingWriteCommit(gitRunner, fields);
         if (taxisRunner && plumbingWriteCommit(taxisRunner, fields) !== gitOid) {
             reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap parent commit divergence at ' + String(index));
@@ -914,7 +717,7 @@ function runGitParityValidation() {
         if (taxisRunner && plumbingWriteBlob(taxisRunner, tagPayload) !== blobOid) {
             reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap tag target blob divergence');
         }
-        const bootTag = { object: parents[0], kind: 'commit', tag: 'bootstrap', tagger: signature('Parity Tagger', '+0000', 1700000000), message: 'bootstrap tag\n' };
+        const bootTag = buildTagFixture(parents[0], 'commit', 'bootstrap', 'bootstrap tag\n', 1700000000);
         const tagOid = plumbingWriteTag(gitRunner, bootTag);
         if (taxisRunner && plumbingWriteTag(taxisRunner, bootTag) !== tagOid) {
             reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap tag divergence');
