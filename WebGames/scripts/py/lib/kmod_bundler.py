@@ -64,8 +64,8 @@ def safe_load_json(file_path: Path) -> dict[str, Any]:
 class ModBundleManifest:
     """模组二进制扩展包元数据对象 (GOV-DAT-001 / archive_format_version=2)。"""
 
-    bundle_id: str
-    bundle_name: str
+    pack_id: str
+    pack_name: str
     version: str
     engine_api_version: str
     tier: int | str
@@ -79,36 +79,39 @@ class ModBundleManifest:
 
     def to_dict(self) -> dict[str, Any]:
         payload = dict(self.extra_fields)
-        payload.update({
-            "archive_format_version": ARCHIVE_FORMAT_VERSION,
-            "manifest_schema": "kalar.mod_sdk.bundle_manifest.v1",
-            "pack_id": self.bundle_id,
-            "pack_name": self.bundle_name,
-            "bundle_id": self.bundle_id,
-            "bundle_name": self.bundle_name,
-            "version": self.version,
-            "author": self.author,
-            "engine_api_version": self.engine_api_version,
-            "tier": self.tier,
-            "description": self.description,
-            "dependencies": list(self.dependencies),
-            "files_manifest": self.files_manifest,
-            "content_sha256": self.content_sha256,
-            "kalar_sdk_version": str(payload.get("kalar_sdk_version") or "1.0.0"),
-            "created_timestamp_utc": self.created_timestamp_utc,
-        })
+        payload.update(
+            {
+                "archive_format_version": ARCHIVE_FORMAT_VERSION,
+                "manifest_schema": "kalar.mod_sdk.bundle_manifest.v1",
+                "pack_id": self.pack_id,
+                "pack_name": self.pack_name,
+                "version": self.version,
+                "author": self.author,
+                "engine_api_version": self.engine_api_version,
+                "tier": self.tier,
+                "description": self.description,
+                "dependencies": list(self.dependencies),
+                "files_manifest": self.files_manifest,
+                "content_sha256": self.content_sha256,
+                "kalar_sdk_version": str(payload.get("kalar_sdk_version") or "1.0.0"),
+                "created_timestamp_utc": self.created_timestamp_utc,
+            }
+        )
         return payload
 
 
 def scan_and_build_files_manifest(mod_dir: Path) -> dict[str, dict[str, Any]]:
-    """兼容查询接口：递归扫描开发目录资产返回路径与 SHA-256 指纹字典。"""
+    """查询接口：递归扫描开发目录资产返回路径与 SHA-256 指纹字典。"""
     manifest: dict[str, dict[str, Any]] = {}
     for p in sorted(mod_dir.rglob("*")):
         if p.is_dir() or should_ignore_path(p):
             continue
         rel_path = p.relative_to(mod_dir).as_posix()
-        if rel_path not in ("manifest.json", "pack.json"):
-            manifest[rel_path] = {"sha256": calculate_file_sha256(p), "size_bytes": p.stat().st_size}
+        if rel_path != "pack.json":
+            manifest[rel_path] = {
+                "sha256": calculate_file_sha256(p),
+                "size_bytes": p.stat().st_size,
+            }
     return manifest
 
 
@@ -126,14 +129,22 @@ def build_kmod_package(
         return False, None, [f"pack.json 格式非法或为空: {pack_json_file}"]
 
     overrides = manifest_overrides or {}
-    bundle_id = str(overrides.get("pack_id") or overrides.get("bundle_id") or pack_meta.get("pack_id") or mod_dir.name).strip()
-    bundle_name = str(overrides.get("pack_name") or overrides.get("bundle_name") or pack_meta.get("pack_name") or bundle_id).strip()
-    version = str(overrides.get("version") or pack_meta.get("version") or "1.0.0").strip()
+    pack_id = str(
+        overrides.get("pack_id") or pack_meta.get("pack_id") or mod_dir.name
+    ).strip()
+    pack_name = str(
+        overrides.get("pack_name") or pack_meta.get("pack_name") or pack_id
+    ).strip()
+    version = str(
+        overrides.get("version") or pack_meta.get("version") or "1.0.0"
+    ).strip()
     deps_raw = overrides.get("dependencies", pack_meta.get("dependencies", []))
 
     try:
         mod_data, media_entries = collect_mod_compile_inputs(mod_dir, pack_meta)
-        mod_data_kdat = compile_data_to_kdat(mod_data, compress=True, payload_type=PAYLOAD_MOD_PACKAGE)
+        mod_data_kdat = compile_data_to_kdat(
+            mod_data, compress=True, payload_type=PAYLOAD_MOD_PACKAGE
+        )
     except Exception as exc:
         return False, None, [f"编译 mod_data.kdat 失败: {exc}"]
 
@@ -143,20 +154,41 @@ def build_kmod_package(
         rel: {"sha256": hashlib.sha256(raw).hexdigest(), "size_bytes": len(raw)}
         for rel, raw in sorted(binary_entries.items())
     }
-    reserved_keys = {"pack_id", "pack_name", "bundle_id", "bundle_name", "version", "author", "engine_api_version", "tier", "description", "dependencies", "files_manifest", "content_sha256"}
+    reserved_keys = {
+        "pack_id",
+        "pack_name",
+        "version",
+        "author",
+        "engine_api_version",
+        "tier",
+        "description",
+        "dependencies",
+        "files_manifest",
+        "content_sha256",
+    }
     extra_fields = {k: v for k, v in pack_meta.items() if k not in reserved_keys}
-    extra_fields.setdefault("pack_profile", pack_meta.get("pack_profile", "CONTENT_ADDON"))
+    extra_fields.setdefault(
+        "pack_profile", pack_meta.get("pack_profile", "CONTENT_ADDON")
+    )
     extra_fields.setdefault("is_active", pack_meta.get("is_active", True))
     extra_fields.setdefault("is_official", pack_meta.get("is_official", False))
 
     bundle_manifest = ModBundleManifest(
-        bundle_id=bundle_id,
-        bundle_name=bundle_name,
+        pack_id=pack_id,
+        pack_name=pack_name,
         version=version,
-        engine_api_version=str(overrides.get("engine_api_version") or pack_meta.get("engine_api_version") or "1.0.0").strip(),
+        engine_api_version=str(
+            overrides.get("engine_api_version")
+            or pack_meta.get("engine_api_version")
+            or "1.0.0"
+        ).strip(),
         tier=overrides.get("tier", pack_meta.get("tier", 2)),
-        author=str(overrides.get("author") or pack_meta.get("author") or "Community Developer").strip(),
-        description=str(overrides.get("description") or pack_meta.get("description") or "").strip(),
+        author=str(
+            overrides.get("author") or pack_meta.get("author") or "Community Developer"
+        ).strip(),
+        description=str(
+            overrides.get("description") or pack_meta.get("description") or ""
+        ).strip(),
         dependencies=[str(d) for d in deps_raw] if isinstance(deps_raw, list) else [],
         files_manifest=files_manifest,
         content_sha256=compute_entries_content_sha256(binary_entries),
@@ -164,11 +196,13 @@ def build_kmod_package(
         extra_fields=extra_fields,
     )
     try:
-        manifest_kdat = compile_data_to_kdat(bundle_manifest.to_dict(), compress=True, payload_type=PAYLOAD_MOD_PACKAGE)
+        manifest_kdat = compile_data_to_kdat(
+            bundle_manifest.to_dict(), compress=True, payload_type=PAYLOAD_MOD_PACKAGE
+        )
     except Exception as exc:
         return False, None, [f"编译 manifest.kdat 失败: {exc}"]
 
-    target_file = output_path or (mod_dir.parent / f"{bundle_id}_v{version}.kmod")
+    target_file = output_path or (mod_dir.parent / f"{pack_id}_v{version}.kmod")
     target_file.parent.mkdir(parents=True, exist_ok=True)
     tmp_target = target_file.with_suffix(".kmod.tmp")
     try:
@@ -195,44 +229,84 @@ def verify_kmod_package(kmod_path: Path) -> tuple[bool, dict[str, Any], list[str
             namelist = zf.namelist()
             json_leaks = [n for n in namelist if n.lower().endswith(".json")]
             if json_leaks:
-                return False, {}, [f"禁止包含明文 .json 文件，正式 .kmod 仅允许 .kdat 与媒体流: {json_leaks[0]}"]
+                return (
+                    False,
+                    {},
+                    [
+                        f"禁止包含明文 .json 文件，正式 .kmod 仅允许 .kdat 与媒体流: {json_leaks[0]}"
+                    ],
+                )
             for required_bin in (KMOD_MANIFEST_ENTRY, KMOD_DATA_ENTRY):
                 if required_bin not in namelist:
                     return False, {}, [f"归档包缺少必需的二进制载荷: {required_bin}"]
 
-            decoded_manifest, m_meta = decompile_kdat_to_data(zf.read(KMOD_MANIFEST_ENTRY))
+            decoded_manifest, m_meta = decompile_kdat_to_data(
+                zf.read(KMOD_MANIFEST_ENTRY)
+            )
             decoded_data, d_meta = decompile_kdat_to_data(zf.read(KMOD_DATA_ENTRY))
-            if not isinstance(decoded_manifest, dict) or not isinstance(decoded_data, dict):
-                return False, {}, ["manifest.kdat 或 mod_data.kdat 解码根节点必须为字典对象"]
-            if int(m_meta.get("payload_type", -1)) != PAYLOAD_MOD_PACKAGE or int(d_meta.get("payload_type", -1)) != PAYLOAD_MOD_PACKAGE:
+            if not isinstance(decoded_manifest, dict) or not isinstance(
+                decoded_data, dict
+            ):
+                return (
+                    False,
+                    {},
+                    ["manifest.kdat 或 mod_data.kdat 解码根节点必须为字典对象"],
+                )
+            if (
+                int(m_meta.get("payload_type", -1)) != PAYLOAD_MOD_PACKAGE
+                or int(d_meta.get("payload_type", -1)) != PAYLOAD_MOD_PACKAGE
+            ):
                 return False, {}, ["二进制载荷 payload_type 必须为 PAYLOAD_MOD_PACKAGE"]
             manifest_data = decoded_manifest
 
-            for req_key in ("bundle_id", "version", "files_manifest", "content_sha256"):
+            for req_key in (
+                "pack_id",
+                "pack_name",
+                "version",
+                "files_manifest",
+                "content_sha256",
+            ):
                 if req_key not in manifest_data:
                     errors.append(f"manifest.kdat 缺失必需字段: {req_key}")
 
             files_manifest = manifest_data.get("files_manifest")
-            if not isinstance(files_manifest, dict) or KMOD_DATA_ENTRY not in files_manifest:
+            if (
+                not isinstance(files_manifest, dict)
+                or KMOD_DATA_ENTRY not in files_manifest
+            ):
                 errors.append("files_manifest 结构非法或缺少 mod_data.kdat 条目")
                 files_manifest = {}
 
-            actual_entries = {n: zf.read(n) for n in namelist if n != KMOD_MANIFEST_ENTRY and not n.endswith("/")}
-            for missing_entry in sorted(set(files_manifest.keys()) - set(actual_entries.keys())):
+            actual_entries = {
+                n: zf.read(n)
+                for n in namelist
+                if n != KMOD_MANIFEST_ENTRY and not n.endswith("/")
+            }
+            for missing_entry in sorted(
+                set(files_manifest.keys()) - set(actual_entries.keys())
+            ):
                 errors.append(f"归档内缺失清单声明条目: {missing_entry}")
-            for extra_entry in sorted(set(actual_entries.keys()) - set(files_manifest.keys())):
+            for extra_entry in sorted(
+                set(actual_entries.keys()) - set(files_manifest.keys())
+            ):
                 errors.append(f"归档内发现未登记条目: {extra_entry}")
             for rel_path, meta in files_manifest.items():
                 if rel_path in actual_entries and isinstance(meta, dict):
                     raw_bytes = actual_entries[rel_path]
                     if hashlib.sha256(raw_bytes).hexdigest() != meta.get("sha256"):
                         errors.append(f"内容哈希不匹配 (可能遭篡改): {rel_path}")
-                    if "size_bytes" in meta and len(raw_bytes) != int(meta["size_bytes"]):
+                    if "size_bytes" in meta and len(raw_bytes) != int(
+                        meta["size_bytes"]
+                    ):
                         errors.append(f"内容字节长度不匹配: {rel_path}")
             computed_digest = compute_entries_content_sha256(actual_entries)
-            declared_digest = str(manifest_data.get("content_sha256", "")).strip().lower()
+            declared_digest = (
+                str(manifest_data.get("content_sha256", "")).strip().lower()
+            )
             if declared_digest and computed_digest != declared_digest:
-                errors.append(f"全包内容指纹 content_sha256 不一致: expected={declared_digest}, actual={computed_digest}")
+                errors.append(
+                    f"全包内容指纹 content_sha256 不一致: expected={declared_digest}, actual={computed_digest}"
+                )
     except zipfile.BadZipFile:
         return False, {}, ["目标文件并非有效的 .kmod ZIP 二进制归档格式"]
     except Exception as exc:
@@ -240,7 +314,9 @@ def verify_kmod_package(kmod_path: Path) -> tuple[bool, dict[str, Any], list[str
     return (False, manifest_data, errors) if errors else (True, manifest_data, [])
 
 
-def inspect_kmod_package(kmod_path: Path, export_json_dir: Path | None = None) -> tuple[bool, dict[str, Any], list[str]]:
+def inspect_kmod_package(
+    kmod_path: Path, export_json_dir: Path | None = None
+) -> tuple[bool, dict[str, Any], list[str]]:
     """检查 .kmod 二进制段头部指标与结构摘要；可选反编译还原为开发期 JSON 调试工作区。"""
     ok, manifest_data, verify_errors = verify_kmod_package(kmod_path)
     if not ok:
@@ -248,14 +324,22 @@ def inspect_kmod_package(kmod_path: Path, export_json_dir: Path | None = None) -
     with zipfile.ZipFile(kmod_path, "r") as zf:
         _, manifest_meta = decompile_kdat_to_data(zf.read(KMOD_MANIFEST_ENTRY))
         mod_data, data_meta = decompile_kdat_to_data(zf.read(KMOD_DATA_ENTRY))
-        media_files = sorted(n for n in zf.namelist() if n not in (KMOD_MANIFEST_ENTRY, KMOD_DATA_ENTRY) and not n.endswith("/"))
+        media_files = sorted(
+            n
+            for n in zf.namelist()
+            if n not in (KMOD_MANIFEST_ENTRY, KMOD_DATA_ENTRY) and not n.endswith("/")
+        )
         if export_json_dir is not None:
-            export_mod_debug_workspace(export_json_dir, manifest_data, mod_data, zf, media_files)
+            export_mod_debug_workspace(
+                export_json_dir, manifest_data, mod_data, zf, media_files
+            )
     summary = {
         "kmod_path": str(kmod_path),
         "archive_size_bytes": kmod_path.stat().st_size,
-        "archive_format_version": manifest_data.get("archive_format_version", ARCHIVE_FORMAT_VERSION),
-        "pack_id": manifest_data.get("pack_id", manifest_data.get("bundle_id", "")),
+        "archive_format_version": manifest_data.get(
+            "archive_format_version", ARCHIVE_FORMAT_VERSION
+        ),
+        "pack_id": manifest_data.get("pack_id", ""),
         "version": manifest_data.get("version", ""),
         "content_sha256": manifest_data.get("content_sha256", ""),
         "manifest_kdat": manifest_meta,
@@ -264,6 +348,8 @@ def inspect_kmod_package(kmod_path: Path, export_json_dir: Path | None = None) -
         "locale_buckets": sorted(mod_data.get("custom_i18n_by_locale", {}).keys()),
         "content_record_count": len(mod_data.get("content_records", [])),
         "media_files": media_files,
-        "exported_debug_dir": str(export_json_dir) if export_json_dir is not None else None,
+        "exported_debug_dir": str(export_json_dir)
+        if export_json_dir is not None
+        else None,
     }
     return True, summary, []
