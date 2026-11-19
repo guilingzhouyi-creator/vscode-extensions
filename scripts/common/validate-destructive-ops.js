@@ -46,6 +46,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
@@ -60,7 +61,7 @@ const SCAN_ROOTS = Object.freeze([
 ]);
 
 const SCAN_EXTENSIONS = new Set(['.ps1', '.psm1', '.sh', '.js', '.mjs', '.cjs', '.ts']);
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'build', '__pycache__', 'archive', 'fixtures']);
+const IGNORED_DIRS = createIgnoredDirSet(['build', '__pycache__', 'fixtures']);
 
 /**
  * Expressions that denote a home, profile or filesystem root in any of the three languages.
@@ -191,6 +192,10 @@ function collectFiles(dir, acc = []) {
   return acc;
 }
 
+const ARG_QUOTES = new Set(['"', "'"]);
+const OPEN_BRACKETS = new Set(['(', '[', '{']);
+const CLOSE_BRACKETS = new Set([')', ']', '}']);
+
 /**
  * Splits an argument list into tokens, honouring quotes and bracket nesting.
  *
@@ -208,13 +213,13 @@ function splitArguments(text) {
       if (char === quote) quote = '';
       continue;
     }
-    if (char === '"' || char === "'") {
+    if (ARG_QUOTES.has(char)) {
       quote = char;
       current += char;
       continue;
     }
-    if (char === '(' || char === '[' || char === '{') depth += 1;
-    if (char === ')' || char === ']' || char === '}') depth = Math.max(0, depth - 1);
+    if (OPEN_BRACKETS.has(char)) depth += 1;
+    if (CLOSE_BRACKETS.has(char)) depth = Math.max(0, depth - 1);
     if (char === ' ' && depth === 0) {
       if (current) tokens.push(current);
       current = '';

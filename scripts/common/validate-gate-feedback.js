@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const REGISTRY = require('./gate-step-registry');
@@ -38,7 +39,7 @@ const SCAN_TARGETS = Object.freeze([
 ]);
 
 const SCAN_EXTENSIONS = new Set(['.js', '.ps1', '.sh', '.py', '.yml', '.yaml']);
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', '__pycache__', 'archive', 'fixtures']);
+const IGNORED_DIRS = createIgnoredDirSet(['__pycache__', 'fixtures']);
 
 /** Positional labels that must never reach operator-facing feedback. */
 const ORDINAL_LABEL_PATTERNS = Object.freeze([

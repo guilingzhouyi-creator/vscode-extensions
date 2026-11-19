@@ -33,18 +33,10 @@ function safeReadJson(filePath) {
   }
 }
 
-const CANONICAL_DIMENSIONS = [
-  'architectureConsistency',
-  'semanticPurity',
-  'codeSecurity',
-  'performanceEfficiency',
-  'standardization',
-  'modernity',
-  'maintainability',
-  'commentQuality',
-  'duplication',
-  'techDebtRisk',
-];
+const TEN_DIMENSIONS_CONTRACT = require('./ten-dimensions-contract.json');
+const CANONICAL_DIMENSIONS = Object.freeze(
+  TEN_DIMENSIONS_CONTRACT.dimensions.map((dimension) => dimension.key),
+);
 
 function resolveLedgerDir(root) {
   const candidates = [

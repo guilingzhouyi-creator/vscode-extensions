@@ -24,6 +24,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
@@ -35,7 +36,7 @@ const SCAN_ROOTS = Object.freeze([
   'workspace-timing/scripts',
 ]);
 
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', '__pycache__', 'archive', 'fixtures', 'config']);
+const IGNORED_DIRS = createIgnoredDirSet(['__pycache__', 'fixtures', 'config']);
 
 /** Which opener kinds may legally precede each continuation. */
 const LEGAL_PREDECESSOR = Object.freeze({

@@ -20,40 +20,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
-const IGNORED_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  'out',
-  'target',
-  '.godot',
-  '.cargo-lock',
-  '.mypy_cache',
-  '.dsh-plugin-download',
-  '.workbuddy',
-  '.commandcode',
-  '.auto-refactor',
-  '.auto-refactor-cache',
-  '.gemini',
-  '.audit-logs',
-  'archive',
-  '.corpus',
-  '.diff-corpus',
-  '.rust-corpus',
-  '.equivalence-corpus',
-  '.equivalence-rust-corpus',
-  '.bench-corpus',
-  'tmp',
-  'temp',
-  '.praxis',
-  '.taxis',
-  '.vitest',
-  '.venv',
-  'venv',
-]);
+const IGNORED_DIRS = createIgnoredDirSet(['.vitest']);
 
 const TEXT_EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.md', '.gd', '.py',

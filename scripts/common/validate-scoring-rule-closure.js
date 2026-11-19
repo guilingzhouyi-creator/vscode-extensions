@@ -27,19 +27,9 @@ const DEDUCTIONS_TS_PATH = path.join(
   'dimensionDeductions.ts',
 );
 
+const TEN_DIMENSIONS_CONTRACT = require('./ten-dimensions-contract.json');
 const VALID_DIMENSIONS = Object.freeze(
-  new Set([
-    'architectureConsistency',
-    'semanticPurity',
-    'codeSecurity',
-    'performanceEfficiency',
-    'standardization',
-    'modernity',
-    'maintainability',
-    'commentQuality',
-    'duplication',
-    'techDebtRisk',
-  ]),
+  new Set(TEN_DIMENSIONS_CONTRACT.dimensions.map((dimension) => dimension.key)),
 );
 
 /**

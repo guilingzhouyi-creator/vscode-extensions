@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const CATALOG_FILE = path.join(__dirname, 'rule-catalog.json');
@@ -44,7 +45,7 @@ const SCAN_ROOTS = Object.freeze([
 ]);
 
 const SCAN_EXTENSIONS = new Set(['.js', '.ts', '.ps1', '.sh', '.yml', '.yaml', '.py', '.json', '.gd', '.rs', '.toml']);
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive', '.git', 'target']);
+const IGNORED_DIRS = createIgnoredDirSet();
 const EXCLUDED_PATTERNS = Object.freeze([
   /rule-catalog\.json$/,
   /rule-sources\//,

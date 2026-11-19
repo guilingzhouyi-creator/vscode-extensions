@@ -20,6 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const AUTO_REFACTOR_ROOT = path.join(REPO_ROOT, 'auto-refactor');
@@ -64,19 +65,10 @@ const LANG_CONFIG = Object.freeze({
   }),
 });
 
-const EXCLUDED_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
+const EXCLUDED_DIRS = createIgnoredDirSet([
   'build',
-  'out',
-  'target',
-  '.venv',
-  'archive',
   '.agents',
-  '.godot',
   '.refactor-trajectory',
-  '.audit-logs',
   'coverage',
 ]);
 

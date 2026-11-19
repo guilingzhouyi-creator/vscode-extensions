@@ -19,6 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const CATALOG_FILE = path.join(__dirname, 'rule-catalog.json');
@@ -42,7 +43,7 @@ const SCAN_TARGETS = Object.freeze([
 ]);
 
 const SCAN_EXTENSIONS = new Set(['.js', '.ps1', '.sh', '.yml', '.yaml', '.ts', '.rs', '.md']);
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive', 'target', '.godot', 'reports']);
+const IGNORED_DIRS = createIgnoredDirSet(['reports']);
 
 /**
  * Loads the identifier vocabulary shared with the analysis engine.

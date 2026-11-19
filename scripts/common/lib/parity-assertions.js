@@ -13,18 +13,10 @@
  */
 'use strict';
 
-const TEN_DIM_KEYS = Object.freeze([
-  'architectureConsistency',
-  'semanticPurity',
-  'codeSecurity',
-  'performanceEfficiency',
-  'standardization',
-  'modernity',
-  'maintainability',
-  'commentQuality',
-  'duplication',
-  'techDebtRisk',
-]);
+const TEN_DIMENSIONS_CONTRACT = require('../ten-dimensions-contract.json');
+const TEN_DIM_KEYS = Object.freeze(
+  TEN_DIMENSIONS_CONTRACT.dimensions.map((dimension) => dimension.key),
+);
 
 const QUANT_METRIC_PATHS = Object.freeze([
   ['rcr', ['financial', 'rcr'], 0],

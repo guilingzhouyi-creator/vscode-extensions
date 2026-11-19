@@ -20,6 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
@@ -32,7 +33,7 @@ const SCAN_ROOTS = Object.freeze([
 ]);
 
 const SCAN_EXTENSIONS = new Set(['.js', '.mjs', '.py', '.ps1', '.sh']);
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', '__pycache__', 'archive', 'fixtures', 'config']);
+const IGNORED_DIRS = createIgnoredDirSet(['__pycache__', 'fixtures', 'config']);
 
 /**
  * A literal integer followed by a Chinese counting unit.
