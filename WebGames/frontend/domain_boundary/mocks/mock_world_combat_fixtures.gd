@@ -8,19 +8,20 @@
 # ==============================================================================
 
 ## 主界面快照、战斗与世界地图域静态模拟数据集
+class_name MockWorldCombatFixtures
 extends RefCounted
 
-static func _boss_part(slug: String, hp: float, max_hp: float, broken: bool) -> Dictionary:
+static func _boss_part(slug: String, current_hp: float, max_hp: float, broken: bool) -> Dictionary:
 	return {
 		"part_name": "ui.fe04.mock.part." + slug,
-		"hp": hp,
+		"hp": current_hp,
 		"max_hp": max_hp,
 		"is_broken": broken,
 	}
 
-static func _fac_or_npc(id: String, prefix: String) -> Dictionary:
+static func _fac_or_npc(entry_id: String, prefix: String) -> Dictionary:
 	return {
-		"id": id,
+		"id": entry_id,
 		"name": prefix + ".name",
 		"desc": prefix + ".desc",
 	}

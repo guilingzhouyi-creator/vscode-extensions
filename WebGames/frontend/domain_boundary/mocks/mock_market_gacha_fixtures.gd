@@ -8,12 +8,13 @@
 # ==============================================================================
 
 ## 经济交易与祈愿卡池域静态模拟数据集
+class_name MockMarketGachaFixtures
 extends RefCounted
 
-static func _auction(item_slug: String, cat_slug: String, bid: int, buyout: int, seller_slug: String) -> Dictionary:
+static func _auction(item_slug: String, category_slug: String, bid: int, buyout: int, seller_slug: String) -> Dictionary:
 	return {
 		"name": "ui.fe05.mock.auction." + item_slug,
-		"category": "ui.fe05.auction." + cat_slug,
+		"category": "ui.fe05.auction." + category_slug,
 		"current_bid": bid,
 		"buyout": buyout,
 		"seller": "ui.fe05.mock.seller." + seller_slug,
@@ -90,7 +91,7 @@ static func build_economy_data() -> Dictionary:
 
 ## 构建卡池保底计数与限定/常驻卡池模拟数据
 static func build_gacha_data() -> Dictionary:
-	var b := "ui.fe06.mock.banner."
+	var banner_prefix := "ui.fe06.mock.banner."
 	return {
 		"pity_5star": 45,
 		"pity_4star": 3,
@@ -98,9 +99,9 @@ static func build_gacha_data() -> Dictionary:
 		"banners": [
 			{
 				"banner_id": "BANNER_LIMITED_WARRIOR",
-				"title": b + "limited_warrior.title",
-				"subtitle": b + "limited_warrior.subtitle",
-				"remaining_time": b + "limited_warrior.remaining",
+				"title": banner_prefix + "limited_warrior.title",
+				"subtitle": banner_prefix + "limited_warrior.subtitle",
+				"remaining_time": banner_prefix + "limited_warrior.remaining",
 				"up_items": [
 					_up_item("flame_knight", "5", true),
 					_up_item("dragon_spine_greatsword", "5", false),
@@ -109,9 +110,9 @@ static func build_gacha_data() -> Dictionary:
 			},
 			{
 				"banner_id": "BANNER_PERMANENT",
-				"title": b + "permanent.title",
-				"subtitle": b + "permanent.subtitle",
-				"remaining_time": b + "permanent.remaining",
+				"title": banner_prefix + "permanent.title",
+				"subtitle": banner_prefix + "permanent.subtitle",
+				"remaining_time": banner_prefix + "permanent.remaining",
 				"up_items": [
 					_up_item("mithril_guardian", "5", false),
 					_up_item("arcane_staff", "4", true),

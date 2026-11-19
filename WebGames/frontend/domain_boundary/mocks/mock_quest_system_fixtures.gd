@@ -8,51 +8,52 @@
 # ==============================================================================
 
 ## 任务因果链、通知公告与系统存档域静态模拟数据集
+class_name MockQuestSystemFixtures
 extends RefCounted
 
-static func _quest(qid: String, slug: String, cat: String, status: String, req: int, obj_n: int, rwd_n: int) -> Dictionary:
-	var p := "ui.fe07.mock.quest." + slug
+static func _quest(qid: String, slug: String, category_name: String, status: String, required_level: int, objective_count: int, reward_count: int) -> Dictionary:
+	var quest_prefix := "ui.fe07.mock.quest." + slug
 	var objectives: Array = []
-	for i in range(1, obj_n + 1):
-		objectives.append(p + ".obj" + str(i))
+	for step_index in range(1, objective_count + 1):
+		objectives.append(quest_prefix + ".obj" + str(step_index))
 	var rewards: Array = []
-	for i in range(1, rwd_n + 1):
-		rewards.append(p + ".rwd" + str(i))
+	for reward_index in range(1, reward_count + 1):
+		rewards.append(quest_prefix + ".rwd" + str(reward_index))
 	return {
 		"quest_id": qid,
-		"title": p + ".title",
-		"category": cat,
+		"title": quest_prefix + ".title",
+		"category": category_name,
 		"status": status,
-		"giver": p + ".giver",
-		"level_req": req,
-		"desc": p + ".desc",
+		"giver": quest_prefix + ".giver",
+		"level_req": required_level,
+		"desc": quest_prefix + ".desc",
 		"objectives": objectives,
 		"rewards": rewards,
 	}
 
 static func _bounty(tid: String, slug: String, tier: int, gold: int) -> Dictionary:
-	var p := "ui.fe07.mock.bounty." + slug
+	var bounty_prefix := "ui.fe07.mock.bounty." + slug
 	return {
 		"target_id": tid,
-		"name": p + ".name",
+		"name": bounty_prefix + ".name",
 		"tier": tier,
 		"reward_gold": gold,
-		"time_remain": p + ".time",
-		"desc": p + ".desc",
+		"time_remain": bounty_prefix + ".time",
+		"desc": bounty_prefix + ".desc",
 	}
 
 static func _dag(nid: String, slug: String, status: String) -> Dictionary:
-	var p := "ui.fe07.mock.dag." + slug
-	return {"node_id": nid, "name": p + ".name", "status": status, "chain_desc": p + ".chain_desc"}
+	var dag_prefix := "ui.fe07.mock.dag." + slug
+	return {"node_id": nid, "name": dag_prefix + ".name", "status": status, "chain_desc": dag_prefix + ".chain_desc"}
 
-static func _notice(id: String, slug: String, cat: int, time_str: String, is_read: bool, jump: String) -> Dictionary:
-	var p := "ui.fe14.notification.mock." + slug
+static func _notice(notice_id: String, slug: String, category_index: int, timestamp_text: String, is_read: bool, jump: String) -> Dictionary:
+	var notice_prefix := "ui.fe14.notification.mock." + slug
 	return {
-		"id": id,
-		"category": cat,
-		"title_key": p + ".title",
-		"content_key": p + ".content",
-		"time": time_str,
+		"id": notice_id,
+		"category": category_index,
+		"title_key": notice_prefix + ".title",
+		"content_key": notice_prefix + ".content",
+		"time": timestamp_text,
 		"read": is_read,
 		"jump_target": jump,
 	}
@@ -90,7 +91,7 @@ static func build_quest_data() -> Dictionary:
 
 ## 构建系统通知与公告列表模拟数据
 static func build_notification_data() -> Dictionary:
-	var bp := "ui.fe14.bulletin.mock."
+	var bulletin_prefix := "ui.fe14.bulletin.mock."
 	return {
 		"notifications": [
 			_notice("N001", "n001", 0, "09-01 10:00", false, ""),
@@ -101,10 +102,10 @@ static func build_notification_data() -> Dictionary:
 			_notice("N006", "n006", 5, "08-31 20:30", true, "character_progression"),
 		],
 		"bulletins": [
-			{"id": "B001", "category": 0, "title_key": bp + "b001.title", "priority": 1, "time": "09-01 00:00", "content_key": bp + "b001.content"},
-			{"id": "B002", "category": 1, "title_key": bp + "b002.title", "priority": 0, "time": "08-31 18:00", "content_key": bp + "b002.content"},
-			{"id": "B003", "category": 2, "title_key": bp + "b003.title", "priority": 2, "time": "08-30 14:00", "content_key": bp + "b003.content"},
-			{"id": "B004", "category": 3, "title_key": bp + "b004.title", "priority": 1, "time": "08-28 10:00", "content_key": bp + "b004.content"},
+			{"id": "B001", "category": 0, "title_key": bulletin_prefix + "b001.title", "priority": 1, "time": "09-01 00:00", "content_key": bulletin_prefix + "b001.content"},
+			{"id": "B002", "category": 1, "title_key": bulletin_prefix + "b002.title", "priority": 0, "time": "08-31 18:00", "content_key": bulletin_prefix + "b002.content"},
+			{"id": "B003", "category": 2, "title_key": bulletin_prefix + "b003.title", "priority": 2, "time": "08-30 14:00", "content_key": bulletin_prefix + "b003.content"},
+			{"id": "B004", "category": 3, "title_key": bulletin_prefix + "b004.title", "priority": 1, "time": "08-28 10:00", "content_key": bulletin_prefix + "b004.content"},
 		],
 	}
 

@@ -8,29 +8,30 @@
 # ==============================================================================
 
 ## 账号与角色域静态模拟数据集
+class_name MockHeroFixtures
 extends RefCounted
 
-static func _inv(id: String, slug: String, cat: String, qty: int, weight: float) -> Dictionary:
+static func _inv(item_id: String, slug: String, category_name: String, quantity: int, weight: float) -> Dictionary:
 	return {
-		"id": id,
+		"id": item_id,
 		"name": "ui.fe03.mock.item." + slug,
-		"category": cat,
-		"qty": qty,
+		"category": category_name,
+		"qty": quantity,
 		"weight": weight,
 	}
 
-static func _skill(id: String, slug: String, level: int, status: String) -> Dictionary:
+static func _skill(skill_id: String, slug: String, level: int, status: String) -> Dictionary:
 	return {
-		"id": id,
+		"id": skill_id,
 		"name": "ui.fe03.mock.skill." + slug,
 		"level": level,
 		"status": status,
 		"desc": "ui.fe03.mock.skill." + slug + ".desc",
 	}
 
-static func _title(id: String, slug: String, rank: String, equipped: bool) -> Dictionary:
+static func _title(title_id: String, slug: String, rank: String, equipped: bool) -> Dictionary:
 	return {
-		"id": id,
+		"id": title_id,
 		"name": "ui.fe03.mock.title." + slug,
 		"rank": "ui.fe03.title.rank." + rank,
 		"equipped": equipped,
@@ -77,7 +78,7 @@ static func build_account_data() -> Dictionary:
 
 ## 构建角色属性、装备、技能、称号与背包模拟数据
 static func build_character_data() -> Dictionary:
-	var lore_p := "ui.fe03.mock.lore."
+	var lore_prefix := "ui.fe03.mock.lore."
 	return {
 		"name": "SandboxHero01",
 		"title": "Vanguard / Arcanist",
@@ -117,14 +118,14 @@ static func build_character_data() -> Dictionary:
 			_title("TITLE_EXPLORER", "explorer", "mortal", false),
 		],
 		"lore": {
-			"background": lore_p + "background",
+			"background": lore_prefix + "background",
 			"milestones": [
-				lore_p + "milestone1", lore_p + "milestone2",
-				lore_p + "milestone3", lore_p + "milestone4", lore_p + "milestone5",
+				lore_prefix + "milestone1", lore_prefix + "milestone2",
+				lore_prefix + "milestone3", lore_prefix + "milestone4", lore_prefix + "milestone5",
 			],
 			"achievements": [
-				lore_p + "achievement1", lore_p + "achievement2",
-				lore_p + "achievement3", lore_p + "achievement4", lore_p + "achievement5",
+				lore_prefix + "achievement1", lore_prefix + "achievement2",
+				lore_prefix + "achievement3", lore_prefix + "achievement4", lore_prefix + "achievement5",
 			],
 		},
 		"inventory_items": [
