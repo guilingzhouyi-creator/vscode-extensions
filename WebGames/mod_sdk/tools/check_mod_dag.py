@@ -22,6 +22,8 @@ from check_mod_common import (
     DiagnosticItem,
     safe_load_json as _safe_load_json,
 )
+
+
 @dataclass(slots=True)
 class DagCycleDetectionContext:
     """DAG Kahn 环检测参数上下文 (GOV-DAT-001)。"""
@@ -65,20 +67,24 @@ def check_dag_entries_and_terminals(
             terminal_nodes.append(nid)
 
     if len(entry_nodes) != 1:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_ENTRY_COUNT",
-            file_path=rel_name,
-            detail=f"DAG 必须有且仅有一个 START_ENTRY 节点，实际找到: {len(entry_nodes)} 个 ({entry_nodes})",
-            fix_suggestion="请调整节点定义，保留且仅保留一个 node_type 为 'START_ENTRY' 的入口节点",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_DAG_ENTRY_COUNT",
+                file_path=rel_name,
+                detail=f"DAG 必须有且仅有一个 START_ENTRY 节点，实际找到: {len(entry_nodes)} 个 ({entry_nodes})",
+                fix_suggestion="请调整节点定义，保留且仅保留一个 node_type 为 'START_ENTRY' 的入口节点",
+            )
+        )
 
     if not terminal_nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_TERMINAL_COUNT",
-            file_path=rel_name,
-            detail="DAG 至少需要一个 TERMINAL_EXIT 终态退出节点",
-            fix_suggestion="在 nodes 中添加一个 node_type 为 'TERMINAL_EXIT' 的完成节点",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_DAG_TERMINAL_COUNT",
+                file_path=rel_name,
+                detail="DAG 至少需要一个 TERMINAL_EXIT 终态退出节点",
+                fix_suggestion="在 nodes 中添加一个 node_type 为 'TERMINAL_EXIT' 的完成节点",
+            )
+        )
 
     entry_id = entry_nodes[0] if len(entry_nodes) == 1 else None
     return entry_id, terminal_nodes
@@ -101,12 +107,14 @@ def build_dag_graph_structure(
         u = edge.get("from_node_id")
         v = edge.get("to_node_id")
         if u not in nodes or v not in nodes:
-            diags.append(DiagnosticItem(
-                code="ERR_DAG_DANGLING_EDGE",
-                file_path=rel_name,
-                detail=f"边连接了不存在的节点: '{u}' -> '{v}'",
-                fix_suggestion="检查边的两端节点 ID 是否均已在 nodes 字典中正确声明",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_DAG_DANGLING_EDGE",
+                    file_path=rel_name,
+                    detail=f"边连接了不存在的节点: '{u}' -> '{v}'",
+                    fix_suggestion="检查边的两端节点 ID 是否均已在 nodes 字典中正确声明",
+                )
+            )
             continue
 
         adj[u].append(v)
@@ -120,34 +128,25 @@ def build_dag_graph_structure(
         if isinstance(prereqs, list):
             for pre in prereqs:
                 if pre not in nodes:
-                    diags.append(DiagnosticItem(
-                        code="ERR_DAG_MISSING_PREREQUISITE",
-                        file_path=rel_name,
-                        detail=f"节点 '{nid}' 的前置依赖 '{pre}' 不存在",
-                        fix_suggestion=f"在 nodes 中补充声明 '{pre}' 或从 '{nid}' 的 required_prerequisites 中移除",
-                    ))
+                    diags.append(
+                        DiagnosticItem(
+                            code="ERR_DAG_MISSING_PREREQUISITE",
+                            file_path=rel_name,
+                            detail=f"节点 '{nid}' 的前置依赖 '{pre}' 不存在",
+                            fix_suggestion=f"在 nodes 中补充声明 '{pre}' 或从 '{nid}' 的 required_prerequisites 中移除",
+                        )
+                    )
 
     return adj, rev_adj, in_degree
 
 
-def detect_dag_cycle_kahn(
-    ctx_or_nodes: DagCycleDetectionContext | dict[str, Any],
-    *args: Any,
-    **kwargs: Any,
-) -> None:
+def detect_dag_cycle_kahn(ctx: DagCycleDetectionContext) -> None:
     """使用 Kahn 拓扑排序算法检测死锁有向环。"""
-    if isinstance(ctx_or_nodes, DagCycleDetectionContext):
-        nodes = ctx_or_nodes.nodes
-        adj = ctx_or_nodes.adj
-        in_degree = ctx_or_nodes.in_degree
-        rel_name = ctx_or_nodes.rel_name
-        diags = ctx_or_nodes.diags
-    else:
-        nodes = ctx_or_nodes
-        adj = args[0] if len(args) > 0 else kwargs.get("adj", {})
-        in_degree = args[1] if len(args) > 1 else kwargs.get("in_degree", {})
-        rel_name = args[2] if len(args) > 2 else kwargs.get("rel_name", "")
-        diags = args[3] if len(args) > 3 else kwargs.get("diags", [])
+    nodes = ctx.nodes
+    adj = ctx.adj
+    in_degree = ctx.in_degree
+    rel_name = ctx.rel_name
+    diags = ctx.diags
 
     deg_copy = dict(in_degree)
     zero_queue = [nid for nid, d in deg_copy.items() if d == 0]
@@ -163,36 +162,25 @@ def detect_dag_cycle_kahn(
 
     if visited_count < len(nodes):
         cyclic_nodes = [nid for nid, d in deg_copy.items() if d > 0]
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_CYCLE",
-            file_path=rel_name,
-            detail=f"DAG 存在死锁循环依赖环 (Cycle)！涉及节点: {cyclic_nodes}",
-            fix_suggestion="断开循环环路中的边（移除构成循环依赖的边，使拓扑保持严格单向）",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_DAG_CYCLE",
+                file_path=rel_name,
+                detail=f"DAG 存在死锁循环依赖环 (Cycle)！涉及节点: {cyclic_nodes}",
+                fix_suggestion="断开循环环路中的边（移除构成循环依赖的边，使拓扑保持严格单向）",
+            )
+        )
 
 
-def check_reachability(
-    ctx_or_nodes: DagReachabilityContext | dict[str, Any],
-    *args: Any,
-    **kwargs: Any,
-) -> None:
+def check_reachability(ctx: DagReachabilityContext) -> None:
     """检查连通性与可达性：所有节点自入口可达，且所有路径均可到达终点。"""
-    if isinstance(ctx_or_nodes, DagReachabilityContext):
-        nodes = ctx_or_nodes.nodes
-        entry_id = ctx_or_nodes.entry_id
-        terminals = ctx_or_nodes.terminals
-        adj = ctx_or_nodes.adj
-        rev_adj = ctx_or_nodes.rev_adj
-        rel_name = ctx_or_nodes.rel_name
-        diags = ctx_or_nodes.diags
-    else:
-        nodes = ctx_or_nodes
-        entry_id = args[0] if len(args) > 0 else kwargs.get("entry_id")
-        terminals = args[1] if len(args) > 1 else kwargs.get("terminals", [])
-        adj = args[2] if len(args) > 2 else kwargs.get("adj", {})
-        rev_adj = args[3] if len(args) > 3 else kwargs.get("rev_adj", {})
-        rel_name = args[4] if len(args) > 4 else kwargs.get("rel_name", "")
-        diags = args[5] if len(args) > 5 else kwargs.get("diags", [])
+    nodes = ctx.nodes
+    entry_id = ctx.entry_id
+    terminals = ctx.terminals
+    adj = ctx.adj
+    rev_adj = ctx.rev_adj
+    rel_name = ctx.rel_name
+    diags = ctx.diags
 
     if not entry_id:
         return
@@ -211,12 +199,14 @@ def check_reachability(
 
     unreachable_nodes = set(nodes.keys()) - fwd_reachable
     if unreachable_nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_ORPHAN_NODE",
-            file_path=rel_name,
-            detail=f"存在无法从入口 '{entry_id}' 到达的孤儿断链节点: {sorted(unreachable_nodes)}",
-            fix_suggestion="请为孤儿节点添加来自上游节点的边，或者从图元中移除未引用的节点",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_DAG_ORPHAN_NODE",
+                file_path=rel_name,
+                detail=f"存在无法从入口 '{entry_id}' 到达的孤儿断链节点: {sorted(unreachable_nodes)}",
+                fix_suggestion="请为孤儿节点添加来自上游节点的边，或者从图元中移除未引用的节点",
+            )
+        )
 
     # 2. 反向可达性 (能到达任意终态节点)
     if not terminals:
@@ -235,12 +225,14 @@ def check_reachability(
 
     dead_end_nodes = fwd_reachable - bwd_reachable
     if dead_end_nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_UNREACHABLE_TERMINAL",
-            file_path=rel_name,
-            detail=f"存在无法沿路径到达任何 TERMINAL_EXIT 的死胡同节点: {sorted(dead_end_nodes)}",
-            fix_suggestion="请为这些节点添加指向终态节点的出边，确保所有分支都能顺利完结",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_DAG_UNREACHABLE_TERMINAL",
+                file_path=rel_name,
+                detail=f"存在无法沿路径到达任何 TERMINAL_EXIT 的死胡同节点: {sorted(dead_end_nodes)}",
+                fix_suggestion="请为这些节点添加指向终态节点的出边，确保所有分支都能顺利完结",
+            )
+        )
 
 
 def flatten_i18n_dict(data: dict[str, Any], prefix: str = "") -> dict[str, str]:
@@ -274,12 +266,14 @@ def check_dag_file(
     nodes = data.get("nodes")
     edges = data.get("edges")
     if not isinstance(nodes, dict) or not nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_NO_NODES",
-            file_path=rel_name,
-            detail="DAG 图元 nodes 字段必须为非空字典",
-            fix_suggestion="在 DAG JSON 中声明 'nodes' 对象，并至少包含起始与终态节点",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_DAG_NO_NODES",
+                file_path=rel_name,
+                detail="DAG 图元 nodes 字段必须为非空字典",
+                fix_suggestion="在 DAG JSON 中声明 'nodes' 对象，并至少包含起始与终态节点",
+            )
+        )
         return
 
     if not isinstance(edges, list):
@@ -294,45 +288,55 @@ def check_dag_file(
         if isinstance(inline_val, str) and inline_val.strip():
             inline_texts.append(inline_val)
         elif isinstance(inline_val, dict):
-            inline_texts.extend([v for v in inline_val.values() if isinstance(v, str) and v.strip()])
+            inline_texts.extend(
+                [v for v in inline_val.values() if isinstance(v, str) and v.strip()]
+            )
 
         if inline_texts:
             for txt in inline_texts:
                 for param in PARAM_REGEX.findall(txt):
                     if param not in WHITELISTED_PLACEHOLDERS:
-                        diags.append(DiagnosticItem(
-                            code="ERR_UNKNOWN_PLACEHOLDER",
-                            file_path=rel_name,
-                            detail=f"节点 '{nid}' inline_text 包含非法/未知占位符 '{{{param}}}'",
-                            fix_suggestion=f"请替换为白名单参数，如: {', '.join(sorted(list(WHITELISTED_PLACEHOLDERS)[:6]))}",
-                        ))
+                        diags.append(
+                            DiagnosticItem(
+                                code="ERR_UNKNOWN_PLACEHOLDER",
+                                file_path=rel_name,
+                                detail=f"节点 '{nid}' inline_text 包含非法/未知占位符 '{{{param}}}'",
+                                fix_suggestion=f"请替换为白名单参数，如: {', '.join(sorted(list(WHITELISTED_PLACEHOLDERS)[:6]))}",
+                            )
+                        )
         else:
             nkey = node_data.get("narrative_key")
             if isinstance(nkey, str) and nkey.strip():
                 required_keys.add(nkey.strip())
             else:
-                diags.append(DiagnosticItem(
-                    code="ERR_DAG_NODE_TEXT_MISSING",
-                    file_path=rel_name,
-                    detail=f"节点 '{nid}' 既无有效 narrative_key 亦无非空 inline_text",
-                    fix_suggestion=f"请为节点 '{nid}' 指定 narrative_key 或直接写入 inline_text",
-                ))
+                diags.append(
+                    DiagnosticItem(
+                        code="ERR_DAG_NODE_TEXT_MISSING",
+                        file_path=rel_name,
+                        detail=f"节点 '{nid}' 既无有效 narrative_key 亦无非空 inline_text",
+                        fix_suggestion=f"请为节点 '{nid}' 指定 narrative_key 或直接写入 inline_text",
+                    )
+                )
 
     entry_id, terminals = check_dag_entries_and_terminals(nodes, rel_name, diags)
     adj, rev_adj, in_deg = build_dag_graph_structure(nodes, edges, rel_name, diags)
-    detect_dag_cycle_kahn(DagCycleDetectionContext(
-        nodes=nodes,
-        adj=adj,
-        in_degree=in_deg,
-        rel_name=rel_name,
-        diags=diags,
-    ))
-    check_reachability(DagReachabilityContext(
-        nodes=nodes,
-        entry_id=entry_id,
-        terminals=terminals,
-        adj=adj,
-        rev_adj=rev_adj,
-        rel_name=rel_name,
-        diags=diags,
-    ))
+    detect_dag_cycle_kahn(
+        DagCycleDetectionContext(
+            nodes=nodes,
+            adj=adj,
+            in_degree=in_deg,
+            rel_name=rel_name,
+            diags=diags,
+        )
+    )
+    check_reachability(
+        DagReachabilityContext(
+            nodes=nodes,
+            entry_id=entry_id,
+            terminals=terminals,
+            adj=adj,
+            rev_adj=rev_adj,
+            rel_name=rel_name,
+            diags=diags,
+        )
+    )
