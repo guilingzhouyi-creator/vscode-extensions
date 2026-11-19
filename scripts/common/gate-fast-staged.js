@@ -35,7 +35,7 @@ const {
   checkHeadReceipt,
 } = require('./git-env');
 const checks = require('./lib/fast-staged-checks');
-const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent, validateCommentOnly, collectIndentWidthWarnings } = checks;
+const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent, validateCommentOnly, collectIndentWidthWarnings, validateFileVolume } = checks;
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -211,91 +211,6 @@ function getStagedDiff(repoRoot, range = '') {
     maxBuffer: MAX_DIFF_BUFFER_BYTES,
   });
 }
-
-function isPlumbingExemptFast(file) {
-  const norm = file.replace(/\\/g, '/').toLowerCase();
-  const base = path.basename(norm);
-  if (base.startsWith('index.')) return true;
-  if (norm.endsWith('.d.ts')) return true;
-  if (base.endsWith('_types.gd') || base.endsWith('_types.ts') || base.endsWith('-types.ts')) return true;
-  if (/(?:\/constants\/|\/tokens\/|\/locales\/|\/i18n\/|\/types\/)/.test(norm)) return true;
-  if (/(?:tests\/|\.test\.|\.spec\.|test_)/i.test(norm)) return true;
-  return false;
-}
-
-function validateFileVolume(file, content, volumeViolations) {
-  const norm = file.replace(/\\/g, '/');
-  if (
-    !/\.(?:ts|tsx|js|jsx|gd|py|sh|ps1|mjs|cjs|rs|go)$/i.test(file) ||
-    /(?:dist\/|out\/|fixtures\/|baseline|reports\/|\.d\.ts$|corpus)/.test(norm)
-  ) {
-    return;
-  }
-  const ext = path.extname(file).toLowerCase();
-  const { totalLoc, eloc, wiringCount } = calculateEloc(content, ext);
-  const langFactor = typeof getLanguageVerbosityFactor === 'function' ? getLanguageVerbosityFactor(file) : 1.0;
-  const maxEloc = Math.round(MAX_ELOC_BUDGET * langFactor);
-  const maxLoc = Math.round(MAX_LOC_BUDGET * langFactor);
-  if (eloc > maxEloc) {
-    const tpl = VIOLATION_TPLS.VOL_ELOC;
-    volumeViolations.push(
-      createViolation({
-        ruleId: RULE_VOL_ELOC_001,
-        file,
-        message: `单文件有效行数超标 (${eloc} > ${maxEloc} ELOC): ${file}`,
-        actual: `ELOC = ${eloc}`,
-        expected: tpl.expected,
-        actionableFix: tpl.actionableFix,
-      }),
-    );
-  }
-  if (totalLoc > maxLoc) {
-    const tpl = VIOLATION_TPLS.VOL_LOC;
-    volumeViolations.push(
-      createViolation({
-        ruleId: RULE_VOL_LOC_001,
-        file,
-        message: `单文件行数超标 (${totalLoc} > ${maxLoc} LOC): ${file}`,
-        actual: `LOC = ${totalLoc}`,
-        expected: tpl.expected,
-        actionableFix: tpl.actionableFix,
-      }),
-    );
-  }
-
-  if (isPlumbingExemptFast(file)) {
-    return;
-  }
-
-  if (totalLoc >= 250 && eloc > 0 && totalLoc > eloc * DENSITY_RATIO_LIMIT) {
-    const actualRatio = (totalLoc / eloc).toFixed(2);
-    volumeViolations.push(
-      createViolation({
-        ruleId: RULE_VOL_RATIO_001,
-        file,
-        message: `垂直行稀释比超标 (LOC: ${totalLoc} > ELOC: ${eloc} * ${DENSITY_RATIO_LIMIT} = ${Math.round(eloc * DENSITY_RATIO_LIMIT)}, 比例 1:${actualRatio}): ${file}`,
-        actual: `1:${actualRatio}`,
-        expected: `<= 1:${DENSITY_RATIO_LIMIT.toFixed(2)}`,
-        actionableFix: '消除空行堆叠或将长篇散文注释移至 Markdown 规范文档 (VOL-RATIO-001)',
-      }),
-    );
-  }
-
-  if (eloc >= 10 && wiringCount / eloc > PLUMBING_RATIO_LIMIT) {
-    const wiringPct = ((wiringCount / eloc) * 100).toFixed(1);
-    volumeViolations.push(
-      createViolation({
-        ruleId: RULE_ARCH_FAC_001,
-        file,
-        message: `接线代码占比超标 (${wiringPct}% > ${(PLUMBING_RATIO_LIMIT * 100).toFixed(1)}%, ELOC: ${eloc}): ${file}`,
-        actual: `${wiringPct}%`,
-        expected: `<= ${(PLUMBING_RATIO_LIMIT * 100).toFixed(1)}%`,
-        actionableFix: '消除空心透传跳板或为门面注入实质领域能力/不可变性冻结 (ARCH-FAC-001)',
-      }),
-    );
-  }
-}
-
 
 function hasViolationForFile(violations, file, ruleId) {
   return violations.some((v) => v.file === file && v.ruleId === ruleId);
