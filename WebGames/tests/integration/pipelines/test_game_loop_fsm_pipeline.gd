@@ -1,9 +1,16 @@
 # ==============================================================================
-# 单元测试：游戏主循环与状态栈 (GameLoopFSM Tests)
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_game_loop_fsm_pipeline.gd
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 单元测试：游戏主循环与状态栈 (GameLoopFSM Tests)
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: test_game_loop_fsm_pipeline 测试契约
 # ==============================================================================
+
+## TestGameLoopFSMPipeline：单元测试：游戏主循环与状态栈 (GameLoopFSM Tests)
 class_name TestGameLoopFSMPipeline extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_push_pop_single_active())

@@ -1,11 +1,17 @@
 # ==============================================================================
-# 单元测试：物品属性双 UID 联动与隐藏特殊词缀体系
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_item_attribute_affix_system_pipeline.gd
-# 职责: 验证双 UID 身份解耦、ABC 三类属性生命周期、隐藏鉴定、品质升格、非负下界与签名防篡改守卫
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证双 UID 身份解耦、ABC 三类属性生命周期、隐藏鉴定、品质升格、非负下界与签名防篡改守卫
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：物品属性双 UID 联动与隐藏特殊词缀体系
 # ==============================================================================
+
+## TestItemAttributeAffixSystemPipeline：验证双 UID 身份解耦、ABC 三类属性生命周期、隐藏鉴定、品质升格、非负下界与签名防篡改守卫
 class_name TestItemAttributeAffixSystemPipeline
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_dual_uid_decoupling())

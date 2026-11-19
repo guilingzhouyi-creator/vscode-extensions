@@ -10,9 +10,11 @@
 # 退出语义与设计依据: 全流程数据流交互契约规约 (TC-CHAIN-01 ~ TC-CHAIN-10, ADV-PRF-002)
 # ==============================================================================
 
+## TestFullChainBackendProtocolAndLifecyclePipeline：全 11 环前后端交互协议数据流与后端流转无头集成验收流水线，
 class_name TestFullChainBackendProtocolAndLifecyclePipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_chain_01_full_eleven_link_backend_protocol_e2e())
@@ -25,6 +27,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_chain_08_honest_shutdown_failure_vs_force_quit_degradation())
 	results.append(test_chain_09_double_cycle_bootstrap_teardown_symmetry())
 	results.append(test_chain_10_protocol_pool_and_deterministic_high_freq_conservation())
+	results.append(test_chain_11_bridge_pool_and_auth_parity())
 	_teardown_env()
 	return TestCase.pack_results("全流程前后端交互协议与后端联调验收流水线", results)
 
@@ -452,3 +455,26 @@ static func test_chain_10_protocol_pool_and_deterministic_high_freq_conservation
 
 	_teardown_env()
 	return TestCase.make_result("TC-CHAIN-10: 高频信封池化ADV-PRF-002借还守恒与确定性压测", conserved, stats)
+
+## TC-CHAIN-11: 同步桥接信封池平衡与单次哈希鉴权等价校验
+static func test_chain_11_bridge_pool_and_auth_parity() -> Dictionary:
+	_setup_env()
+	var reg := _dispatch("account", "REGISTER_ACCOUNT", {
+		"username": "chain_hero_auth_11",
+		"password_plain": "SecretPass999",
+		"device_fingerprint": "FP_CHAIN_11",
+		"auto_login": true
+	})
+	var account_id := String(reg.data.get("account_id", ""))
+	var session_token := String(reg.data.get("session_token", ""))
+	var flat_reply := RealProtocolBridge.dispatch_flat("world_state", "PULL_HUD_SNAPSHOT", {})
+	var pool_stats := UnifiedProtocolFactory.get_pool_stats()
+	var single_valid := AuthService.validate_session_request(session_token, account_id, true)
+	AuthService.revoke_token(session_token)
+	var single_revoked := AuthService.validate_session_request(session_token, account_id, true)
+	var passed: bool = bool(flat_reply.get("success", false)) \
+		and int(pool_stats.get("req_borrowed", -1)) == 0 \
+		and bool(single_valid.get("success", false)) \
+		and bool(single_revoked.get("revoked_or_expired", false))
+	_teardown_env()
+	return TestCase.make_result("TC-CHAIN-11: 同步桥接池守恒与单次哈希鉴权一致性", passed)

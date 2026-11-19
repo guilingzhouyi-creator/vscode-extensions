@@ -1,13 +1,17 @@
 # ==============================================================================
-# 单元测试：用户会话生命周期与主页HUD双向同步流水线
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_session_lifecycle_and_hud_sync_pipeline.gd
-# 职责: 覆盖「注册 ➔ 登录 ➔ 进世界 HUD 首帧快照 ➔ 会话注销」全流程无头断言，
-#       验证快照真实溯源（零臆造）、除数下限守卫、广播载荷契约（args/category_key）。
-# 需求源: 阶段4（S4：TestSessionLifecycleAndHudSyncPipeline，8 用例）
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 覆盖「注册 ➔ 登录 ➔ 进世界 HUD 首帧快照 ➔ 会话注销」全流程无头断言， 验证快照真实溯源（零臆造）、除数下限守卫、广播载荷契约（args/category_key）。 需求源: 阶段4（S4：TestSessionLifecycleAndHudSyncPipeline，8 用例）
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：用户会话生命周期与主页HUD双向同步流水线
 # ==============================================================================
+
+## TestSessionLifecycleAndHudSyncPipeline：覆盖「注册 ➔ 登录 ➔ 进世界 HUD 首帧快照 ➔ 会话注销」全流程无头断言， 验证快照真实溯源（零臆造）、除数下限
 class_name TestSessionLifecycleAndHudSyncPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_registration_validation_and_duplicate())

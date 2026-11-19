@@ -2,12 +2,9 @@
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_zero_mod_fail_closed_pipeline.gd
 # 架构定位: Integration Test Pipeline / Zero-MOD Fail-Closed Guard
-# 依赖与触发: 上游: TestRegistry | 下游: GameConfig, ModPrecheckAndAdaptationSolver,
-#           GameModeRoutingSolver, WorldCharacterCreationOrchestrator,
-#           PrologueExecutionKernel, WorldGatewayFSM, WorldGatewayView
-# 职责说明: 验证纯引擎基座在零 MOD 与纯扩展包（无基础/全转化包）状态下的全域
-#           Fail-Closed 拦截契约（ERR_NO_BASE_CONTENT_MOD）及网关 UI 缺包横幅表现。
-# 设计依据: 阶段验收矩阵 (TC-ZMF-01 ~ TC-ZMF-05)
+# 依赖与触发: 上游: TestRegistry | 下游: GameConfig, ModPrecheckAndAdaptationSolver, GameModeRoutingSolver, WorldCharacterCreationOrchestrator, PrologueExecutionKernel, WorldGatewayFSM, WorldGatewayView
+# 职责说明: 验证纯引擎基座在零 MOD 与纯扩展包（无基础/全转化包）状态下的全域 Fail-Closed 拦截契约（ERR_NO_BASE_CONTENT_MOD）及网关 UI 缺包横幅表现。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-ZMF-01 ~ TC-ZMF-05)
 # ==============================================================================
 
 ## TestZeroModFailClosedPipeline：零 MOD 严格 Fail-Closed 与缺包 UI 防御集成测试套件

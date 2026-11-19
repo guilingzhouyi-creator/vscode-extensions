@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 统一日志错误基础框架测试套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_log_error_base_pipeline.gd
-# 职责: 验收统一日志记录模型（LogRecordDTO）、日志导出器（LogFileExporter）、
-#       错误码注册表（ErrorCodeRegistry）、统一爆错通道（ErrorReporter）与存量收敛
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验收统一日志记录模型（LogRecordDTO）、日志导出器（LogFileExporter）、 错误码注册表（ErrorCodeRegistry）、统一爆错通道（ErrorReporter）与存量收敛
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 统一日志错误基础框架测试套件
 # ==============================================================================
+
+## TestLogErrorBasePipeline：验收统一日志记录模型（LogRecordDTO）、日志导出器（LogFileExporter）、 错误码注册表（Erro
 class_name TestLogErrorBasePipeline
 extends RefCounted
 
@@ -15,6 +19,7 @@ const ErrorReporterClass = preload("res://backend/infrastructure/error_reporter.
 const ContractRegistryIndexClass = preload("res://backend/domains/contract_registry/contract_registry_index.gd")
 const GMArbitrationAuditServiceClass = preload("res://backend/domains/admin_sandbox/gm_arbitration_audit_service.gd")
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name := "统一日志错误基础框架与英文报错收敛治理验收流水线"
@@ -275,6 +280,7 @@ static func _test_lg_10_exporter_rotation_and_pruning() -> Dictionary:
 
 	return {"test": "TC-LG-10: LogFileExporter 轮转截断与裁剪", "passed": true}
 
+## 迭代读取测试日志目录中的下一个文件名
 static func file_name_next(_dir: DirAccess, _fn: String) -> void:
 	pass
 

@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试流水线 (Tests · 自动化测试框架)
 # 文件路径: res://tests/integration/pipelines/test_narrative_mod_and_perturbation_pipeline.gd
-# 架构定位: Integration Test Pipeline / Narrative MOD & Perturbation Harness
-# 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, CrossWorldPerturbationBroker, WorldModAffinityManager, WorldGatewayFSM, WorldArchiveRepository | 配置: config/domains/narrative_orchestration/core.json
+# 架构定位: Integration Test Pipeline / Narrative MOD & Perturbation Harness 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, CrossWorldPerturbationBroker, WorldModAffinityManager, WorldGatewayFSM, WorldArchiveRepository | 配置: config/domains/narrative_orchestration/core.json
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 自动化端到端测试剧情 MOD 级联发现、Kahn 拓扑排序、跨世界虚空因果扰动、世界亲和锁文件固化、防坏档拦截与安全降级
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestNarrativeModAndPerturbationPipeline：自动化端到端测试剧情 MOD 级联发现、Kahn 拓扑排序、跨世界虚空因果扰动、世界亲和锁文件固化、防坏档拦截与安全降级
 class_name TestNarrativeModAndPerturbationPipeline
 extends TestCase
 
@@ -157,7 +158,7 @@ static func test_topological_sort_and_cyclic_detection() -> Dictionary:
 
 	var cycle_res := ModPackageDiscoverySolver.sort_and_resolve_dependencies([pkg_cycle_a, pkg_cycle_b])
 	var cycle_detected: bool = not bool(cycle_res.get("success", false)) \
-		and str(cycle_res.get("error", "")) == "ERR_CYCLIC_DEPENDENCY"
+		and str(cycle_res.get("error_code", "")) == "ERR_CYCLIC_DEPENDENCY"
 
 	# 3. 缺失依赖检测测试
 	var pkg_orphan := NarrativePackManifestDTO.new()
@@ -166,7 +167,7 @@ static func test_topological_sort_and_cyclic_detection() -> Dictionary:
 
 	var missing_res := ModPackageDiscoverySolver.sort_and_resolve_dependencies([pkg_orphan])
 	var missing_detected: bool = not bool(missing_res.get("success", false)) \
-		and str(missing_res.get("error", "")) == "ERR_MISSING_DEPENDENCY"
+		and str(missing_res.get("error_code", "")) == "ERR_MISSING_DEPENDENCY"
 
 	var passed: bool = valid_ok and first_is_core and second_is_magic and last_is_addon and cycle_detected and missing_detected
 	return {
@@ -305,7 +306,7 @@ static func test_missing_critical_mod_gateway_blocking() -> Dictionary:
 	var partial_installed: Array = [{"pack_id": "mod_core_narrative", "version": "1.0.0"}]
 	var mgr_verify := mgr.verify_and_bind_world_mods(world_id, partial_installed, false)
 	var mgr_blocked: bool = not bool(mgr_verify.get("success", false)) \
-		and str(mgr_verify.get("error", "")) == "ERR_MISSING_CRITICAL_MOD" \
+		and str(mgr_verify.get("error_code", "")) == "ERR_MISSING_CRITICAL_MOD" \
 		and (mgr_verify.get("missing_packs", []) as Array).has("mod_dragon_boss")
 
 	# 2. 模拟 WorldGatewayFSM 接入守卫拦截
@@ -315,7 +316,7 @@ static func test_missing_critical_mod_gateway_blocking() -> Dictionary:
 
 	var enter_res := fsm.enter_world(world_id, false)
 	var enter_blocked: bool = not bool(enter_res.get("success", false)) \
-		and (str(enter_res.get("error_code", "")) == "ERR_MISSING_CRITICAL_MOD" or str(enter_res.get("error", "")) == "ERR_MISSING_CRITICAL_MOD")
+		and str(enter_res.get("error_code", "")) == "ERR_MISSING_CRITICAL_MOD"
 
 	# 断言状态机阶段被坚决阻断在进入世界之前，未跃迁至 IN_WORLD
 	var phase_preserved: bool = fsm.context.current_phase != WorldGatewayModel.GatewayPhase.IN_WORLD

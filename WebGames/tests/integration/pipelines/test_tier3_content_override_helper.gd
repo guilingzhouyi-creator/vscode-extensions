@@ -4,7 +4,7 @@
 # 架构定位: Integration Test Harness Helper
 # 依赖与触发: 由 TestTier3ContentOverridePipeline 调度执行
 # 职责说明: 提供 Tier 3 MOD 测试沙箱清理、模拟包生成辅助及 TC-T3MOD-04 (REPLACE_ENTRY) 与 TC-T3MOD-05 (TOTAL_PURGE) 集成用例验证。
-# 设计依据: 阶段验收矩阵 (TC-T3MOD-04 ~ TC-T3MOD-05) 与非破坏性覆盖契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-T3MOD-04 ~ TC-T3MOD-05) 与非破坏性覆盖契约
 # ==============================================================================
 
 ## TestTier3ContentOverrideHelper：Tier 3 MOD 测试夹具构造与覆盖模式验证助手

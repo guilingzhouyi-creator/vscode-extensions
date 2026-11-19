@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 全域核心算法性能加固与多实体扩展性测试套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_performance_and_scalability_pipeline.gd
-# 职责: 验收物品统计O(1)增量累加、空间方位倒排索引、多实体状态机隔离、
-#       剧情因果DAG邻接表索引与轻量会话序列化、背包增量度量及频控有界缓存。
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验收物品统计O(1)增量累加、空间方位倒排索引、多实体状态机隔离、 剧情因果DAG邻接表索引与轻量会话序列化、背包增量度量及频控有界缓存。
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 全域核心算法性能加固与多实体扩展性测试套件
 # ==============================================================================
+
+## TestPerformanceAndScalabilityPipeline：验收物品统计O(1)增量累加、空间方位倒排索引、多实体状态机隔离、 剧情因果DAG邻接表索引与轻量会话序列化、背包增量度
 class_name TestPerformanceAndScalabilityPipeline
 extends RefCounted
 
@@ -13,6 +17,7 @@ const NarrativeDAGExecutionEngineClass = preload("res://backend/domains/narrativ
 const InventoryMetricSnapshotClass = preload("res://backend/domains/inventory/inventory_metric_snapshot.gd")
 const NarrativeDagSessionDTOClass = preload("res://backend/domains/narrative_orchestration/narrative_dag_session_dto.gd")
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name := "全域核心算法性能加固与多实体扩展性治理验收流水线"

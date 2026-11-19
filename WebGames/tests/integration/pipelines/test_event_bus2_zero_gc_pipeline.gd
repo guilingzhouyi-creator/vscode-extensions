@@ -1,8 +1,13 @@
 # ==============================================================================
-# 单元测试：新一代EventBus 2.0空间分发与零GC流水线验收套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd
-# 职责: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（17项断言）。
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（18项断言）。
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：新一代EventBus 2.0空间分发与零GC流水线验收套件
 # ==============================================================================
+
+## TestEventBus2ZeroGCPipeline：验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（18项断言）。
 class_name TestEventBus2ZeroGCPipeline
 extends TestCase
 
@@ -21,6 +26,7 @@ static func _release_test_subscriptions() -> void:
 		token.bus = null
 	_test_subscriptions.clear()
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	_release_test_subscriptions()
 	var results: Array[Dictionary] = []
@@ -41,6 +47,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_ring_buffer_saturation_and_drop_metrics())
 	results.append(_test_dead_spatial_listener_auto_eviction())
 	results.append(_test_config_driven_channel_resolution())
+	results.append(_test_dynamic_channel_isolation_and_mask_routing())
+	results.append(_test_soa_spatial_linear_hash_parity())
 	_release_test_subscriptions()
 
 	return TestCase.pack_results("新一代EventBus 2.0空间分发测试套件", results)
@@ -419,3 +427,65 @@ static func _test_config_driven_channel_resolution() -> Dictionary:
 	if not received["hit"]:
 		return {"name": tname, "test": tname, "passed": false, "message": "字符串信道广播未命中订阅"}
 	return {"name": tname, "test": tname, "passed": true, "message": "配置驱动全域信道动态解析与广播机制验证"}
+
+# ---- 18. 动态命名信道隔离与配置掩码路由校验 ----
+static func _test_dynamic_channel_isolation_and_mask_routing() -> Dictionary:
+	var tname := "TC-EB2-18: 动态命名信道隔离与配置掩码路由校验"
+	var bus := EventBusCore.new()
+	bus.initialize_from_config()
+	var dyn_alpha := bus.resolve_channel_id("mod_custom.alpha")
+	var dyn_beta := bus.resolve_channel_id("mod_custom.beta")
+	if dyn_alpha < EventBusCore.DYNAMIC_CHANNEL_ID_BASE or dyn_alpha == dyn_beta or dyn_alpha == EventChannelDefinition.DOMAIN_EVENT_GENERIC:
+		return {"name": tname, "test": tname, "passed": false, "message": "动态信道分配冲突 alpha=%d beta=%d" % [dyn_alpha, dyn_beta]}
+	if bus.resolve_channel_id("mod_custom.alpha") != dyn_alpha or bus.resolve_channel_name(dyn_alpha) != "mod_custom.alpha":
+		return {"name": tname, "test": tname, "passed": false, "message": "动态信道双向映射不稳定"}
+
+	var alpha_hits := {"n": 0}
+	var beta_hits := {"n": 0}
+	var observed_mask := {"mask": 0, "is_domain": false}
+	var tok_alpha := _track_subscription(bus.on_channel("mod_custom.alpha", func(_p: EventPacket) -> void: alpha_hits["n"] += 1))
+	var tok_beta := _track_subscription(bus.on_channel("mod_custom.beta", func(_p: EventPacket) -> void: beta_hits["n"] += 1))
+	var tok_life := _track_subscription(bus.on_channel("lifecycle.teardown_completed", func(pkt: EventPacket) -> void:
+		observed_mask["mask"] = pkt.category_mask
+		observed_mask["is_domain"] = pkt.is_domain_event
+	))
+	bus.emit_domain_event("mod_custom.alpha", {"v": 1})
+	bus.emit_domain_event("lifecycle.teardown_completed", {"category_key": "lifecycle"})
+	tok_alpha.unbind()
+	tok_beta.unbind()
+	tok_life.unbind()
+
+	if alpha_hits["n"] != 1 or beta_hits["n"] != 0:
+		return {"name": tname, "test": tname, "passed": false, "message": "动态信道交叉串扰 alpha=%d beta=%d" % [alpha_hits["n"], beta_hits["n"]]}
+	if int(observed_mask["mask"]) != EventCategoryMask.CORE_STATE or not bool(observed_mask["is_domain"]):
+		return {"name": tname, "test": tname, "passed": false, "message": "配置分类掩码未对齐 mask=%d" % int(observed_mask["mask"])}
+	return {"name": tname, "test": tname, "passed": true, "message": "动态命名信道独立隔离且按配置分类掩码直投"}
+
+# ---- 19. SoA 线性与哈希网格跃迁等价性及交换删除守恒 ----
+static func _test_soa_spatial_linear_hash_parity() -> Dictionary:
+	var test_label := "TC-EB2-19: SoA 线性/哈希混合空间索引与 swap-remove 守恒"
+	var grid := HeadlessSpatialHashGrid3D.new(16.0, 256.0)
+	var hit_ids: Array[int] = []
+	var make_callback := func(slot_index: int) -> Callable:
+		return func(_pkt: EventPacket) -> void: hit_ids.append(slot_index)
+
+	for entity_index in range(80):
+		grid.register_listener(1000 + entity_index, Vector3(float(entity_index * 2), 0.0, 0.0), 10.0, make_callback.call(entity_index))
+	grid.unregister_listener(1000)
+	grid.unregister_listener(1040)
+	grid.unregister_listener(1079)
+
+	var test_packet := EventPacket.new()
+	var hash_dispatched: int = grid.dispatch_spatial(Vector3(10.0, 0.0, 0.0), 6.0, test_packet)
+	var has_removed_zero: bool = hit_ids.has(0)
+	var has_expected_neighbor: bool = hit_ids.has(5)
+	if hash_dispatched <= 0 or has_removed_zero or not has_expected_neighbor:
+		return {"name": test_label, "test": test_label, "passed": false, "message": "混合索引/删除错乱 hits=%s" % str(hit_ids)}
+
+	for drop_index in range(60, 79):
+		grid.unregister_listener(1000 + drop_index)
+	hit_ids.clear()
+	var linear_dispatched: int = grid.dispatch_spatial(Vector3(10.0, 0.0, 0.0), 6.0, test_packet)
+	if linear_dispatched <= 0 or hit_ids.has(0) or not hit_ids.has(5):
+		return {"name": test_label, "test": test_label, "passed": false, "message": "回落线性扫描不一致 hits=%s" % str(hit_ids)}
+	return {"name": test_label, "test": test_label, "passed": true, "message": "SoA 线性<->哈希自动跃迁及 swap-remove 一致"}

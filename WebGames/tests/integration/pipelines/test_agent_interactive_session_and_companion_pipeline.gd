@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试层 (Integration · Agent交互试玩与伴侣观察总线流水线)
 # 文件路径: res://tests/integration/pipelines/test_agent_interactive_session_and_companion_pipeline.gd
-# 架构定位: Integration Test Suite / End-to-End Pipeline Harness
-# 跨域依赖: 上游: TestRegistry | 下游: AgentPlaythroughSession, CompanionObserverBus, CompanionBlackboxRecorder, ModWorkbenchView | 配置: config/domains/*.json | 信号: CompanionObserverBus
+# 架构定位: Integration Test Suite / End-to-End Pipeline Harness 跨域依赖: 上游: TestRegistry | 下游: AgentPlaythroughSession, CompanionObserverBus, CompanionBlackboxRecorder, ModWorkbenchView | 配置: config/domains/*.json | 信号: CompanionObserverBus
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 验证长程交互式Agent推演会话生命周期、单步分支选择与突变结算、决策快照回滚与状态恢复、非侵入式伴侣观察总线广播与有界队列、现场黑匣子诊断转储及前端工坊轻量待命接口契约。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (智能体试玩会话与伴侣观察总线架构规范)
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (智能体试玩会话与伴侣观察总线架构规范)
 # ==============================================================================
 
+## TestAgentInteractiveSessionAndCompanionPipeline：验证长程交互式Agent推演会话生命周期、单步分支选择与突变结算、决策快照回滚与状态恢复、非侵入式伴侣观察总线广播与有界
 class_name TestAgentInteractiveSessionAndCompanionPipeline
 extends TestCase
 

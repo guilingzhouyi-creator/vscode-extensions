@@ -1,13 +1,17 @@
 # ==============================================================================
-# 单元测试：统一资源索引中心与配置系统异步流式加载端到端流水线
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd
-# 职责: 覆盖资源索引注册中心解析、多态解码器分发、GameConfig L0 极速启动预算、
-#       辅助资源工作池批量载入栅栏、JIT 按需实时回退加载、批任务取消令牌阻断、
-#       DTO 序列化自洽性与测试单例隔离复位。
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 覆盖资源索引注册中心解析、多态解码器分发、GameConfig L0 极速启动预算、 辅助资源工作池批量载入栅栏、JIT 按需实时回退加载、批任务取消令牌阻断、 DTO 序列化自洽性与测试单例隔离复位。
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：统一资源索引中心与配置系统异步流式加载端到端流水线
 # ==============================================================================
+
+## TestResourceCatalogAndAsyncConfigPipeline：覆盖资源索引注册中心解析、多态解码器分发、GameConfig L0 极速启动预算、 辅助资源工作池批量载入栅栏、JIT
 class_name TestResourceCatalogAndAsyncConfigPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_catalog_resolution_and_indexing())
@@ -18,6 +22,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_batch_load_cancellation())
 	results.append(test_dto_serialization_and_reset())
 	results.append(test_singleton_isolation_cleanup())
+	results.append(test_greedy_prefetch_and_two_gen_cache())
 
 	return TestCase.pack_results("统一资源索引中心与配置系统异步流式加载流水线", results)
 
@@ -64,21 +69,21 @@ static func test_resource_decoder_polymorphism() -> Dictionary:
 	var valid_json_str: String = "{\"test_key\": 1234, \"status\": \"ok\"}"
 	var valid_json_raw: PackedByteArray = valid_json_str.to_utf8_buffer()
 	var json_res: Dictionary = registry.decode(valid_json_raw, valid_json_str, json_entry)
-	ok = assert_eq(String(json_res.get("error", "")), StorageContractInterfaces.ERR_NONE, "TC-RIC-02A: 合法 JSON 解码应无错误") and ok
+	ok = assert_eq(String(json_res.get("error_code", "")), StorageContractInterfaces.ERR_NONE, "TC-RIC-02A: 合法 JSON 解码应无错误") and ok
 	var json_data: Dictionary = json_res.get("data", {})
 	ok = assert_eq(int(json_data.get("test_key", 0)), 1234, "TC-RIC-02B: JSON 解码内容应一致") and ok
 
 	var invalid_json_str: String = "{broken_json:"
 	var invalid_json_raw: PackedByteArray = invalid_json_str.to_utf8_buffer()
 	var err_res: Dictionary = registry.decode(invalid_json_raw, invalid_json_str, json_entry)
-	ok = assert_eq(String(err_res.get("error", "")), StorageContractInterfaces.ERR_CORRUPT, "TC-RIC-02C: 畸形 JSON 解码应报 ERR_CORRUPT") and ok
+	ok = assert_eq(String(err_res.get("error_code", "")), StorageContractInterfaces.ERR_CORRUPT, "TC-RIC-02C: 畸形 JSON 解码应报 ERR_CORRUPT") and ok
 
 	# 2. 内置 Text 解码器测试
 	var text_entry := ResourceIndexEntryDTO.new("res_txt", "res://narratives/intro.txt", "text", 3)
 	var text_str: String = "Hello Kalar Engine"
 	var text_raw: PackedByteArray = text_str.to_utf8_buffer()
 	var text_res: Dictionary = registry.decode(text_raw, text_str, text_entry)
-	ok = assert_eq(String(text_res.get("error", "")), StorageContractInterfaces.ERR_NONE, "TC-RIC-02D: 纯文本解码应成功") and ok
+	ok = assert_eq(String(text_res.get("error_code", "")), StorageContractInterfaces.ERR_NONE, "TC-RIC-02D: 纯文本解码应成功") and ok
 	ok = assert_eq(String(text_res.get("data", "")), "Hello Kalar Engine", "TC-RIC-02E: 纯文本内容应一致") and ok
 
 	# 3. 默认解码器选择断言
@@ -231,3 +236,17 @@ static func test_singleton_isolation_cleanup() -> Dictionary:
 	AuxiliaryWorkerPool.reset_for_tests()
 
 	return make_result("TC-RIC-08: 确定性单例生命周期隔离与清理", ok)
+
+## ---- TC-RIC-09: 贪婪后台预热与双代缓存热重载一致性 ----
+static func test_greedy_prefetch_and_two_gen_cache() -> Dictionary:
+	var ok := true
+	GameConfig.prefetch_remaining_tables_async()
+	GameConfig.await_prefetch_if_running()
+	ok = assert_true(GameConfig.is_loaded(), "TC-RIC-09A: 贪婪预热后应处于已装载状态") and ok
+	var rate_before := GameConfig.get_int("domains.currency", "rates/silver", -1)
+	ok = assert_gt(rate_before, 0, "TC-RIC-09B: 贪婪预热后应可直读核心业务配置表") and ok
+	var reload_result := GameConfig.reload_config()
+	ok = assert_true(bool(reload_result.get("success", false)), "TC-RIC-09C: 并行热重载应成功返回") and ok
+	var rate_after := GameConfig.get_int("domains.currency", "rates/silver", -1)
+	ok = assert_eq(rate_before, rate_after, "TC-RIC-09D: 重载前后双代缓存数值应严格一致") and ok
+	return make_result("TC-RIC-09: 贪婪后台并发预热与双代缓存一致性", ok)

@@ -1,13 +1,17 @@
 # ==============================================================================
-# 单元测试：存档二次载入与复合鉴权双模式分流端到端流水线
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_save_secondary_load_and_dual_stream_pipeline.gd
-# 职责: 覆盖「复合鉴权自动注册/登录 ➔ 多世界默认槽位防御 ➔ 边界A/B双模式判定与分流 ➔
-#       世界主页HUD汇聚同步 ➔ ESC呼出菜单 ➔ 优雅停机安全反装配」全生命周期无头断言。
-# 需求源: 路线图规划阶段存档二次载入与复合鉴权双模式分流规范
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 覆盖「复合鉴权自动注册/登录 ➔ 多世界默认槽位防御 ➔ 边界A/B双模式判定与分流 ➔ 世界主页HUD汇聚同步 ➔ ESC呼出菜单 ➔ 优雅停机安全反装配」全生命周期无头断言。 需求源: 路线图规划阶段存档二次载入与复合鉴权双模式分流规范
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：存档二次载入与复合鉴权双模式分流端到端流水线
 # ==============================================================================
+
+## TestSaveSecondaryLoadAndDualStreamPipeline：覆盖「复合鉴权自动注册/登录 ➔ 多世界默认槽位防御 ➔ 边界A/B双模式判定与分流 ➔ 世界主页HUD汇聚同步 ➔ E
 class_name TestSaveSecondaryLoadAndDualStreamPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

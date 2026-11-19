@@ -1,14 +1,17 @@
 # ==============================================================================
-# 单元测试：文字版角色序章执行内核、占位符引擎与后端剧情 i18n
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_prologue_core_and_placeholder_pipeline.gd
-# 职责: 验证角色专属序章上下文隔离（非世界序章）、占位符全量动态解析与缺失
-#       安全降级、新手装备发放幂等保护、后端剧情 i18n 与前端 UI i18n 隔离、
-#       结构化事件流输出与状态解耦（纯事件不指示前端页面）。
-# 需求源: 验收矩阵 TC-PRO-01 ~ TC-PRO-06
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证角色专属序章上下文隔离（非世界序章）、占位符全量动态解析与缺失 安全降级、新手装备发放幂等保护、后端剧情 i18n 与前端 UI i18n 隔离、 结构化事件流输出与状态解耦（纯事件不指示前端页面）。 需求源: 验收矩阵 TC-PRO-01 ~ TC-PRO-06
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：文字版角色序章执行内核、占位符引擎与后端剧情 i18n
 # ==============================================================================
+
+## TestPrologueCoreAndPlaceholderPipeline：验证角色专属序章上下文隔离（非世界序章）、占位符全量动态解析与缺失 安全降级、新手装备发放幂等保护、后端剧情 i18n 
 class_name TestPrologueCoreAndPlaceholderPipeline
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

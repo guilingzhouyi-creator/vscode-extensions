@@ -2,13 +2,9 @@
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd
 # 架构定位: Integration Test Pipeline / World MOD Lock Lifecycle & Drift Detection
-# 依赖与触发: 上游: TestRegistry | 下游: WorldCharacterCreationOrchestrator,
-#           WorldModAffinityManager, SaveLoadRoutingSolver, WorldGatewayFSM,
-#           WorldArchiveRepository, WorldGatewayView
-# 职责说明: 验证单机世界建档固化 world_mod_lock.json 后卸载叠层重进自动恢复、
-#           缺失关键 MOD 阻断、摘要/版本漂移检测拦截、安全降级记录 MOD_DETACHED 与
-#           网关档案诊断面板渲染。
-# 设计依据: 阶段验收矩阵 (TC-WLD-01 ~ TC-WLD-05)
+# 依赖与触发: 上游: TestRegistry | 下游: WorldCharacterCreationOrchestrator, WorldModAffinityManager, SaveLoadRoutingSolver, WorldGatewayFSM, WorldArchiveRepository, WorldGatewayView
+# 职责说明: 验证单机世界建档固化 world_mod_lock.json 后卸载叠层重进自动恢复、 缺失关键 MOD 阻断、摘要/版本漂移检测拦截、安全降级记录 MOD_DETACHED 与 网关档案诊断面板渲染。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-WLD-01 ~ TC-WLD-05)
 # ==============================================================================
 
 ## TestWorldModLockReentryAndDrift：世界档案 MOD 锁重入复原、缺失漂移拦截与安全降级测试套件
@@ -232,7 +228,7 @@ static func test_lock_sha256_fail_closed_and_strict_reconcile() -> Dictionary:
 	var installed := ModPackageDiscoverySolver.scan_installed_full_mod_packages()
 	var bind_degrade := lock_mgr.verify_and_bind_world_mods(LOCKED_WORLD_ID, installed, true)
 	var bind_blocked: bool = not bool(bind_degrade.get("success", true)) \
-		and str(bind_degrade.get("error", "")) == "MOD_ERR_REALM_DIGEST_MISMATCH"
+		and str(bind_degrade.get("error_code", "")) == "MOD_ERR_REALM_DIGEST_MISMATCH"
 
 	var drift_fsm := WorldGatewayFSM.new("ACC_WLD_DRIFT_FC")
 	drift_fsm.enter_gateway()

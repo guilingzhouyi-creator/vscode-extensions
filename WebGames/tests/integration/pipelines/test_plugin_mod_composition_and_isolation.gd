@@ -2,12 +2,9 @@
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_plugin_mod_composition_and_isolation.gd
 # 架构定位: Integration Test Pipeline / Engine Neutrality & MOD Composition
-# 依赖与触发: 上游: TestRegistry | 下游: ModPackageDiscoverySolver,
-#           ModPrecheckAndAdaptationSolver, Tier3ContentOverrideLoader,
-#           PrologueExecutionKernel, AssetPathResolver, AntiBridgeGuard
-# 职责说明: 使用与卡拉尔完全无关的纯合成异世界内容 MOD，验证可组合叠层注入、
-#           DAG 序章推演、环依赖拒载、.kmod 二进制寻址隔离、联机摘要核验与退回归零。
-# 设计依据: 阶段验收矩阵 (TC-PMC-01 ~ TC-PMC-05)
+# 依赖与触发: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, ModPrecheckAndAdaptationSolver, Tier3ContentOverrideLoader, PrologueExecutionKernel, AssetPathResolver, AntiBridgeGuard
+# 职责说明: 使用与卡拉尔完全无关的纯合成异世界内容 MOD，验证可组合叠层注入、 DAG 序章推演、环依赖拒载、.kmod 二进制寻址隔离、联机摘要核验与退回归零。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-PMC-01 ~ TC-PMC-05)
 # ==============================================================================
 
 ## TestPluginModCompositionAndIsolation：纯插件化非卡拉尔 MOD 组合、资产隔离与叠层归零测试套件

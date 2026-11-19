@@ -14,6 +14,7 @@ extends RefCounted
 const TEST_ACCOUNTS_PATH: String = "user://test_chain_accounts/account_registry.json"
 const TEST_WORLDS_ROOT: String = "user://test_chain_worlds/"
 
+## 初始化集成测试沙盒目录与运行时服务容器
 static func setup_env() -> void:
 	teardown_env()
 	GameConfig.ensure_loaded()
@@ -21,6 +22,7 @@ static func setup_env() -> void:
 	AccountRepository.get_instance().set_custom_registry_path(TEST_ACCOUNTS_PATH)
 	WorldArchiveRepository.get_instance().set_custom_root_dir(TEST_WORLDS_ROOT)
 
+## 清理集成测试沙盒残留并释放运行时状态
 static func teardown_env() -> void:
 	WorldSessionRuntimeService.reset_for_tests()
 	HumanControlLeaseManager.reset_for_tests()
@@ -42,6 +44,7 @@ static func teardown_env() -> void:
 			if FileAccess.file_exists(vault_file_path):
 				DirAccess.remove_absolute(vault_file_path)
 
+## 递归删除测试临时目录
 static func remove_test_dir_recursive(dir_path: String) -> void:
 	if not DirAccess.dir_exists_absolute(dir_path):
 		return
@@ -61,6 +64,7 @@ static func remove_test_dir_recursive(dir_path: String) -> void:
 	dir_access.list_dir_end()
 	DirAccess.remove_absolute(dir_path)
 
+## 向测试运行时分发结构化请求指令
 static func dispatch(
 	domain: String,
 	action_type: String,

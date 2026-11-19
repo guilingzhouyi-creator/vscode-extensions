@@ -1,15 +1,17 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_full_lifecycle_chain_and_esc_flow_pipeline.gd
-# 架构定位: Integration Test Pipeline / Acceptance Harness
-# 跨域依赖: 上游: TestRegistry | 下游: account, world_gateway, character_creation, world_state, lifecycle, frontend
+# 架构定位: Integration Test Pipeline / Acceptance Harness 跨域依赖: 上游: TestRegistry | 下游: account, world_gateway, character_creation, world_state, lifecycle, frontend
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 完整生命周期与ESC菜单后端双分流无头集成测试流水线
-# 设计依据: 业务域第一性原理与端到端架构契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务域第一性原理与端到端架构契约
 # ==============================================================================
 
+## TestFullLifecycleChainAndEscFlowPipeline：完整生命周期与ESC菜单后端双分流无头集成测试流水线
 class_name TestFullLifecycleChainAndEscFlowPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	_reset_env()

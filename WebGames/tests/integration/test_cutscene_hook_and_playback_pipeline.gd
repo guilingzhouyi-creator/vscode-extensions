@@ -3,12 +3,11 @@
 # 文件路径: res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 依赖与触发: 上游: TestRegistry | 下游: CutsceneRequestDTO, CutsceneAsyncLoader, CutsceneHookRegistry, CutsceneOrchestrator, CutscenePlayerView, NarrativeDagExecutionEngine
-# 职责说明: 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎端到端验收集成测试套件；
-#           全面断言参数化 DTO、非阻塞流式装载、LRU 缓存、Hook 路由拦截、长按跳过互锁、
-#           无艺术资产时的文字替补演播（Text Fallback）与主线程纯通用调用流程。
-# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
+# 职责说明: 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎端到端验收集成测试套件； 全面断言参数化 DTO、非阻塞流式装载、LRU 缓存、Hook 路由拦截、长按跳过互锁、 无艺术资产时的文字替补演播（Text Fallback）与主线程纯通用调用流程。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestCutsceneHookAndPlaybackPipeline：全域非阻塞 CG 视频播放与剧情通用 Hook 引擎端到端验收集成测试套件； 全面断言参数化 DTO、非阻塞流式装载、L
 class_name TestCutsceneHookAndPlaybackPipeline
 extends TestCase
 
@@ -18,6 +17,7 @@ const CutscenePresenterClass = preload("res://frontend/presentation/common/cutsc
 # 一、测试套件总入口与环境重置
 # ==============================================================================
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_cs_01_request_dto_parameters_and_duplication())

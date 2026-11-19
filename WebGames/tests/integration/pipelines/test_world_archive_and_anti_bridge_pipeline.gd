@@ -1,15 +1,17 @@
 # ==============================================================================
 # 模块归属: 集成测试流水线 (Tests · 自动化测试框架)
 # 文件路径: res://tests/integration/pipelines/test_world_archive_and_anti_bridge_pipeline.gd
-# 架构定位: Integration Test Pipeline / Security & World Archive Harness
-# 跨域依赖: 上游: world_gateway, world_state | 下游: EventBus | 配置: config/domains/world_gateway/core.json
+# 架构定位: Integration Test Pipeline / Security & World Archive Harness 跨域依赖: 上游: world_gateway, world_state | 下游: EventBus | 配置: config/domains/world_gateway/core.json
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 验证单机世界档案独立落盘与自愈、角色死亡世界连续性、模式探针诊断、防越权守卫与全量内存清理
-# 设计依据: 业务域第一性原理与气密级防越权安全验收契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务域第一性原理与气密级防越权安全验收契约
 # ==============================================================================
 
+## TestWorldArchiveAndAntiBridgePipeline：验证单机世界档案独立落盘与自愈、角色死亡世界连续性、模式探针诊断、防越权守卫与全量内存清理
 class_name TestWorldArchiveAndAntiBridgePipeline
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

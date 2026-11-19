@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试流水线 (Tests · 自动化测试基础套件)
 # 文件路径: res://tests/integration/pipelines/test_mod_sdk_and_realm_security_pipeline.gd
-# 架构定位: Integration Test Pipeline / Mod SDK & Realm Security Harness
-# 跨域依赖: 上游: TestRegistry | 下游: AntiBridgeGuard, WorldGatewayFSM, GameModeRoutingSolver | 配置: config/domains/world_gateway/core.json
+# 架构定位: Integration Test Pipeline / Mod SDK & Realm Security Harness 跨域依赖: 上游: TestRegistry | 下游: AntiBridgeGuard, WorldGatewayFSM, GameModeRoutingSolver | 配置: config/domains/world_gateway/core.json
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 自动化全流程测试 MOD 开发者 SDK 同步与联机域安全净化、跨模式防污染与状态对称释放
-# 设计依据: 业务领域第一性原理与气密级防越权安全验收契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务领域第一性原理与气密级防越权安全验收契约
 # ==============================================================================
 
+## TestModSdkAndRealmSecurityPipeline：自动化全流程测试 MOD 开发者 SDK 同步与联机域安全净化、跨模式防污染与状态对称释放
 class_name TestModSdkAndRealmSecurityPipeline
 extends TestCase
 

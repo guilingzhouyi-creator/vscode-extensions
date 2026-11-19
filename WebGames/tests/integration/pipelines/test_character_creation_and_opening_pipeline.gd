@@ -1,14 +1,17 @@
 # ==============================================================================
-# 单元测试：配置驱动角色创建系统升级与开局事件流接入
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_character_creation_and_opening_pipeline.gd
-# 职责: 验证 RaceDefinitionDTO 配置驱动种族元数据、创角顺序状态机防跃迁、
-#       后端权威属性派生防篡改（前端伪造战斗属性零信任丢弃）、首次开档开局事件
-#       流广播、种族扩展灰度拦截，以及世界栏网关到开局叙事全流程无断裂。
-# 需求源: 验收矩阵 TC-CC-01 ~ TC-CC-06
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证 RaceDefinitionDTO 配置驱动种族元数据、创角顺序状态机防跃迁、 后端权威属性派生防篡改（前端伪造战斗属性零信任丢弃）、首次开档开局事件 流广播、种族扩展灰度拦截，以及世界栏网关到开局叙事全流程无断裂。 需求源: 验收矩阵 TC-CC-01 ~ TC-CC-06
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：配置驱动角色创建系统升级与开局事件流接入
 # ==============================================================================
+
+## TestCharacterCreationAndOpeningPipeline：验证 RaceDefinitionDTO 配置驱动种族元数据、创角顺序状态机防跃迁、 后端权威属性派生防篡改（前端伪造战
 class_name TestCharacterCreationAndOpeningPipeline
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

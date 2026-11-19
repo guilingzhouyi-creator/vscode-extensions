@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 战斗双随机与第三时间轴测试套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_combat_dual_random_and_timeline_pipeline.gd
-# 职责: 验收手牌数量随机与牌型抽取解耦、合法0手牌与保活推演、时间轴开局预排期及前端脱敏
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验收手牌数量随机与牌型抽取解耦、合法0手牌与保活推演、时间轴开局预排期及前端脱敏
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 战斗双随机与第三时间轴测试套件
 # ==============================================================================
+
+## TestCombatDualRandomAndTimelinePipeline：验收手牌数量随机与牌型抽取解耦、合法0手牌与保活推演、时间轴开局预排期及前端脱敏
 class_name TestCombatDualRandomAndTimelinePipeline
 extends RefCounted
 
@@ -15,6 +20,7 @@ const CombatRoundCoordinatorClass = preload("res://backend/domains/physics_therm
 const TertiaryTimelineEngineClass = preload("res://backend/domains/physics_thermodynamics/tertiary_timeline_engine.gd")
 const DeterministicRNGClass = preload("res://backend/infrastructure/deterministic_rng.gd")
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name := "战斗抽牌数量随机与第三时间轴事件调度重构验收流水线"

@@ -2,14 +2,9 @@
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd
 # 架构定位: Integration Test Pipeline / Headless Full-Chain Clickable Real UI Verification
-# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator(mode="real"), NavManager, AppRoot,
-#           AccountEntryView, WorldGatewayView, CharacterCreationView, PrologueView, MainHUDView,
-#           WorldModAffinityManager
-# 职责说明: 在无头 SceneTree 中以真实 UI 信号点击与 service_mode="real" 验证完整玩家路径：
-#           自动登录注册(零伪令牌) -> 世界网关建档 -> 自动分流 CharacterCreationView ->
-#           权威创角锁定(真实64位SHA256) -> DAG序章 -> MainHUD -> ESC返关(栈深=1/保上下文) ->
-#           NavManager.pop_screen 参数保真 -> 切换联机清除 SP MOD -> 验签 -> 优雅停机 -> 重进已有角色直入。
-# 设计依据: 阶段验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03)
+# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator(mode="real"), NavManager, AppRoot, AccountEntryView, WorldGatewayView, CharacterCreationView, PrologueView, MainHUDView, WorldModAffinityManager
+# 职责说明: 在无头 SceneTree 中以真实 UI 信号点击与 service_mode="real" 验证完整玩家路径： 自动登录注册(零伪令牌) -> 世界网关建档 -> 自动分流 CharacterCreationView -> 权威创角锁定(真实64位SHA256) -> DAG序章 -> MainHUD -> ESC返关(栈深=1/保上下文) -> NavManager.pop_screen 参数保真 -> 切换联机清除 SP MOD -> 验签 -> 优雅停机 -> 重进已有角色直入。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03)
 # ==============================================================================
 
 ## TestRealUiChainAndLockSecurityPipeline：全端可点击 UI 真实流程回归套件

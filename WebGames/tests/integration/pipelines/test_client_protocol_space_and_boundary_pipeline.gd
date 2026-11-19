@@ -13,9 +13,11 @@
 # 退出语义与设计依据: 客户端交互协议空间规约 (TC-PROTO-01 ~ TC-PROTO-10, ADV-PRF-002)
 # ==============================================================================
 
+## TestClientProtocolSpaceAndBoundaryPipeline：客户端交互协议空间标准化与边界适配器验收流水线，
 class_name TestClientProtocolSpaceAndBoundaryPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_proto_01_real_auth_lifecycle_and_session_activation())

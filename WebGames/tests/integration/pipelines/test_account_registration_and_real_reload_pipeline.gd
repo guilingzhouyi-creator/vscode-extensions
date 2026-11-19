@@ -10,12 +10,14 @@
 # 退出语义与设计依据: 注册与持久化恢复规约与卡拉尔世界引擎前后端解耦规范
 # ==============================================================================
 
+## TestAccountRegistrationAndRealReloadPipeline：注册页后端校验、原子持久化落盘与二次重载插槽恢复全流程验收流水线。
 class_name TestAccountRegistrationAndRealReloadPipeline
 extends TestCase
 
 const TEST_ACCOUNTS_DIR: String = "user://test_reload_accounts"
 const TEST_ACCOUNTS_PATH: String = TEST_ACCOUNTS_DIR + "/account_registry.json"
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_arr_01_registration_form_boundary_validation())

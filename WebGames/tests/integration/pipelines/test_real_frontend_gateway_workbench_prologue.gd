@@ -2,12 +2,9 @@
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_real_frontend_gateway_workbench_prologue.gd
 # 架构定位: Integration Test Pipeline / Headless Full-Stack Real UI Walkthrough
-# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator (mode="real"), NavManager,
-#           AppRoot, AccountEntryView, WorldGatewayView, ModWorkbenchScreen, PrologueView
-# 职责说明: 在真实无头 SceneTree 中实例化全套前端视图场景并开启 service_mode = "real"，
-#           端到端驱动 注册/登录 ➔ 世界网关刷新 ➔ MOD 工坊启停预检 ➔ 建档创角 ➔
-#           交互式 DAG 序章分支推演 ➔ 主页 HUD 交接 ➔ ESC 清理注销与全节点回收。
-# 设计依据: 阶段验收矩阵 (TC-FGP-01 ~ TC-FGP-05)
+# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator (mode="real"), NavManager, AppRoot, AccountEntryView, WorldGatewayView, ModWorkbenchScreen, PrologueView
+# 职责说明: 在真实无头 SceneTree 中实例化全套前端视图场景并开启 service_mode = "real"， 端到端驱动 注册/登录 ➔ 世界网关刷新 ➔ MOD 工坊启停预检 ➔ 建档创角 ➔ 交互式 DAG 序章分支推演 ➔ 主页 HUD 交接 ➔ ESC 清理注销与全节点回收。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-FGP-01 ~ TC-FGP-05)
 # ==============================================================================
 
 ## TestRealFrontendGatewayWorkbenchPrologue：真实前端视图 + service_mode="real" 全链无头推演测试套件

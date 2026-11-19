@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试层 (Integration · 全目录MOD磁盘加载与Agent无头试玩流水线)
 # 文件路径: res://tests/integration/pipelines/test_full_mod_disk_and_playthrough_pipeline.gd
-# 架构定位: Integration Test Suite / End-to-End Pipeline Harness
-# 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, WorldGatewayFSM, PrologueExecutionKernel, ModPrecheckAndAdaptationSolver, ProloguePlaceholderResolver | 配置: config/domains/*.json | 信号: 无直接监听
+# 架构定位: Integration Test Suite / End-to-End Pipeline Harness 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, WorldGatewayFSM, PrologueExecutionKernel, ModPrecheckAndAdaptationSolver, ProloguePlaceholderResolver | 配置: config/domains/*.json | 信号: 无直接监听
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 端到端验证磁盘五件套模板聚合与双态Schema归一化、网关单机一键磁盘发现与挂载、悬空序章与套件跨表拦截、内联文本语法糖与大小写占位符展开、后端无头试玩推演与因果突变结算流程、以及Python工具链同构等价性。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (全目录MOD磁盘发现与推演内核架构规范)
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (全目录MOD磁盘发现与推演内核架构规范)
 # ==============================================================================
 
+## TestFullModDiskAndPlaythroughPipeline：端到端验证磁盘五件套模板聚合与双态Schema归一化、网关单机一键磁盘发现与挂载、悬空序章与套件跨表拦截、内联文本语法糖
 class_name TestFullModDiskAndPlaythroughPipeline
 extends TestCase
 

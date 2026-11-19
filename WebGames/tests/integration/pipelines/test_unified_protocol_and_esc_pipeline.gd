@@ -1,15 +1,17 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd
-# 架构定位: Integration Test Pipeline / Acceptance Harness
-# 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, lifecycle, frontend/systems
+# 架构定位: Integration Test Pipeline / Acceptance Harness 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, lifecycle, frontend/systems
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 统一协议工厂、双模式租约抢占、HUD 事件桥接与 ESC 菜单端到端无头验收套件
-# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestUnifiedProtocolAndEscPipeline：统一协议工厂、双模式租约抢占、HUD 事件桥接与 ESC 菜单端到端无头验收套件
 class_name TestUnifiedProtocolAndEscPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_upe_01_protocol_factory_packing_roundtrip())

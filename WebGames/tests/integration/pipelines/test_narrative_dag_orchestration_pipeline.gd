@@ -1,11 +1,17 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 通用剧情因果 DAG 编排与多角色差异化序章测试套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_narrative_dag_orchestration_pipeline.gd
-# 职责: 验证 DAG 静态拓扑排序、循环依赖环拦截、汇聚等待、条件分支、多角色路由与全生命周期流转
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证 DAG 静态拓扑排序、循环依赖环拦截、汇聚等待、条件分支、多角色路由与全生命周期流转
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 通用剧情因果 DAG 编排与多角色差异化序章测试套件
 # ==============================================================================
+
+## TestNarrativeDagOrchestrationPipeline：验证 DAG 静态拓扑排序、循环依赖环拦截、汇聚等待、条件分支、多角色路由与全生命周期流转
 class_name TestNarrativeDagOrchestrationPipeline
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

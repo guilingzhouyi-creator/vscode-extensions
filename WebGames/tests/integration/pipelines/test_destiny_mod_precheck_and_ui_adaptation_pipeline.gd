@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试层 (Integration · 单机显性MOD预检与命途UI多包列表适配流水线)
 # 文件路径: res://tests/integration/pipelines/test_destiny_mod_precheck_and_ui_adaptation_pipeline.gd
-# 架构定位: Integration Test Suite / End-to-End Pipeline Harness
-# 跨域依赖: 上游: TestRegistry | 下游: ModPrecheckAndAdaptationSolver, WorldGatewayFSM, WorldCharacterCreationOrchestrator, AccountEntryView, SnapshotInjectionSolver, PrologueDagRegistry, WorldModAffinityManager | 配置: config/domains/*.json | 信号: 无直接监听
+# 架构定位: Integration Test Suite / End-to-End Pipeline Harness 跨域依赖: 上游: TestRegistry | 下游: ModPrecheckAndAdaptationSolver, WorldGatewayFSM, WorldCharacterCreationOrchestrator, AccountEntryView, SnapshotInjectionSolver, PrologueDagRegistry, WorldModAffinityManager | 配置: config/domains/*.json | 信号: 无直接监听
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 端到端验证单机显性MOD合规预检拦截、多MOD列表协同合并、冲突检测阻断、前端AccountEntryView受控UI解锁与载荷构建、后端受控权威创角与初始装备入包及序章路由与世界锁前置固化、以及SnapshotInjectionSolver虚拟MOD注入装配与对称清理。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestDestinyModPrecheckAndUiAdaptationPipeline：端到端验证单机显性MOD合规预检拦截、多MOD列表协同合并、冲突检测阻断、前端AccountEntryView受控UI解
 class_name TestDestinyModPrecheckAndUiAdaptationPipeline
 extends TestCase
 

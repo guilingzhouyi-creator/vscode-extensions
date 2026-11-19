@@ -2,13 +2,9 @@
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd
 # 架构定位: Integration Test Pipeline / Neutrality, Real Services & Gates Pipeline
-# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator, RealServiceContainer,
-#           ItemRegistrySolver, ModPackageDiscoverySolver, ModPrecheckAndAdaptationSolver,
-#           GameConfig, NavManager, UIIntermediary
-# 职责说明: 端到端验证全领域 21 项真实服务无模拟回退、多命名空间物品格式、
-#           基座配置去卡拉尔中性化与 views.json 视图段完整性、total_conversion_sample
-#           与 official_kalar 哈希自洽、以及前端单例 teardown 零孤立节点泄漏。
-# 设计依据: 阶段验收矩阵 (TC-NEUT-01 ~ TC-NEUT-04)
+# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator, RealServiceContainer, ItemRegistrySolver, ModPackageDiscoverySolver, ModPrecheckAndAdaptationSolver, GameConfig, NavManager, UIIntermediary
+# 职责说明: 端到端验证全领域 21 项真实服务无模拟回退、多命名空间物品格式、 基座配置去卡拉尔中性化与 views.json 视图段完整性、total_conversion_sample 与 official_kalar 哈希自洽、以及前端单例 teardown 零孤立节点泄漏。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-NEUT-01 ~ TC-NEUT-04)
 # ==============================================================================
 
 ## TestNeutralitySdkAndGatesPipeline：全领域真实服务、基础中性化与门禁校验流水线

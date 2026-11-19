@@ -1,13 +1,17 @@
 # ==============================================================================
-# 单元测试：快照测试工程模式与全域数据流插桩端到端流水线
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_snapshot_engineering_harness_pipeline.gd
-# 职责: 覆盖快照 DTO 往返、环境守卫熔断、典型快照目录、链式 Builder 构造、
-#       全域状态实体装配、HUD 状态就绪、现场冻结抓取与对称清理反装配全生命周期。
-# 需求源: 路线图规划阶段快照测试工程模式与数据插桩流水线规范
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 覆盖快照 DTO 往返、环境守卫熔断、典型快照目录、链式 Builder 构造、 全域状态实体装配、HUD 状态就绪、现场冻结抓取与对称清理反装配全生命周期。 需求源: 路线图规划阶段快照测试工程模式与数据插桩流水线规范
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：快照测试工程模式与全域数据流插桩端到端流水线
 # ==============================================================================
+
+## TestSnapshotEngineeringHarnessPipeline：覆盖快照 DTO 往返、环境守卫熔断、典型快照目录、链式 Builder 构造、 全域状态实体装配、HUD 状态就绪、现
 class_name TestSnapshotEngineeringHarnessPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_snapshot_dto_round_trip_and_reset())

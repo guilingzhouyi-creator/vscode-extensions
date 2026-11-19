@@ -1,16 +1,17 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_agent_telemetry_high_throughput_pipeline.gd
-# 架构定位: Integration Test Pipeline / High Throughput Benchmark Harness
-# 跨域依赖: 上游: TestRegistry | 下游: world_state, narrative_orchestration | 配置: config/domains/world_state/core.json
-# 职责说明: Agent 遥测高频推演基准、深度对象池守恒与紧凑二进制流验收测试流水线。
-#           覆盖 TC-ATH-01 ~ TC-ATH-10，验证对象池借还守恒、原位求解零堆分配、环形轨迹回溯、WorkerThreadPool 异步背压与二进制无损编解码。
-# 设计依据: 高频推演基准与零瞬态堆分配验收测试矩阵 (Inv-DEEP-POOL-CONSERVATION-1, Inv-RING-BUFFER-BOUNDED-2, Inv-BINARY-ROUNDTRIP-LOSSLESS-3)
+# 架构定位: Integration Test Pipeline / High Throughput Benchmark Harness 跨域依赖: 上游: TestRegistry | 下游: world_state, narrative_orchestration | 配置: config/domains/world_state/core.json
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: Agent 遥测高频推演基准、深度对象池守恒与紧凑二进制流验收测试流水线。 覆盖 TC-ATH-01 ~ TC-ATH-10，验证对象池借还守恒、原位求解零堆分配、环形轨迹回溯、WorkerThreadPool 异步背压与二进制无损编解码。
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 高频推演基准与零瞬态堆分配验收测试矩阵 (Inv-DEEP-POOL-CONSERVATION-1, Inv-RING-BUFFER-BOUNDED-2, Inv-BINARY-ROUNDTRIP-LOSSLESS-3)
 # ==============================================================================
 
+## TestAgentTelemetryHighThroughputPipeline：Agent 遥测高频推演基准、深度对象池守恒与紧凑二进制流验收测试流水线。 覆盖 TC-ATH-01 ~ TC-ATH-
 class_name TestAgentTelemetryHighThroughputPipeline
 extends TestCase
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_deep_object_pool_conservation_and_preallocation())
@@ -314,7 +315,7 @@ static func test_binary_telemetry_size_budget_and_compression_ratio() -> Diction
 	return TestCase.make_result("test_binary_telemetry_size_budget_and_compression_ratio", true)
 
 ## -----------------------------------------------------------------------------
-## TC-ATH-10: 伴侣观察总线重构平滑向前兼容性验证 (Inv-SEAMLESS-COMPATIBILITY-1)
+## TC-ATH-10: 伴侣观察总线 O(1) 环形覆盖与顺序分发验证 (Inv-OBSERVER-BUS-FORWARD-1)
 ## -----------------------------------------------------------------------------
 static func test_companion_observer_bus_refactor_backward_compatibility() -> Dictionary:
 	CompanionObserverBus.reset_for_tests()
@@ -325,7 +326,7 @@ static func test_companion_observer_bus_refactor_backward_compatibility() -> Dic
 		received_events.append(ev_type)
 	)
 
-	# 广播 50 条事件测试 O(1) 滚动覆盖与向前兼容
+	# 广播 50 条事件测试 O(1) 滚动覆盖与观察者回调顺序分发
 	for i in range(1, 51):
 		bus.broadcast_event("test_step_%d" % i, {"step": i})
 

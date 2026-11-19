@@ -3,6 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_companion_ipc_and_hot_reload_pipeline.gd
 # 架构定位: 跨进程回环 IPC 协议、MOD 热重载回滚与工坊增删改端到端集成测试套件
 # 依赖与触发: 上游: TestRegistry | 下游: CompanionIPCServer, ModHotReloadSolver, WorldModLifecycleHelper
+# 职责说明: test_companion_ipc_and_hot_reload_pipeline 测试套件与断言验证
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: test_companion_ipc_and_hot_reload_pipeline 测试契约
 # ==============================================================================
 
 ## 跨进程伴侣 IPC 回环、MOD 热重载原子回滚与生命周期增删改端到端测试套件
@@ -10,6 +12,7 @@ class_name TestCompanionIpcAndHotReloadPipeline
 extends RefCounted
 
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var outcomes: Array[Dictionary] = [
 		_test_loopback_ipc_handshake_and_session(),

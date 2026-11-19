@@ -1,14 +1,20 @@
 # ==============================================================================
-# 单元测试：灰度发布版本编排与底层动态更新流水线测试套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_version_governance_pipeline.gd
-# 职责: 验证灰度分群、动态 PCK 挂载、版本激活门禁、单机/联机双模式隔离与端到端推送信道
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证灰度分群、动态 PCK 挂载、版本激活门禁、单机/联机双模式隔离与端到端推送信道
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：灰度发布版本编排与底层动态更新流水线测试套件
 # ==============================================================================
+
+## TestVersionGovernancePipeline：验证灰度分群、动态 PCK 挂载、版本激活门禁、单机/联机双模式隔离与端到端推送信道
 class_name TestVersionGovernancePipeline
 extends RefCounted
 
 # ==============================================================================
 # 测试运行总入口 (10 项第一性原理严格断言)
 # ==============================================================================
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_single_player_unauthorized_startup_blocking())
@@ -117,7 +123,7 @@ static func _test_patch_sha256_tamper_rejection() -> Dictionary:
 	var res := PatchIntegrityVerifier.verify_file_sha256("res://project.godot", fake_hash)
 	if res.get("success", true):
 		return {"test": tname, "name": tname, "passed": false, "message": "篡改哈希竟然通过了校验！"}
-	if res.get("error", "") != "HASH_MISMATCH":
+	if res.get("error_code", "") != "HASH_MISMATCH":
 		return {"test": tname, "name": tname, "passed": false, "message": "哈希不匹配错误标识异常"}
 
 	return {"test": tname, "name": tname, "passed": true, "message": "流式 SHA-256 硬件加速校验防篡改生效"}

@@ -1,15 +1,19 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 全域结构化日志改造升级测试套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_structured_log_pipeline.gd
-# 职责: 验收全域结构化日志模型（StructuredLogRecord）、脱敏引擎（RedactionRule）、
-#       遥测聚合（TelemetryAggregate）、多维检索（LogQueryService）、环形缓冲
-#       与保留期清理等核心组件及全域不变量（Inv-LS-1 ~ Inv-LS-5）。
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验收全域结构化日志模型（StructuredLogRecord）、脱敏引擎（RedactionRule）、 遥测聚合（TelemetryAggregate）、多维检索（LogQueryService）、环形缓冲 与保留期清理等核心组件及全域不变量（Inv-LS-1 ~ Inv-LS-5）。
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 全域结构化日志改造升级测试套件
 # ==============================================================================
+
+## TestStructuredLogPipeline：验收全域结构化日志模型（StructuredLogRecord）、脱敏引擎（RedactionRule）、 遥测聚合（T
 class_name TestStructuredLogPipeline
 extends RefCounted
 
 
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name := "后端全域系统日志改造升级全量验收流水线"

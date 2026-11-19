@@ -1,16 +1,18 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd
-# 架构定位: Integration Test Pipeline / Mod SDK Developer Ergonomics Harness
-# 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, persistence_protocol, lifecycle
+# 架构定位: Integration Test Pipeline / Mod SDK Developer Ergonomics Harness 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, persistence_protocol, lifecycle
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: MOD 开发者便利套件协议同步与调试推演端到端流水线 (TC-MDE-01 ~ TC-MDE-08)
-# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestModSdkDeveloperErgonomicsPipeline：MOD 开发者便利套件协议同步与调试推演端到端流水线 (TC-MDE-01 ~ TC-MDE-08)
 class_name TestModSdkDeveloperErgonomicsPipeline
 extends TestCase
 
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_mde_01_mod_sdk_drift_free_audit())

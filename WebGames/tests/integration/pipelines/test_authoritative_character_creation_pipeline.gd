@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试层 (Integration · 角色创建与时空装配流水线)
 # 文件路径: res://tests/integration/pipelines/test_authoritative_character_creation_pipeline.gd
-# 架构定位: Integration Test Suite / Pipeline Harness
-# 跨域依赖: 上游: TestRegistry | 下游: WorldCharacterCreationOrchestrator, WorldArchiveRepository, AccountRepository, SaveDataAccessLayer, WorldGatewayFSM | 配置: config/domains/*.json | 信号: 无直接监听
+# 架构定位: Integration Test Suite / Pipeline Harness 跨域依赖: 上游: TestRegistry | 下游: WorldCharacterCreationOrchestrator, WorldArchiveRepository, AccountRepository, SaveDataAccessLayer, WorldGatewayFSM | 配置: config/domains/*.json | 信号: 无直接监听
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 自动化端到端测试世界内角色权威创建流水线。覆盖纯名字权威解算、前端篡改防御、全景呈现快照契约、背包装备实体装配、世界历史片段单调追加及网关状态机自动回挂跃迁。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestAuthoritativeCharacterCreationPipeline：自动化端到端测试世界内角色权威创建流水线。覆盖纯名字权威解算、前端篡改防御、全景呈现快照契约、背包装备实体装配、世界历史
 class_name TestAuthoritativeCharacterCreationPipeline
 extends TestCase
 

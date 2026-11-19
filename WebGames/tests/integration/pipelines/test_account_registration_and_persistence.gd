@@ -1,15 +1,17 @@
 # ==============================================================================
 # 模块归属: 测试框架层 (Tests · 集成测试流水线 (Integration Pipelines))
 # 文件路径: res://tests/integration/pipelines/test_account_registration_and_persistence.gd
-# 架构定位: Integration Pipeline Test Suite
-# 跨域依赖: 上游: AuthService, AccountRepository | 下游: TestCase, AccountProfile
+# 架构定位: Integration Pipeline Test Suite 跨域依赖: 上游: AuthService, AccountRepository | 下游: TestCase, AccountProfile
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 覆盖账号标准注册物理落盘、冷启动恢复自愈、大小写不敏感查重拦截、复合鉴权自动注册并持久化、历史空盐重铸在持久化仓储中的原子更新以及账号删除与双层索引清理全生命周期断言。
-# 设计依据: 业务域第一性原理 / 账号物理仓储与持久化落盘引擎规范
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 业务域第一性原理 / 账号物理仓储与持久化落盘引擎规范
 # ==============================================================================
 
+## TestAccountRegistrationAndPersistence：覆盖账号标准注册物理落盘、冷启动恢复自愈、大小写不敏感查重拦截、复合鉴权自动注册并持久化、历史空盐重铸在持久化仓储中的原
 class_name TestAccountRegistrationAndPersistence
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_arp_01_registration_and_persistence_roundtrip())

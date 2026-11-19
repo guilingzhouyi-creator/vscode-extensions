@@ -1,10 +1,10 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_tier3_content_override_pipeline.gd
-# 架构定位: Integration Test Suite / Tier 3 Differential Loader & Diagnostics Harness
-# 跨域依赖: 上游: TestRegistry | 下游: TestTier3ContentOverrideHelper, ModManifestValidator, ModPackageDiscoverySolver, Tier3ContentOverrideLoader, GameConfig, ItemLoaderPipeline, PhysicalVerbRegistry, WorldGatewayFSM | 配置: config/domains/*.json | 信号: config.mod_overlay_applied, config.mod_overlay_cleared
+# 架构定位: Integration Test Suite / Tier 3 Differential Loader & Diagnostics Harness 跨域依赖: 上游: TestRegistry | 下游: TestTier3ContentOverrideHelper, ModManifestValidator, ModPackageDiscoverySolver, Tier3ContentOverrideLoader, GameConfig, ItemLoaderPipeline, PhysicalVerbRegistry, WorldGatewayFSM | 配置: config/domains/*.json | 信号: config.mod_overlay_applied, config.mod_overlay_cleared
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 端到端验证 MOD 清单结构化诊断（属性键白名单/包内重名/独立特质一致性）、统一多级 mods/ 磁盘发现优先级、Tier 3 content/ 在三种覆盖策略下的运行时覆盖效应，以及网关卸载或退出时向基础配置的原子回退。
-# 设计依据: 阶段验收矩阵 (TC-T3MOD-01 ~ TC-T3MOD-06) 与非破坏性覆盖契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收矩阵 (TC-T3MOD-01 ~ TC-T3MOD-06) 与非破坏性覆盖契约
 # ==============================================================================
 
 ## TestTier3ContentOverridePipeline：Tier 3 content/ 运行时差分覆盖与诊断测试套件

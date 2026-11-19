@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 契约注册表端到端验收套件
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_contract_registry_pipeline.gd
-# 职责: 覆盖契约注册表数据模型、解析器三算法、完整性守卫与 CI 门禁四大维度
-#       实现 S1(12) + S2(14) + S3(8) + S4(12) = 46 条端到端断言，达成 100% 验收
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 覆盖契约注册表数据模型、解析器三算法、完整性守卫与 CI 门禁四大维度 实现 S1(12) + S2(14) + S3(8) + S4(12) = 46 条端到端断言，达成 100% 验收
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 契约注册表端到端验收套件
 # ==============================================================================
+
+## TestContractRegistryPipeline：覆盖契约注册表数据模型、解析器三算法、完整性守卫与 CI 门禁四大维度 实现 S1(12) + S2(14) + S3(
 class_name TestContractRegistryPipeline
 extends RefCounted
 
@@ -19,6 +23,7 @@ const FactoryClass = preload("res://tests/fixtures/factories/contract_registry_f
 const EXPECTED_ENTRY_COUNT: int = 49
 
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 
@@ -283,7 +288,7 @@ static func test_s2_04_dto_cast_transform_with_clamp() -> Dictionary:
 static func test_s2_05_non_dto_endpoint_error() -> Dictionary:
 	var entry = FactoryClass.create_valid_event_entry("CT-S2-05")
 	var res: Dictionary = ParserClass.resolve_dto_mapping({}, entry)
-	var ok: bool = (String(res.get("error", "")) == "CT_ERR_SCHEMA_INVALID")
+	var ok: bool = (String(res.get("error_code", "")) == "CT_ERR_SCHEMA_INVALID")
 	return {"test": "TC-CT-S2-05: 非 DTO 条目传入解析器返回类型错误", "passed": ok}
 
 

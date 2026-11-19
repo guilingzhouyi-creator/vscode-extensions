@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 集成测试层 (Integration · Agent全流程推演与开发者工作台流水线)
 # 文件路径: res://tests/integration/pipelines/test_agent_full_playthrough_and_workbench_pipeline.gd
-# 架构定位: Integration Test Suite / End-to-End Pipeline Harness
-# 跨域依赖: 上游: TestRegistry | 下游: ModManifestValidator, WorldGatewayFSM, PrologueHandoffDTO, AccountSlotCreationDTO, AgentPlaythroughSession, CompositeEventExtractor
+# 架构定位: Integration Test Suite / End-to-End Pipeline Harness 跨域依赖: 上游: TestRegistry | 下游: ModManifestValidator, WorldGatewayFSM, PrologueHandoffDTO, AccountSlotCreationDTO, AgentPlaythroughSession, CompositeEventExtractor
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
 # 职责说明: 开发者集成工作台、.kmod 清单审计、创角参数收敛、序章大地图跃迁与循环零瞬态堆分配端到端回归套件
-# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
+# 退出语义与设计依据: 退出码: 返回全量断言结果 | 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TestAgentFullPlaythroughAndWorkbenchPipeline：开发者集成工作台、.kmod 清单审计、创角参数收敛、序章大地图跃迁与循环零瞬态堆分配端到端回归套件
 class_name TestAgentFullPlaythroughAndWorkbenchPipeline
 extends TestCase
 
@@ -14,6 +15,7 @@ extends TestCase
 # 一、测试套件总入口与环境重置
 # ==============================================================================
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_afw_01_mod_manifest_validator_and_bundle_contract())

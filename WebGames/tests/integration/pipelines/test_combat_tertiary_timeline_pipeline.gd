@@ -1,13 +1,17 @@
 # ==============================================================================
-# 测试领域：核心战斗逻辑与第三时间轴动态博弈体系
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_combat_tertiary_timeline_pipeline.gd
-# 职责: 验证综合先手评估求解器、第三时间轴推演引擎、待发栏满载溢出缓冲、
-#       小回合生命周期无缝继承、确定性重放审计与配置热更回退。
-# 需求源: 核心战斗验收矩阵
+# 架构定位: End-to-End Integration Test Pipeline
+# 依赖与触发: 触发方: TestRegistry / test_runner | 上游: backend/, frontend/ | 下游: tests/reports/
+# 职责说明: 验证综合先手评估求解器、第三时间轴推演引擎、待发栏满载溢出缓冲、 小回合生命周期无缝继承、确定性重放审计与配置热更回退。 需求源: 核心战斗验收矩阵
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 测试领域：核心战斗逻辑与第三时间轴动态博弈体系
 # ==============================================================================
+
+## TestCombatTertiaryTimelinePipeline：验证综合先手评估求解器、第三时间轴推演引擎、待发栏满载溢出缓冲、 小回合生命周期无缝继承、确定性重放审计与配置热更回退。
 class_name TestCombatTertiaryTimelinePipeline
 extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_initiative_calculation())
