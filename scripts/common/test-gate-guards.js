@@ -867,7 +867,100 @@ check(
   })(),
 );
 
-const failures = results.filter((r) => !r.ok).length;if (failures > 0) {
+// --- 标准化门禁原语负向自证（步超时边界 / 单步失败信封净化 / 通用 CLI 标志对齐）---
+const STEP_REGISTRY = require('./gate-step-registry');
+const FAILURE_CONTRACT = require('./gate-failure-contract');
+
+check(
+  'step registry timeout validator accepts positive integers and omitted values',
+  (() => {
+    const validDoc = {
+      entries: {
+        probe: {
+          steps: [
+            { id: 'PROBE-STEP-01', title: 'step one', ruleId: 'GUARD-SYS-001', timeoutSeconds: 45 },
+            { id: 'PROBE-STEP-02', title: 'step two', ruleId: 'GUARD-SYS-001' },
+          ],
+        },
+      },
+    };
+    const docAudit = STEP_REGISTRY.auditRegistryDoc(validDoc, new Set(['GUARD-SYS-001']));
+    return (
+      STEP_REGISTRY.validateStepTimeout({ timeoutSeconds: 30 }) &&
+      STEP_REGISTRY.validateStepTimeout({}) &&
+      docAudit.valid &&
+      docAudit.errors.length === 0
+    );
+  })(),
+);
+
+check(
+  'step registry timeout validator rejects 0, -5, 1.5, and "30"',
+  (() => {
+    const invalidTimeouts = [0, -5, 1.5, '30'];
+    const directRejected = invalidTimeouts.every((val) => !STEP_REGISTRY.validateStepTimeout({ timeoutSeconds: val }));
+    const docRejected = invalidTimeouts.every((val) => {
+      const doc = {
+        entries: {
+          probe: {
+            steps: [{ id: 'PROBE-STEP-01', title: 'bad timeout', ruleId: 'GUARD-SYS-001', timeoutSeconds: val }],
+          },
+        },
+      };
+      const res = STEP_REGISTRY.auditRegistryDoc(doc, new Set(['GUARD-SYS-001']));
+      return !res.valid && res.errors.some((e) => e.includes('timeoutSeconds'));
+    });
+    return directRejected && docRejected;
+  })(),
+);
+
+check(
+  'failure contract single-step envelope strips ANSI, sanitizes drive paths, and pins schema fields',
+  (() => {
+    const driveSample = 'C' + ':\\workspace\\proj\\demo\\file.js';
+    const env = FAILURE_CONTRACT.buildSingleStepFailureEnvelope({
+      gate: 'pre-push',
+      stepId: 'PROBE-STEP-01',
+      ruleId: 'GUARD-SYS-001',
+      command: `node ${driveSample}`,
+      summary: `\u001b[31mFailure\u001b[39m in ${driveSample}`,
+      actionableFix: `\u001b[33mInspect\u001b[39m ${driveSample}`,
+      targetFiles: [driveSample],
+    });
+    return (
+      env.protocolVersion === '1.0.0' &&
+      env.step === 'PROBE-STEP-01' &&
+      env.step === env.stepId &&
+      !env.summary.includes('\u001b[') &&
+      !env.violations[0].actionableFix.includes('\u001b[') &&
+      !env.summary.includes('C' + ':') &&
+      !env.failedCommand.includes('C' + ':') &&
+      env.agentDirectives.targetFiles.length === 1 &&
+      env.agentDirectives.targetFiles[0].startsWith('<workspace>/')
+    );
+  })(),
+);
+
+check(
+  'isomorphism guard catches missing universal Help or ViewLog flag on a root gate pair',
+  (() => {
+    const psAll = '[switch]$Agent\n[switch]$Json\n[switch]$ViewLog\n[switch]$Fast\n[switch]$Help\n';
+    const psNoHelp = '[switch]$Agent\n[switch]$Json\n[switch]$ViewLog\n[switch]$Fast\n';
+    const shAll = '--agent --json --view-log --fast --help';
+    const shNoViewLog = '--agent --json --fast --help';
+    const missingHelp = ISOMORPHISM.auditFlagAlignment('pre-commit-gate', psNoHelp, shAll);
+    const missingViewLog = ISOMORPHISM.auditFlagAlignment('pre-commit-gate', psAll, shNoViewLog);
+    const clean = ISOMORPHISM.auditFlagAlignment('pre-commit-gate', psAll, shAll);
+    return (
+      missingHelp.some((err) => err.includes("'Help'")) &&
+      missingViewLog.some((err) => err.includes("'ViewLog'")) &&
+      clean.length === 0
+    );
+  })(),
+);
+
+const failures = results.filter((r) => !r.ok).length;
+if (failures > 0) {
   console.error(`✖ BLOCK  ${failures} guard assertion(s) did not hold`);
   process.exit(1);
 }

@@ -430,6 +430,73 @@ function compareCargoMissingBash() {
 }
 
 /**
+ * Executes a gate command and captures its exit status and combined stdout/stderr text.
+ *
+ * @param {string} command - Executable name or path.
+ * @param {string[]} args - CLI arguments.
+ * @returns {{ status: number, output: string }} Exit status (-1 on spawn failure) and output.
+ */
+function runGateProbe(command, args) {
+  const result = spawnSync(command, args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: makeGateEnv(),
+  });
+  if (result.error) return { status: -1, output: String(result.error.message || '') };
+  return {
+    status: result.status === null ? -1 : result.status,
+    output: `${result.stdout || ''}${result.stderr || ''}`,
+  };
+}
+
+/**
+ * Verifies `-Help` / `--help` parity across all four root gate pairs.
+ *
+ * @param {boolean} hasPwsh - Whether pwsh runtime is available.
+ * @returns {boolean} True when every root gate exits 0 with non-empty usage output.
+ */
+function compareHelpParity(hasPwsh) {
+  const gates = ['pre-commit-gate', 'commit-msg-gate', 'pre-push-gate', 'audit-all'];
+  let allPassed = true;
+  for (const gate of gates) {
+    const sh = runGateProbe(POSIX_SHELL, [`scripts/sh/${gate}.sh`, '--help']);
+    const shOk = sh.status === 0 && sh.output.trim().length > 0;
+    const ps = hasPwsh ? runGateProbe('pwsh', ['-NoProfile', '-File', `scripts/ps1/${gate}.ps1`, '-Help']) : null;
+    const psOk = ps === null || (ps.status === 0 && ps.output.trim().length > 0);
+    const ok = shOk && psOk;
+    const pwshTag = ps === null ? '' : ` pwsh=${ps.status}`;
+    console.log(`help-parity ${gate}: bash=${sh.status}${pwshTag} ${ok ? '✔ PASS' : '✖ BLOCK'}`);
+    if (!ok) allPassed = false;
+  }
+  return allPassed;
+}
+
+/**
+ * Verifies `pre-push-gate` fails closed with `BLOCK` on an invalid commit range across runtimes.
+ *
+ * @param {boolean} hasPwsh - Whether pwsh runtime is available.
+ * @returns {boolean} True when both implementations reject the invalid range with `BLOCK`.
+ */
+function comparePrePushInvalidRangeParity(hasPwsh) {
+  const sh = runGateProbe(POSIX_SHELL, [
+    'scripts/sh/pre-push-gate.sh',
+    '--pushed-sha',
+    'deadbeef',
+    '--remote-sha',
+    '0000001',
+  ]);
+  const shOk = sh.status !== 0 && sh.output.includes('BLOCK');
+  const ps = hasPwsh
+    ? runGateProbe('pwsh', ['-NoProfile', '-File', 'scripts/ps1/pre-push-gate.ps1', '-PushedSha', 'deadbeef', '-RemoteSha', '0000001'])
+    : null;
+  const psOk = ps === null || (ps.status !== 0 && ps.output.includes('BLOCK'));
+  const ok = shOk && psOk;
+  const pwshTag = ps === null ? '' : ` pwsh=${ps.status}`;
+  console.log(`pre-push invalid-range fail-closed: bash=${sh.status}${pwshTag} ${ok ? '✔ PASS' : '✖ BLOCK'}`);
+  return ok;
+}
+
+/**
  * Materializes fixtures and compares both implementations.
  *
  * @returns {number} Process exit code.
@@ -459,6 +526,8 @@ function main() {
   // Fail-closed compile step: an absent Rust toolchain must block, never report a silent pass.
   if (!assertCargoMissingFailClosed()) failures += 1;
   if (!compareCargoMissingBash()) failures += 1;
+  if (!compareHelpParity(hasPwsh)) failures += 1;
+  if (!comparePrePushInvalidRangeParity(hasPwsh)) failures += 1;
 
   cleanup();
   if (failures > 0) {

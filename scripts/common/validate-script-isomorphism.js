@@ -39,11 +39,11 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
  * Key parameter flags that must be supported identically across root dual implementations.
  */
 const REQUIRED_FLAG_ALIGNMENTS = {
-  'audit-all': ['Fast', 'Json', 'Agent'],
-  'commit-msg-gate': ['Agent', 'ViewLog'],
+  'audit-all': ['Fast', 'Json', 'Agent', 'ViewLog', 'Help'],
+  'commit-msg-gate': ['Agent', 'Json', 'ViewLog', 'Help'],
   package: ['HotSync'],
-  'pre-commit-gate': ['Agent', 'ViewLog', 'Fast'],
-  'pre-push-gate': ['Agent', 'ViewLog'],
+  'pre-commit-gate': ['Agent', 'Json', 'ViewLog', 'Fast', 'Help'],
+  'pre-push-gate': ['Agent', 'Json', 'ViewLog', 'Help'],
   'release-tag': ['DryRun', 'NoPush'],
   'version-bump': ['DryRun'],
 };
