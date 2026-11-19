@@ -20,16 +20,11 @@ import argparse
 import json
 import re
 import sys
+
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-try:
-    from cook_assets import cook_assets
-except ImportError:
-    cook_assets = None
-
-# ==============================================================================
 from check_mod_common import (
     DiagnosticItem,
     WHITELISTED_PLACEHOLDERS,
@@ -39,6 +34,11 @@ from check_mod_common import (
     ensure_utf8_stdout as _ensure_utf8_stdout,
     add_diag as _add_diag,
     safe_load_json as _safe_load_json,
+)
+from check_mod_content import (
+    check_asset_safety_and_manifest,
+    check_content_directory,
+    check_dangling_asset_refs,
 )
 from check_mod_dag import (
     check_dag_entries_and_terminals as _check_dag_entries_and_terminals,
@@ -70,36 +70,44 @@ from check_mod_schema import validate_mod_schemas
 # ==============================================================================
 
 
-def _check_manifest(mod_dir: Path, diags: list[DiagnosticItem]) -> dict[str, Any] | None:
+def _check_manifest(
+    mod_dir: Path, diags: list[DiagnosticItem]
+) -> dict[str, Any] | None:
     """校验 pack.json 清单。"""
     manifest_path = mod_dir / "pack.json"
     data = _safe_load_json(manifest_path, "pack.json", diags)
     if not isinstance(data, dict):
         if data is not None:
-            diags.append(DiagnosticItem(
-                code="ERR_MANIFEST_NOT_OBJECT",
-                file_path="pack.json",
-                detail="pack.json 顶层必须为 JSON 对象",
-                fix_suggestion="请将 pack.json 根节点修改为 JSON 对象格式 {}",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_MANIFEST_NOT_OBJECT",
+                    file_path="pack.json",
+                    detail="pack.json 顶层必须为 JSON 对象",
+                    fix_suggestion="请将 pack.json 根节点修改为 JSON 对象格式 {}",
+                )
+            )
         return None
 
     for field in REQUIRED_MANIFEST_FIELDS:
         if field not in data:
-            diags.append(DiagnosticItem(
-                code="ERR_MANIFEST_FIELD_MISSING",
-                file_path="pack.json",
-                detail=f"清单缺失必备字段: '{field}'",
-                fix_suggestion=f"在 pack.json 中补充 '{field}' 字段声明",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_MANIFEST_FIELD_MISSING",
+                    file_path="pack.json",
+                    detail=f"清单缺失必备字段: '{field}'",
+                    fix_suggestion=f"在 pack.json 中补充 '{field}' 字段声明",
+                )
+            )
 
     if not isinstance(data.get("priority", 0), int):
-        diags.append(DiagnosticItem(
-            code="ERR_MANIFEST_FIELD_TYPE",
-            file_path="pack.json",
-            detail="字段 'priority' 必须为整数",
-            fix_suggestion="将 'priority' 字段修改为正整数（如 100）",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_MANIFEST_FIELD_TYPE",
+                file_path="pack.json",
+                detail="字段 'priority' 必须为整数",
+                fix_suggestion="将 'priority' 字段修改为正整数（如 100）",
+            )
+        )
 
     return data
 
@@ -120,33 +128,39 @@ def _check_routing_rules(
 
     rules = extract_rules_list(data)
     if not rules:
-        diags.append(DiagnosticItem(
-            code="ERR_ROUTING_EMPTY",
-            file_path="routing_rules.json",
-            detail="routing_rules.json 中未解析到有效的路由规则列表",
-            fix_suggestion="请在 routing_rules.json 中提供 'routing_rules' 数组并配置匹配规则",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_ROUTING_EMPTY",
+                file_path="routing_rules.json",
+                detail="routing_rules.json 中未解析到有效的路由规则列表",
+                fix_suggestion="请在 routing_rules.json 中提供 'prologue_routing_rules' 数组并配置匹配规则",
+            )
+        )
         return
 
     valid_dags = declared_dag_ids | BUILTIN_DAG_IDS
     for idx, rule in enumerate(rules):
         target = rule.get("target_dag_id")
         if not target or not isinstance(target, str):
-            diags.append(DiagnosticItem(
-                code="ERR_ROUTING_TARGET_MISSING",
-                file_path="routing_rules.json",
-                detail=f"第 {idx} 条路由规则缺少 'target_dag_id'",
-                fix_suggestion="为该规则指定目标 DAG 图标识符 target_dag_id",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_ROUTING_TARGET_MISSING",
+                    file_path="routing_rules.json",
+                    detail=f"第 {idx} 条路由规则缺少 'target_dag_id'",
+                    fix_suggestion="为该规则指定目标 DAG 图标识符 target_dag_id",
+                )
+            )
             continue
 
         if valid_dags and target not in valid_dags:
-            diags.append(DiagnosticItem(
-                code="ERR_ROUTING_TARGET_UNKNOWN",
-                file_path="routing_rules.json",
-                detail=f"第 {idx} 条规则引用的 target_dag_id '{target}' 在 dag_graphs/ 或内置图中未找到",
-                fix_suggestion=f"请确保 dag_graphs/{target}.json 存在或修改目标 ID",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_ROUTING_TARGET_UNKNOWN",
+                    file_path="routing_rules.json",
+                    detail=f"第 {idx} 条规则引用的 target_dag_id '{target}' 在 dag_graphs/ 或内置图中未找到",
+                    fix_suggestion=f"请确保 dag_graphs/{target}.json 存在或修改目标 ID",
+                )
+            )
 
 
 # ==============================================================================
@@ -156,30 +170,37 @@ def _check_routing_rules(
 # - Inv-MULTI-CONFLICT: 跨包互斥、同名 origin_id/trait_id/kit_id 与 UI 策略互斥静态阻断
 # ==============================================================================
 
-def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticItem]) -> None:
+
+def _check_i18n(
+    mod_dir: Path, required_keys: set[str], diags: list[DiagnosticItem]
+) -> None:
     """校验 i18n 语言包与占位符白名单（当所有节点采用 inline_text 且 i18n 不存在时免校验放行）。"""
     i18n_dir = mod_dir / "i18n"
     if not i18n_dir.is_dir():
         if not required_keys:
             return
-        diags.append(DiagnosticItem(
-            code="ERR_I18N_DIR_MISSING",
-            file_path="i18n",
-            detail="缺少 i18n 本地化目录",
-            fix_suggestion="创建 i18n 目录并在其中放置 zh-CN.json",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_I18N_DIR_MISSING",
+                file_path="i18n",
+                detail="缺少 i18n 本地化目录",
+                fix_suggestion="创建 i18n 目录并在其中放置 zh-CN.json",
+            )
+        )
         return
 
     i18n_files = sorted(i18n_dir.glob("*.json"))
     if not i18n_files:
         if not required_keys:
             return
-        diags.append(DiagnosticItem(
-            code="ERR_I18N_EMPTY",
-            file_path="i18n",
-            detail="i18n 目录下未找到任何语言 JSON 文件",
-            fix_suggestion="在 i18n 目录创建 zh-CN.json 提供多语言文案字典",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_I18N_EMPTY",
+                file_path="i18n",
+                detail="i18n 目录下未找到任何语言 JSON 文件",
+                fix_suggestion="在 i18n 目录创建 zh-CN.json 提供多语言文案字典",
+            )
+        )
         return
 
     for ifile in i18n_files:
@@ -193,12 +214,14 @@ def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticIt
         # 1. 检查 DAG 引用的叙事键在语言包中是否存在
         for rkey in sorted(required_keys):
             if rkey not in data:
-                diags.append(DiagnosticItem(
-                    code="ERR_I18N_MISSING_KEY",
-                    file_path=rel_path,
-                    detail=f"语言包缺少 DAG 所需的文案键: '{rkey}'",
-                    fix_suggestion=f"在 {rel_path} 中添加键 '{rkey}' 的本地化翻译文本",
-                ))
+                diags.append(
+                    DiagnosticItem(
+                        code="ERR_I18N_MISSING_KEY",
+                        file_path=rel_path,
+                        detail=f"语言包缺少 DAG 所需的文案键: '{rkey}'",
+                        fix_suggestion=f"在 {rel_path} 中添加键 '{rkey}' 的本地化翻译文本",
+                    )
+                )
 
         # 2. 占位符白名单校验
         for k, text in data.items():
@@ -207,188 +230,35 @@ def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticIt
             matches = PARAM_REGEX.findall(text)
             for param in matches:
                 if param not in WHITELISTED_PLACEHOLDERS:
-                    diags.append(DiagnosticItem(
-                        code="ERR_UNKNOWN_PLACEHOLDER",
-                        file_path=rel_path,
-                        detail=f"键 '{k}' 包含非法/未知占位符 '{{{param}}}'",
-                        fix_suggestion=f"请替换为白名单参数，如: {', '.join(sorted(list(WHITELISTED_PLACEHOLDERS)[:6]))}",
-                    ))
-
-
-def _check_asset_safety_and_manifest(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
-    """若存在 assets/ 目录，校验其资源格式白名单、体积预算及 manifest.json。"""
-    assets_dir = mod_dir / "assets"
-    if not assets_dir.is_dir():
-        return
-    if cook_assets is not None:
-        valid_assets, asset_diags, _ = cook_assets(mod_dir, check_only=True)
-        for d in asset_diags:
-            diags.append(DiagnosticItem(d.code, d.file, d.detail, d.fix_suggestion))
-
-
-def _collect_mod_uri_strings(obj: Any) -> list[str]:
-    """递归收集数据对象中所有以 'mod://' 开头的资产 URI 字符串。"""
-    found: list[str] = []
-    if isinstance(obj, str):
-        if obj.startswith("mod://"):
-            found.append(obj)
-    elif isinstance(obj, dict):
-        for v in obj.values():
-            found.extend(_collect_mod_uri_strings(v))
-    elif isinstance(obj, list):
-        for item in obj:
-            found.extend(_collect_mod_uri_strings(item))
-    return found
-
-
-def _resolve_mod_uri_path(mod_dir: Path, uri: str, pack_id: str = "") -> bool:
-    """判断 mod:// 资产 URI 是否在模组内物理存在。"""
-    clean_target = uri[6:].strip("/")
-    if not clean_target:
-        return False
-    candidates = [clean_target]
-    if pack_id and clean_target.startswith(pack_id + "/"):
-        candidates.append(clean_target[len(pack_id) + 1:])
-    for rel in candidates:
-        if (mod_dir / rel).is_file():
-            return True
-        if (mod_dir / "assets" / rel).is_file():
-            return True
-    return False
-
-
-def _scan_json_refs(json_file: Path, rel_label: str, mod_dir: Path, pack_id: str, diags: list[DiagnosticItem]) -> None:
-    if not json_file.is_file():
-        return
-    try:
-        payload = json.loads(json_file.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return
-    for uri in _collect_mod_uri_strings(payload):
-        if not _resolve_mod_uri_path(mod_dir, uri, pack_id):
-            diags.append(DiagnosticItem(
-                code="ERR_ASSET_DANGLING_REF",
-                file_path=rel_label,
-                detail=f"{rel_label} 引用了不存在的资产: '{uri}'",
-                fix_suggestion="请确保资产文件已放置于 assets/ 对应路径，并运行 'kalar-mod cook' 生成清单",
-            ))
-
-
-def _check_dangling_asset_refs(mod_dir: Path, diags: list[DiagnosticItem], pack_id: str = "") -> None:
-    """校验 destinies.json、因果 DAG 与 content/ 中引用的 mod:// 资产是否存在于 assets/。"""
-    _scan_json_refs(mod_dir / "destinies.json", "destinies.json", mod_dir, pack_id, diags)
-
-    dag_dir = mod_dir / "dag_graphs"
-    if dag_dir.is_dir():
-        for df in sorted(dag_dir.glob("*.json")):
-            _scan_json_refs(df, f"dag_graphs/{df.name}", mod_dir, pack_id, diags)
-
-    content_dir = mod_dir / "content"
-    if content_dir.is_dir():
-        for cf in sorted(content_dir.rglob("*.json")):
-            _scan_json_refs(cf, f"content/{cf.relative_to(content_dir).as_posix()}", mod_dir, pack_id, diags)
-
-    if (mod_dir / "assets").is_dir() and (mod_dir / "cutscenes").is_dir():
-        for cs_file in sorted((mod_dir / "cutscenes").glob("*.json")):
-            _scan_json_refs(cs_file, f"cutscenes/{cs_file.name}", mod_dir, pack_id, diags)
-
-
-def _validate_content_domain_payload(
-    rel_str: str,
-    cdata: dict[str, Any] | list[Any],
-    diags: list[DiagnosticItem],
-) -> None:
-    """校验 content/ 子目录中各域扩展数据的顶层结构与契约键值。"""
-    parts = rel_str.split("/")
-    domain_dir = parts[1] if len(parts) >= 3 else ""
-    if domain_dir in ("entities", "world", "events", "narratives", "copywriting") and not isinstance(cdata, dict):
-        diags.append(DiagnosticItem(
-            code="ERR_CONTENT_DOMAIN_SCHEMA",
-            file_path=rel_str,
-            detail=f"{rel_str} 属于 {domain_dir} 域，顶层必须为 JSON 对象 {{}}",
-            fix_suggestion=f"请将 {rel_str} 根结构调整为符合 {domain_dir} Schema 的 JSON 对象",
-        ))
-    elif domain_dir == "quests" and isinstance(cdata, dict) and not any(
-        isinstance(cdata.get(k), (list, dict)) for k in ("quests", "bounties", "chains", "templates")
-    ) and not cdata:
-        diags.append(DiagnosticItem(
-            code="ERR_CONTENT_DOMAIN_SCHEMA",
-            file_path=rel_str,
-            detail=f"{rel_str} 任务包对象不可为空",
-            fix_suggestion="请在 quests 定义中声明 quests / bounties / chains 等非空任务映射",
-        ))
-
-
-def _check_content_directory(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
-    """校验 content/ 大魔改数据目录及其 JSON 实体定义的合法性。"""
-    content_dir = mod_dir / "content"
-    if not content_dir.is_dir():
-        return
-
-    content_files = sorted([p for p in content_dir.rglob("*") if p.is_file()])
-    if not content_files:
-        diags.append(DiagnosticItem(
-            code="ERR_CONTENT_EMPTY",
-            file_path="content",
-            detail="content/ 目录已创建但未包含任何数据文件",
-            fix_suggestion="请在 content/ 目录下放置合规的 JSON 数据定义文件，或移除空的 content/ 目录",
-        ))
-        return
-
-    forbidden_exts = frozenset({".exe", ".bat", ".cmd", ".sh", ".py", ".pyc", ".dll", ".so", ".bin", ".ps1"})
-    for cf in content_files:
-        rel_str = f"content/{cf.relative_to(content_dir).as_posix()}"
-        ext = cf.suffix.lower()
-        if ext in forbidden_exts:
-            diags.append(DiagnosticItem(
-                code="ERR_CONTENT_FORBIDDEN_FILE",
-                file_path=rel_str,
-                detail=f"content/ 目录严禁包含可执行或脚本文件: '{cf.name}'",
-                fix_suggestion="请将该文件移出 content/ 目录",
-            ))
-            continue
-        if ext not in (".json", ".json5"):
-            diags.append(DiagnosticItem(
-                code="ERR_CONTENT_INVALID_FORMAT",
-                file_path=rel_str,
-                detail=f"content/ 文件格式非法: '{cf.name}' (仅支持 .json)",
-                fix_suggestion="请将大魔改数据存储为合规的 .json 格式",
-            ))
-            continue
-        try:
-            cdata = json.loads(cf.read_text(encoding="utf-8"))
-            if not isinstance(cdata, (dict, list)):
-                diags.append(DiagnosticItem(
-                    code="ERR_CONTENT_NOT_OBJECT_OR_ARRAY",
-                    file_path=rel_str,
-                    detail=f"{rel_str} 顶层必须为 JSON 对象或列表",
-                    fix_suggestion="请将该文件的根结构调整为 {} 或 []",
-                ))
-            else:
-                _validate_content_domain_payload(rel_str, cdata, diags)
-        except (json.JSONDecodeError, OSError) as exc:
-            diags.append(DiagnosticItem(
-                code="ERR_CONTENT_JSON_INVALID",
-                file_path=rel_str,
-                detail=f"JSON 解析失败: {exc}",
-                fix_suggestion=f"请检查 {rel_str} 的语法正确性",
-            ))
+                    diags.append(
+                        DiagnosticItem(
+                            code="ERR_UNKNOWN_PLACEHOLDER",
+                            file_path=rel_path,
+                            detail=f"键 '{k}' 包含非法/未知占位符 '{{{param}}}'",
+                            fix_suggestion=f"请替换为白名单参数，如: {', '.join(sorted(list(WHITELISTED_PLACEHOLDERS)[:6]))}",
+                        )
+                    )
 
 
 def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
     """核心单包诊断校验流水线。"""
     diags: list[DiagnosticItem] = []
     if not mod_dir.is_dir():
-        diags.append(DiagnosticItem(
-            code="ERR_MOD_DIR_NOT_FOUND",
-            file_path=str(mod_dir),
-            detail=f"MOD 目标目录不存在: {mod_dir}",
-            fix_suggestion="请确认命令行指定的 MOD 根目录路径存在",
-        ))
+        diags.append(
+            DiagnosticItem(
+                code="ERR_MOD_DIR_NOT_FOUND",
+                file_path=str(mod_dir),
+                detail=f"MOD 目标目录不存在: {mod_dir}",
+                fix_suggestion="请确认命令行指定的 MOD 根目录路径存在",
+            )
+        )
         return False, diags
 
     manifest = _check_manifest(mod_dir, diags)
-    pack_profile = str((manifest or {}).get("pack_profile", "CONTENT_ADDON")).strip().upper() or "CONTENT_ADDON"
+    pack_profile = (
+        str((manifest or {}).get("pack_profile", "CONTENT_ADDON")).strip().upper()
+        or "CONTENT_ADDON"
+    )
     has_prologue_dag = bool((manifest or {}).get("has_prologue_dag", True))
 
     dag_dir = mod_dir / "dag_graphs"
@@ -397,45 +267,58 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
 
     if not dag_dir.is_dir():
         if has_prologue_dag:
-            diags.append(DiagnosticItem(
-                code="ERR_DAG_DIR_MISSING",
-                file_path="dag_graphs",
-                detail="缺少 dag_graphs 目录",
-                fix_suggestion="创建 dag_graphs 目录并在其中放置因果 DAG 图元 JSON",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_DAG_DIR_MISSING",
+                    file_path="dag_graphs",
+                    detail="缺少 dag_graphs 目录",
+                    fix_suggestion="创建 dag_graphs 目录并在其中放置因果 DAG 图元 JSON",
+                )
+            )
     else:
         dag_files = sorted(dag_dir.glob("*.json"))
         if not dag_files and has_prologue_dag:
-            diags.append(DiagnosticItem(
-                code="ERR_DAG_NO_FILES",
-                file_path="dag_graphs",
-                detail="dag_graphs 目录下未找到任何因果图元 JSON 文件",
-                fix_suggestion="在 dag_graphs 下至少创建一个 DAG_<ID>.json 图元文件",
-            ))
+            diags.append(
+                DiagnosticItem(
+                    code="ERR_DAG_NO_FILES",
+                    file_path="dag_graphs",
+                    detail="dag_graphs 目录下未找到任何因果图元 JSON 文件",
+                    fix_suggestion="在 dag_graphs 下至少创建一个 DAG_<ID>.json 图元文件",
+                )
+            )
         for df in dag_files:
             dag_stem = df.stem
             declared_dag_ids.add(dag_stem)
-            _check_dag_file(df, f"dag_graphs/{df.name}", required_keys, declared_dag_ids, diags)
+            _check_dag_file(
+                df, f"dag_graphs/{df.name}", required_keys, declared_dag_ids, diags
+            )
 
-    _check_routing_rules(mod_dir, declared_dag_ids, diags, has_prologue_dag=has_prologue_dag)
+    _check_routing_rules(
+        mod_dir, declared_dag_ids, diags, has_prologue_dag=has_prologue_dag
+    )
     _check_i18n(mod_dir, required_keys, diags)
-    check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids, pack_profile=pack_profile)
-    _check_asset_safety_and_manifest(mod_dir, diags)
+    check_destinies_file(
+        mod_dir, diags, declared_dag_ids=declared_dag_ids, pack_profile=pack_profile
+    )
+    check_asset_safety_and_manifest(mod_dir, diags)
     pack_id = str((manifest or {}).get("pack_id", "")).strip()
-    _check_dangling_asset_refs(mod_dir, diags, pack_id=pack_id)
-    _check_content_directory(mod_dir, diags)
+    check_dangling_asset_refs(mod_dir, diags, pack_id=pack_id)
+    check_content_directory(mod_dir, diags)
     validate_mod_schemas(mod_dir, diags)
 
     valid = len(diags) == 0
     return valid, diags
 
 
-
 def print_cli_report(valid: bool, diags: list[DiagnosticItem], mod_dir: Path) -> None:
     """输出人类可读的控制台审查报告。"""
-    print("==============================================================================")
+    print(
+        "=============================================================================="
+    )
     print(f"🔍 纯净世界引擎 MOD 静态诊断报告: {mod_dir.resolve().name}")
-    print("------------------------------------------------------------------------------")
+    print(
+        "------------------------------------------------------------------------------"
+    )
     if valid:
         print("  🎉 诊断结论: 100% 合规通过！")
         print("  • 清单格式   : 合规")
@@ -444,7 +327,9 @@ def print_cli_report(valid: bool, diags: list[DiagnosticItem], mod_dir: Path) ->
         print("  • 占位符白名单: 100% 遵从")
         print("  • 资产与引用 : 格式白名单、体积预算与 mod:// 引用全部合规")
         print("  • 魔改数据体 : content/ 大魔改数据结构合法")
-        print("==============================================================================")
+        print(
+            "=============================================================================="
+        )
         return
 
     print(f"  ❌ 发现 {len(diags)} 处违规或拓扑缺陷:\n")
@@ -452,10 +337,14 @@ def print_cli_report(valid: bool, diags: list[DiagnosticItem], mod_dir: Path) ->
         print(f"  [{idx}] [{d.code}] 文件: {d.file}")
         print(f"      • 详情: {d.detail}")
         print(f"      • 建议: {d.fix_suggestion}\n")
-    print("==============================================================================")
+    print(
+        "=============================================================================="
+    )
 
 
-def _collect_target_dirs(mod_dir_arg: str | None, multi_dirs_arg: list[str] | None) -> list[Path]:
+def _collect_target_dirs(
+    mod_dir_arg: str | None, multi_dirs_arg: list[str] | None
+) -> list[Path]:
     """汇总并去重命令行传入的待检 MOD 目录列表。"""
     targets: list[Path] = []
     seen_resolved: set[Path] = set()
@@ -489,7 +378,12 @@ def main() -> None:
         default=None,
         help="多包联合冲突预检的附加或完整 MOD 目录列表",
     )
-    parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 诊断信息")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="输出机器可读的结构化 JSON 诊断信息",
+    )
 
     args = parser.parse_args()
     target_dirs = _collect_target_dirs(args.mod_dir, args.multi_dirs)
