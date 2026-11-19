@@ -46,7 +46,7 @@ flowchart TD
 | | [├─ `skill-catalog.md`](./skill-catalog.md) | **Skill Invocation Catalog**: 3-tier topology, domain linkage chains, trigger keywords, and verification commands rendered from `skill-registry.json` | Skill selection & trigger lookup | `scripts/common/skill-registry.json` |
 | | [└─ `skill-activation-and-linkage.md`](../.agents/skills/skill-governance/references/skill-activation-and-linkage.md) | **Skill Activation & Linkage Reference**: Description visibility rules, trigger examples, prerequisite/successor chains, and guard scripts | Skill metadata authoring | `.agents/skills/skill-governance/` |
 | **Tier 4**<br/>Archives | [**`archive/deliverables/README.md`**](../archive/deliverables/README.md) | **Read-Only Historical Deliverables Archive**: Frozen architecture review dossiers, milestone reports, and historical snapshots | Historical traceability (read-only) | `archive/deliverables/` |
-| **Tier 5**<br/>Scripts | [**`scripts/README.md`**](../scripts/README.md) | **Cross-Platform Script & Gate Manual**: Inventory of <!-- METRICS:BEGIN script-inventory -->**112 份**<!-- METRICS:END script-inventory --> controlled scripts, invocation contracts, and isolation guarantees | Local gates & CI maintenance | `scripts/` |
+| **Tier 5**<br/>Scripts | [**`scripts/README.md`**](../scripts/README.md) | **Cross-Platform Script & Gate Manual**: Inventory of <!-- METRICS:BEGIN script-inventory -->**115 份**<!-- METRICS:END script-inventory --> controlled scripts, invocation contracts, and isolation guarantees | Local gates & CI maintenance | `scripts/` |
 
 ---
 
