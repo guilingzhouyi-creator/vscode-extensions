@@ -34,6 +34,8 @@ const {
   readStagedEolBufferSafe,
   checkHeadReceipt,
 } = require('./git-env');
+const checks = require('./lib/fast-staged-checks');
+const { calculateEloc, createViolation } = checks;
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -216,103 +218,6 @@ function isExemptSlangPath(filePath, baseName) {
 }
 
 const RE_FAST_WIRING = /^(?:import\s+|import\(|from\s+|export\s+(?:\*|type\s+\*|\{[^}]*\}\s*(?:from\s+[^;]+)?;?|default\s+[A-Za-z0-9_$]+;?$)|(?:const|let|var)\s+.*=\s*require\(|module\.exports\s*=|exports\.|source\s+|\.\s+|using\s+|Import-Module\s+|(?:extends\s+|class_name\s+|(?:const|var)\s+\w+\s*=\s*preload\())/;
-
-/**
- * Measures ELOC, physical LOC, and wiring-line count for staged content.
- *
- * Line classification is delegated to evaluate-eloc-budget.js, which is the
- * declared single source of truth for ELOC semantics. Only the wiring-line
- * tally is local, because the fast staged gate is its sole consumer.
- *
- * @param {string} content - File content.
- * @param {string} ext - Lowercase file extension.
- * @returns {{ totalLoc: number, eloc: number, wiringCount: number }} Volume metrics.
- */
-function calculateEloc(content, ext) {
-  const lines = content.split(/\r?\n/);
-  if (lines.length > 0 && lines[lines.length - 1] === '') {
-    lines.pop();
-  }
-
-  const { eloc, totalLoc } = evaluateCodeMetrics(content, ext, '');
-  let wiringCount = 0;
-  const effective = collectEffectiveLines(lines, ext);
-  for (const line of effective) {
-    if (RE_FAST_WIRING.test(line)) {
-      wiringCount++;
-    }
-  }
-  return { totalLoc, eloc, wiringCount };
-}
-
-/**
- * Returns the trimmed text of every semantically effective line.
- *
- * Runs the SSOT classifiers directly so the wiring tally observes exactly the
- * same line set that produced ELOC.
- *
- * @param {string[]} lines - Physical lines.
- * @param {string} ext - Lowercase file extension.
- * @returns {string[]} Trimmed effective lines.
- */
-function collectEffectiveLines(lines, ext) {
-  const isPowerShell = ext === '.ps1';
-  const isHash = HASH_STYLE_EXTS.has(ext);
-  const result = [];
-  let inBlock = false;
-  let quoteChar = '';
-
-  for (const line of lines) {
-    if (isPowerShell) {
-      const res = classifyPowerShellLine(line, inBlock);
-      inBlock = res.inBlock;
-      if (!res.isBlank && !res.isComment) result.push(line.trim());
-      continue;
-    }
-    if (isHash) {
-      const res = classifyHashStyleLine(line, inBlock, quoteChar);
-      inBlock = res.inBlock;
-      quoteChar = res.quoteChar;
-      if (!res.isBlank && !res.isComment) result.push(line.trim());
-      continue;
-    }
-    const res = classifyCStyleLine(line, inBlock);
-    inBlock = res.inBlock;
-    if (!res.isBlank && !res.isComment) result.push(line.trim());
-  }
-  return result;
-}
-
-
-/**
- * Constructs a structured violation payload adhering to the Agent Directives Protocol.
- *
- * @param {object} violation - Violation parameters.
- * @param {string} violation.ruleId - Unique catalogued rule identifier.
- * @param {string} violation.file - Path to target file with violation.
- * @param {string} violation.message - Factual diagnostic explanation.
- * @param {string} violation.actual - Observed non-compliant state.
- * @param {string} violation.expected - Target compliant invariant.
- * @param {string} violation.actionableFix - Actionable prescription for Agent self-healing.
- * @param {number} [violation.line] - 1-indexed target line number.
- * @returns {object} Structured violation envelope.
- */
-function createViolation({ ruleId, file, message, actual, expected, actionableFix, line = undefined }) {
-  const item = {
-    ruleId,
-    severity: SEVERITY_BLOCK,
-    file: file ? file.replace(/\\/g, '/') : undefined,
-    line,
-    actual,
-    expected,
-    message,
-    actionableFix,
-  };
-  item.toString = function () {
-    return this.message;
-  };
-  return item;
-}
 
 /**
  * Validates that file name does not contain temporary engineering slang or batch tokens.
