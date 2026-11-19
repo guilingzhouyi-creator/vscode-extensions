@@ -1,7 +1,7 @@
 /**
- * Module: Tooling / Staged Differential Diff & 5D Line Classifier
+ * Module: Tooling / Staged Differential Diff & Weighted ELOC Line Classifier
  * File Path: scripts/common/lib/differential-diff-parser.js
- * Architecture Role: Staged git diff parser and 5D Riemannian line semantic classifier
+ * Architecture Role: Staged git diff parser and weighted ELOC line semantic classifier
  * Dependencies & Triggers: Consumed by gate-differential-bounds.js, pre-commit-gate, and CLI audits
  * Responsibilities:
  *   1. Classify diff line semantics with stateful multi-line block comment tracking;
@@ -16,6 +16,16 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const {
+  LINE_BLANK,
+  LINE_COMMENT,
+  LINE_DOC_COMMENT,
+  LINE_TRAMPOLINE,
+  LINE_SUBSTANTIVE,
+  isMechanicalTrampoline,
+  classifyLineWithState,
+  classifyLine,
+} = require('./eloc-line-classifier');
 
 const DIFF_BOUNDS_CONTRACT = Object.freeze(require('../diff-bounds-contract.json'));
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -27,164 +37,6 @@ const CODE_EXTENSIONS = new Set([
 const EXEMPT_EXTENSIONS = new Set([
   '.md', '.json', '.yml', '.yaml', '.txt', '.toml', '.svg', '.png', '.lock',
 ]);
-
-const LINE_BLANK = 0;
-const LINE_COMMENT = 1;
-const LINE_DOC_COMMENT = 2;
-const LINE_TRAMPOLINE = 3;
-const LINE_SUBSTANTIVE = 4;
-
-/**
- * Checks whether a trimmed segment begins with a single-line comment delimiter across supported languages.
- *
- * @param {string} trimmed - Trimmed line segment.
- * @returns {boolean} True when line starts with a single-line comment token.
- */
-function isSingleLineComment(trimmed) {
-  return (
-    trimmed.startsWith('//') ||
-    trimmed.startsWith('#') ||
-    trimmed.startsWith('--') ||
-    trimmed.startsWith(';')
-  );
-}
-
-/**
- * Detects mechanical forwarding or empty stub lines.
- *
- * @param {string} trimmed - Trimmed line text.
- * @returns {boolean} True if trampoline.
- */
-function isMechanicalTrampoline(trimmed) {
-  const isShortForwardingCall =
-    (trimmed.startsWith('return ') || trimmed.startsWith('self.') || trimmed.startsWith('this.')) &&
-    trimmed.endsWith(';') &&
-    trimmed.includes('(') &&
-    trimmed.length <= 45;
-  return isShortForwardingCall || trimmed === '{}' || trimmed === '};';
-}
-
-/**
- * Returns true if character begins a single, double, or template quote literal.
- *
- * @param {string} ch - Single source character.
- * @returns {boolean} True when character is a quote delimiter.
- */
-function isStringDelimiter(ch) {
-  return ch === '"' || ch === "'" || ch === '`';
-}
-
-/**
- * Updates block-comment tracker for trailing block-open tokens outside quotes or line comments.
- *
- * @param {string} codeSlice - Trimmed code segment.
- * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block state.
- */
-function scanTrailingBlockComment(codeSlice, state) {
-  let index = 0;
-  let activeQuote = '';
-  while (index < codeSlice.length) {
-    const ch = codeSlice[index];
-    if (activeQuote) {
-      if (ch === '\\' && index + 1 < codeSlice.length) {
-        index += 2;
-        continue;
-      }
-      if (ch === activeQuote) activeQuote = '';
-      index += 1;
-      continue;
-    }
-    if (isStringDelimiter(ch)) {
-      activeQuote = ch;
-      index += 1;
-      continue;
-    }
-    if (codeSlice.startsWith('//', index)) break;
-    if (codeSlice.startsWith('/*', index)) {
-      const isDoc = codeSlice.startsWith('/**', index) && !codeSlice.startsWith('/**/', index);
-      const closePos = codeSlice.indexOf('*/', index + 2);
-      if (closePos >= 0) {
-        index = closePos + 2;
-        continue;
-      }
-      state.inBlockComment = true;
-      state.inDocComment = isDoc;
-      break;
-    }
-    index += 1;
-  }
-}
-
-/**
- * Classifies trimmed text starting outside an active block comment.
- *
- * @param {string} trimmed - Trimmed segment.
- * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block state.
- * @returns {number} Semantic line classification constant.
- */
-function classifyUncommentedSegment(trimmed, state) {
-  let current = trimmed;
-  while (true) {
-    if (current.length === 0) return LINE_BLANK;
-    if (current.startsWith('///') || current.startsWith('//!')) return LINE_DOC_COMMENT;
-    if (isSingleLineComment(current)) return LINE_COMMENT;
-    if (current.startsWith('/*')) {
-      const isDoc = current.startsWith('/**') && !current.startsWith('/**/');
-      const afterOpen = current.slice(2);
-      const closePos = afterOpen.indexOf('*/');
-      if (closePos < 0) {
-        state.inBlockComment = true;
-        state.inDocComment = isDoc;
-        return isDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
-      }
-      const afterClose = afterOpen.slice(closePos + 2).trim();
-      if (afterClose.length === 0 || isSingleLineComment(afterClose)) {
-        return isDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
-      }
-      current = afterClose;
-      continue;
-    }
-    scanTrailingBlockComment(current, state);
-    return isMechanicalTrampoline(current) ? LINE_TRAMPOLINE : LINE_SUBSTANTIVE;
-  }
-}
-
-/**
- * Classifies one source line using and mutating multi-line block comment state.
- *
- * @param {string} line - Raw line text.
- * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block comment state.
- * @returns {number} Semantic kind constant.
- */
-function classifyLineWithState(line, state) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) return LINE_BLANK;
-  if (state.inBlockComment) {
-    const wasDoc = state.inDocComment;
-    const closePos = trimmed.indexOf('*/');
-    if (closePos < 0) {
-      return wasDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
-    }
-    state.inBlockComment = false;
-    state.inDocComment = false;
-    const remainder = trimmed.slice(closePos + 2).trim();
-    if (remainder.length === 0 || isSingleLineComment(remainder)) {
-      return wasDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
-    }
-    return classifyUncommentedSegment(remainder, state);
-  }
-  return classifyUncommentedSegment(trimmed, state);
-}
-
-/**
- * Classifies a single isolated line slice with 5D Riemannian rules.
- *
- * @param {string} line - Raw line text.
- * @returns {number} Semantic kind constant.
- */
-function classifyLine(line) {
-  return classifyLineWithState(line, { inBlockComment: false, inDocComment: false });
-}
 
 /**
  * Checks if a file path belongs to auditable code files.
@@ -257,6 +109,9 @@ function parseLedgerSample(trimmedLine) {
 function loadRecentAdmissionSamples() {
   const candidateLedgers = [
     path.join(REPO_ROOT, DIFF_BOUNDS_CONTRACT.ledgers.taxisRelative),
+    ...(DIFF_BOUNDS_CONTRACT.ledgers.taxisLegacyRelative
+      ? [path.join(REPO_ROOT, DIFF_BOUNDS_CONTRACT.ledgers.taxisLegacyRelative)]
+      : []),
     path.join(REPO_ROOT, DIFF_BOUNDS_CONTRACT.ledgers.autoRefactorRelative),
     path.join(REPO_ROOT, 'auto-refactor', DIFF_BOUNDS_CONTRACT.ledgers.autoRefactorRelative),
   ];

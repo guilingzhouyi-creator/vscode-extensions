@@ -21,6 +21,8 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { createIgnoredDirSet } = require('./workspace-walker');
+const { QUALITY_BUDGET } = require('./lib/eloc-line-classifier');
 const { getRangeFiles, getStagedFiles, readStagedContentSafe, readStagedBuffersBatch } = require('./git-env');
 const {
   evaluateCodeMetrics,
@@ -28,9 +30,9 @@ const {
   isAuditableCodeFile,
 } = require('./evaluate-eloc-budget');
 
-const DEFAULT_POR_LIMIT = 0.60;
-const DEFAULT_MIN_TAU = 2.5;
-const DEFAULT_MAX_TAU = 22.0;
+const DEFAULT_POR_LIMIT = QUALITY_BUDGET.density.maxPor;
+const DEFAULT_MIN_TAU = QUALITY_BUDGET.density.tauMin;
+const DEFAULT_MAX_TAU = QUALITY_BUDGET.density.tauMax;
 const MIN_REPRESENTATIVE_ELOC = 10;
 
 
@@ -317,9 +319,8 @@ function outputJsonDensityReport(allViolations, inspections, totalFiles, exemptC
   process.exit(allViolations.length === 0 ? 0 : 1);
 }
 
-const RE_IGNORED_DIRS = new Set([
-  '.git', '.agents', 'node_modules', 'dist', 'out', 'target', 'fixtures', 'baseline',
-  'reports', 'archive', 'build', '.godot', '.refactor-trajectory', 'tmp', 'temp'
+const RE_IGNORED_DIRS = createIgnoredDirSet([
+  '.agents', 'fixtures', 'baseline', 'reports', 'build', '.refactor-trajectory',
 ]);
 
 function findRepoCodeFiles(dir, fileList = []) {

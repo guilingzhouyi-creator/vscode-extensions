@@ -21,22 +21,34 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { createIgnoredDirSet } = require('./workspace-walker');
+const {
+  LINE_BLANK,
+  LINE_COMMENT,
+  LINE_DOC_COMMENT,
+  QUALITY_BUDGET,
+  createClassifierState,
+  classifyLineWithState,
+  stripInlineComment,
+  countSemanticTokens,
+  isWiringLine: isPlumbingLine,
+} = require('./lib/eloc-line-classifier');
 const { getStagedFiles: queryStagedFiles } = require('./git-env');
 
-const DEFAULT_MAX_ELOC = 900;
-const DEFAULT_MAX_LOC = 1400;
+const DEFAULT_MAX_ELOC = QUALITY_BUDGET.volume.maxEloc;
+const DEFAULT_MAX_LOC = QUALITY_BUDGET.volume.maxLoc;
 const DEFAULT_WARN_ELOC = 750;
 const DEFAULT_WARN_LOC = 1100;
-const DEFAULT_TARGET_DENSITY_RATIO = 3.0;
+const DEFAULT_TARGET_DENSITY_RATIO = QUALITY_BUDGET.volume.targetDensityRatio;
 const MIN_CONTRACT_COMMENT_RATIO = 0.08;
 const MIN_REPRESENTATIVE_LOC = 250;
 
 const LOG_NORMAL_MU = Math.log(7.5);
 const LOG_NORMAL_SIGMA = 0.55;
 const LOG_NORMAL_DENOM = 2 * LOG_NORMAL_SIGMA * LOG_NORMAL_SIGMA; // 0.605
-const MAX_PLUMBING_RATIO = 0.60;
-const MIN_TOKENS_PER_ELOC = 2.5;
-const MAX_TOKENS_PER_ELOC = 22.0;
+const MAX_PLUMBING_RATIO = QUALITY_BUDGET.density.maxPor;
+const MIN_TOKENS_PER_ELOC = QUALITY_BUDGET.density.tauMin;
+const MAX_TOKENS_PER_ELOC = QUALITY_BUDGET.density.tauMax;
 
 const TAG_VOL_ELOC = 'VOL-ELOC-001';
 const TAG_VOL_LOC = 'VOL-LOC-001';
@@ -67,8 +79,8 @@ function suggestDensity(codeDensityPct) {
 }
 const SUGGESTION_DOCS = 'Add required type contracts, state machine invariants, or JSDoc specification for complex logic';
 
-const CONSTANT_MAX_ELOC = 1800;
-const CONSTANT_MAX_LOC = 2500;
+const CONSTANT_MAX_ELOC = QUALITY_BUDGET.volume.constantMaxEloc;
+const CONSTANT_MAX_LOC = QUALITY_BUDGET.volume.constantMaxLoc;
 const DYNAMIC_MIN_PHYSICAL_LOC = 150;
 const HIGH_LOAD_ELOC_THRESHOLD = 600;
 
@@ -91,46 +103,25 @@ function getLanguageVerbosityFactor(filePath) {
 }
 
 /**
- * Checks whether a line in a C-style language (TS, JS) is a comment or blank,
- * updating the block comment state accordingly.
+ * Legacy adapter: classifies a C-style line via SSOT classifier while preserving the legacy
+ * `{ isBlank, isComment, inBlock }` return contract.
  *
  * @param {string} line
  * @param {boolean} inBlockComment
  * @returns {{ isBlank: boolean, isComment: boolean, inBlock: boolean }}
  */
 function classifyCStyleLine(line, inBlockComment) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
-    return { isBlank: true, isComment: false, inBlock: inBlockComment };
-  }
-
-  if (inBlockComment) {
-    const endIdx = trimmed.indexOf('*/');
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true };
-    }
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-
-  if (trimmed.startsWith('/*')) {
-    const endIdx = trimmed.indexOf('*/', 2);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true };
-    }
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-
-  if (trimmed.startsWith('//') || (trimmed.startsWith('*') && !trimmed.startsWith('*='))) {
-    return { isBlank: false, isComment: true, inBlock: false };
-  }
-
-  return { isBlank: false, isComment: false, inBlock: false };
+  const state = { inBlockComment: Boolean(inBlockComment), inDocComment: false, quoteChar: '' };
+  const kind = classifyLineWithState(line, state, '.ts');
+  return {
+    isBlank: kind === LINE_BLANK,
+    isComment: kind === LINE_COMMENT || kind === LINE_DOC_COMMENT,
+    inBlock: state.inBlockComment,
+  };
 }
 
 /**
- * Checks whether a line in a hash-comment language (GDScript, Python, Shell) is a comment or blank.
+ * Legacy adapter: classifies a hash-comment line via SSOT classifier.
  *
  * @param {string} line
  * @param {boolean} inTripleQuote
@@ -138,167 +129,43 @@ function classifyCStyleLine(line, inBlockComment) {
  * @returns {{ isBlank: boolean, isComment: boolean, inBlock: boolean, quoteChar: string }}
  */
 function classifyHashStyleLine(line, inTripleQuote, quoteChar) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
-    return { isBlank: true, isComment: false, inBlock: inTripleQuote, quoteChar };
-  }
-
-  if (inTripleQuote) {
-    const endIdx = trimmed.indexOf(quoteChar);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true, quoteChar };
-    }
-    const rest = trimmed.slice(endIdx + 3).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false, quoteChar: '' };
-  }
-
-  if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
-    const currentQuote = trimmed.slice(0, 3);
-    const endIdx = trimmed.indexOf(currentQuote, 3);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true, quoteChar: currentQuote };
-    }
-    const rest = trimmed.slice(endIdx + 3).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false, quoteChar: '' };
-  }
-
-  if (trimmed.startsWith('#') || trimmed.startsWith(';')) {
-    return { isBlank: false, isComment: true, inBlock: false, quoteChar: '' };
-  }
-
-  return { isBlank: false, isComment: false, inBlock: false, quoteChar: '' };
+  const state = {
+    inBlockComment: Boolean(inTripleQuote),
+    inDocComment: Boolean(inTripleQuote),
+    quoteChar: quoteChar || '',
+  };
+  const kind = classifyLineWithState(line, state, '.py');
+  return {
+    isBlank: kind === LINE_BLANK,
+    isComment: kind === LINE_COMMENT || kind === LINE_DOC_COMMENT,
+    inBlock: state.inBlockComment,
+    quoteChar: state.quoteChar,
+  };
 }
 
 /**
- * Checks whether a line in a PowerShell script (.ps1) is a comment or blank,
- * handling single-line '#' comments and multi-line '<# ... #>' block comments.
+ * Legacy adapter: classifies a PowerShell line via SSOT classifier.
  *
  * @param {string} line
  * @param {boolean} inBlockComment
  * @returns {{ isBlank: boolean, isComment: boolean, inBlock: boolean }}
  */
 function classifyPowerShellLine(line, inBlockComment) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
-    return { isBlank: true, isComment: false, inBlock: inBlockComment };
-  }
-
-  if (inBlockComment) {
-    const endIdx = trimmed.indexOf('#>');
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true };
-    }
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-
-  if (trimmed.startsWith('<#')) {
-    const endIdx = trimmed.indexOf('#>', 2);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true };
-    }
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-
-  if (trimmed.startsWith('#')) {
-    return { isBlank: false, isComment: true, inBlock: false };
-  }
-
-  return { isBlank: false, isComment: false, inBlock: false };
+  const state = { inBlockComment: Boolean(inBlockComment), inDocComment: false, quoteChar: '' };
+  const kind = classifyLineWithState(line, state, '.ps1');
+  return {
+    isBlank: kind === LINE_BLANK,
+    isComment: kind === LINE_COMMENT || kind === LINE_DOC_COMMENT,
+    inBlock: state.inBlockComment,
+  };
 }
 
-const HASH_COMMENT_EXTS = new Set(['.gd', '.py', '.sh', '.bash', '.ps1']);
-const QUOTE_CHARS = new Set(['"', "'", '`']);
-
-function isCommentStart(ch, nextCh, isHash) {
-  if (isHash) return ch === '#';
-  return ch === '/' && nextCh === '/';
-}
-
-/**
- * Strips trailing single-line comments from an effective code line,
- * taking string literals into account to avoid false truncation.
- *
- * @param {string} line - Raw line text.
- * @param {string} ext - File extension.
- * @returns {string} Code text with trailing comments removed.
- */
-function stripInlineComment(line, ext) {
-  if (!line) return '';
-  const isHash = HASH_COMMENT_EXTS.has(ext);
-  let inQuote = null;
-  let isEscaped = false;
-  const len = line.length;
-
-  for (let i = 0; i < len; i++) {
-    const ch = line[i];
-    if (isEscaped) {
-      isEscaped = false;
-      continue;
-    }
-    if (ch === '\\') {
-      isEscaped = true;
-      continue;
-    }
-    if (inQuote) {
-      if (ch === inQuote) inQuote = null;
-      continue;
-    }
-    if (QUOTE_CHARS.has(ch)) {
-      inQuote = ch;
-      continue;
-    }
-    if (isCommentStart(ch, line[i + 1], isHash)) {
-      return line.slice(0, i);
-    }
-  }
-  return line;
-}
-
-const TOKEN_PATTERN = /[a-zA-Z0-9_$]+|===|!==|==|!=|<=|>=|=>|&&|\|\||\+\+|--|[^\s\w]/g;
-
-/**
- * Counts the number of semantic tokens in a code segment.
- *
- * @param {string} text - Code text stripped of comments.
- * @returns {number} Token count.
- */
-function countSemanticTokens(text) {
-  if (!text) return 0;
-  const matches = text.match(TOKEN_PATTERN);
-  return matches ? matches.length : 0;
-}
-
-/**
- * Detects whether a code line represents pure wiring/plumbing
- * (import, export forwarding, from, require, use, source).
- *
- * @param {string} trimmedLine - Cleaned, trimmed code line.
- * @param {string} ext - File extension.
- * @returns {boolean} True if the line is a plumbing statement.
- */
-const RE_PLUMBING_IMPORT = /^(?:import\s+|import\(|from\s+|require\(|(?:const|let|var)\s+.*=\s*require\()/;
-const RE_PLUMBING_EXPORT = /^export\s+(?:\*|type\s+\*|\{[^}]*\}\s*(?:from\s+[^;]+)?;?|default\s+[A-Za-z0-9_$]+;?$)/;
-const RE_PLUMBING_CJS = /^(?:module\.exports\s*=|exports\.)/;
-const RE_PLUMBING_SHELL = /^(?:source\s+|\.\s+|using\s+|Import-Module\s+)/;
-const RE_PLUMBING_GD = /^(?:extends\s+|class_name\s+|(?:const|var)\s+\w+\s*=\s*preload\()/;
 const RE_CONST_DECL = /^(?:export\s+(?:const|enum)|const|readonly)\s+|as\s+const;?$/;
 const RE_FN_OR_CLASS = /function\s+|=>\s*\{|class\s+/;
 
 const CONSTANT_PATH_PATTERNS = Object.freeze(
   '/constants/,/tokens/,/locales/,/i18n/,/types/,constants.ts,tokens.ts,rule-codes.ts,diagnostic-tokens.ts,system-tokens.ts,ast-tokens.ts,_types.gd,_types.ts,-types.ts'.split(',')
 );
-
-function isPlumbingLine(trimmedLine, ext) {
-  if (!trimmedLine) return false;
-  if (RE_PLUMBING_IMPORT.test(trimmedLine)) return true;
-  if (RE_PLUMBING_EXPORT.test(trimmedLine)) return true;
-  if (RE_PLUMBING_CJS.test(trimmedLine)) return true;
-  if (RE_PLUMBING_SHELL.test(trimmedLine)) return true;
-  if (ext === '.gd' && RE_PLUMBING_GD.test(trimmedLine)) return true;
-  return false;
-}
 
 /**
  * Check if the file path matches benign constant catalog patterns.
@@ -388,28 +255,28 @@ function isPlumbingExemptPath(filePath, content = '') {
 }
 
 /**
- * Classifies a single line of source code based on language comment conventions.
+ * Classifies a single line of source code via the SSOT line classifier.
  *
  * @param {string} line - Raw line text.
  * @param {string} ext - Lowercase file extension.
- * @param {{ inBlock: boolean, quoteChar: string }} state - Parser block comment state.
+ * @param {{ inBlock?: boolean, inBlockComment?: boolean, inDocComment?: boolean, quoteChar?: string }} state - Parser block comment state.
  * @returns {{ isBlank: boolean, isComment: boolean }}
  */
 function classifySourceLine(line, ext, state) {
-  if (ext === '.ps1') {
-    const res = classifyPowerShellLine(line, state.inBlock);
-    state.inBlock = res.inBlock;
-    return res;
-  }
-  if (HASH_COMMENT_EXTS.has(ext)) {
-    const res = classifyHashStyleLine(line, state.inBlock, state.quoteChar);
-    state.inBlock = res.inBlock;
-    state.quoteChar = res.quoteChar;
-    return res;
-  }
-  const res = classifyCStyleLine(line, state.inBlock);
-  state.inBlock = res.inBlock;
-  return res;
+  const classifierState = {
+    inBlockComment: Boolean(state.inBlockComment ?? state.inBlock),
+    inDocComment: Boolean(state.inDocComment),
+    quoteChar: state.quoteChar || '',
+  };
+  const kind = classifyLineWithState(line, classifierState, ext);
+  state.inBlock = classifierState.inBlockComment;
+  state.inBlockComment = classifierState.inBlockComment;
+  state.inDocComment = classifierState.inDocComment;
+  state.quoteChar = classifierState.quoteChar;
+  return {
+    isBlank: kind === LINE_BLANK,
+    isComment: kind === LINE_COMMENT || kind === LINE_DOC_COMMENT,
+  };
 }
 
 function computeDerivedDensityMetrics({ totalLoc, eloc, commentLines, tokenCount, plumbingLines, isExempt }) {
@@ -481,13 +348,13 @@ function evaluateCodeMetrics(content, ext, filePath = '') {
   let tokenCount = 0;
   let plumbingLines = 0;
 
-  const state = { inBlock: false, quoteChar: '' };
+  const state = createClassifierState();
 
   for (const line of lines) {
-    const result = classifySourceLine(line, ext, state);
-    if (result.isBlank) {
+    const kind = classifyLineWithState(line, state, ext);
+    if (kind === LINE_BLANK) {
       blankLines++;
-    } else if (result.isComment) {
+    } else if (kind === LINE_COMMENT || kind === LINE_DOC_COMMENT) {
       commentLines++;
     } else {
       eloc++;
@@ -746,11 +613,11 @@ const USAGE_TEXT = [
   '  <files...>               Evaluate explicit paths',
   '',
   'Volume overrides:',
-  '  --max-eloc <n>           Hard ELOC ceiling (default 900)',
-  '  --max-loc <n>            Hard physical-LOC ceiling (default 1400)',
-  '  --warn-eloc <n>          ELOC warning line (default 750)',
-  '  --warn-loc <n>           LOC warning line (default 1100)',
-  '  --density-ratio <n>      Target LOC:ELOC dilution ratio (default 3.0)',
+  `  --max-eloc <n>           Hard ELOC ceiling (default ${DEFAULT_MAX_ELOC})`,
+  `  --max-loc <n>            Hard physical-LOC ceiling (default ${DEFAULT_MAX_LOC})`,
+  `  --warn-eloc <n>          ELOC warning line (default ${DEFAULT_WARN_ELOC})`,
+  `  --warn-loc <n>           LOC warning line (default ${DEFAULT_WARN_LOC})`,
+  `  --density-ratio <n>      Target LOC:ELOC dilution ratio (default ${DEFAULT_TARGET_DENSITY_RATIO.toFixed(1)})`,
   '',
   'Output:',
   '  --json                   Emit machine-readable JSON',
@@ -837,9 +704,8 @@ function isAuditableCodeFile(file) {
   return AUDITABLE_EXTENSIONS.has(ext);
 }
 
-const RE_IGNORED_DIR_NAMES = new Set([
-  '.git', '.agents', 'node_modules', 'dist', 'out', 'target', 'fixtures', 'baseline',
-  'reports', 'archive', 'build', '.godot', '.refactor-trajectory', 'tmp', 'temp',
+const RE_IGNORED_DIR_NAMES = createIgnoredDirSet([
+  '.agents', 'fixtures', 'baseline', 'reports', 'build', '.refactor-trajectory',
 ]);
 
 /**

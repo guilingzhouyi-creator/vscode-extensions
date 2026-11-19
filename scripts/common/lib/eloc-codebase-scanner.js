@@ -16,13 +16,19 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createIgnoredDirSet } = require('../workspace-walker');
 const { evaluateCodeMetrics, isAuditableCodeFile } = require('../evaluate-eloc-budget');
 
 const RUST_EXT = '.rs';
-const DEFAULT_IGNORE_DIRS = new Set([
-  '.git', '.agents', 'node_modules', 'dist', 'out', 'target', 'fixtures', 'baseline',
-  'reports', 'archive', 'build', '.godot', '.refactor-trajectory', 'coverage',
-  'tmp', 'temp', '.vitest', '.audit-logs',
+const DEFAULT_IGNORE_DIRS = createIgnoredDirSet([
+  '.agents',
+  'fixtures',
+  'baseline',
+  'reports',
+  'build',
+  '.refactor-trajectory',
+  'coverage',
+  '.vitest',
 ]);
 
 function roundTwo(val) {

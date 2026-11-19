@@ -46,9 +46,34 @@ const DEFAULT_IGNORED_DIRS = new Set([
   'temp',
   '.praxis',
   '.taxis',
+  '.vitest',
   '.venv',
   'venv',
 ]);
+
+/**
+ * Derives a new ignored directory Set from `DEFAULT_IGNORED_DIRS` with optional additions and omissions.
+ *
+ * @param {Iterable<string>} [extraDirs=[]] - Additional directory names to ignore.
+ * @param {Iterable<string>} [omitDirs=[]] - Directory names to remove from the default ignore set.
+ * @returns {Set<string>} Derived ignore directory set.
+ */
+function createIgnoredDirSet(extraDirs = [], omitDirs = []) {
+  const result = new Set(DEFAULT_IGNORED_DIRS);
+  if (extraDirs) {
+    for (const dir of extraDirs) {
+      if (typeof dir === 'string' && dir.length > 0) {
+        result.add(dir);
+      }
+    }
+  }
+  if (omitDirs) {
+    for (const dir of omitDirs) {
+      result.delete(dir);
+    }
+  }
+  return result;
+}
 
 /**
  * Standard text extensions subject to physical hygiene and static code analysis.
@@ -198,6 +223,7 @@ function walkWorkspace(rootDir, visitor, options = {}) {
 module.exports = {
   DEFAULT_IGNORED_DIRS,
   DEFAULT_TEXT_EXTENSIONS,
+  createIgnoredDirSet,
   isIgnoredDirectory,
   collectWorkspaceFiles,
   walkWorkspace,
