@@ -4,9 +4,9 @@ description: >-
   【触发：clarify/design/rework/churn/spec/X-Y/contract/scope】Clarify ambiguous specs one question at a time, expose X-Y traps, and lock contracts before architecture edits.
 ---
 
-# spec-driven-development — Single-Point Inquiry, Capability Mapping & Spec-First Workflow
+# spec-driven-development — Single-Point Inquiry, Capability Map & Spec-First
 
-Combines **Reverse Engineering Specification Review (Reverse ESR)** with **Spec-Driven Development** before coding: resolve ambiguity one question at a time, lock unidirectional capability topologies and typed contracts in `SPEC.md`, and obtain alignment before implementation.
+Combines **Reverse ESR** and **Spec-Driven Development**: resolve ambiguity one question at a time, lock unidirectional topologies and typed contracts in `SPEC.md`, then implement.
 
 ---
 
@@ -21,41 +21,27 @@ Combines **Reverse Engineering Specification Review (Reverse ESR)** with **Spec-
 - **何时联动**：Draft 4-stage spec before building new gameplay → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
-## 1. When to Activate (and Exemptions)
+## 1. Activation Scope
 
-- **Activate**: Ambiguous requirements with architectural trade-offs; new features, cross-layer services, or wire/storage protocol upgrades; breaking changes or state-machine migrations.
-- **Exempt**: Typo fixes, deterministic 1-line null guards, or localized tweaks already covered by an existing spec.
+- **Activate**: Ambiguous trade-offs, cross-layer services, wire/storage upgrades, breaking changes, or FSM migrations.
+- **Exempt**: Typos, deterministic 1-line null guards, or tweaks covered by an existing spec.
 
 ---
 
 ## 2. Five-Stage Pre-Coding Workflow
 
-```text
-Stage -1: Reverse ESR ──▶ Stage 0: Capability Map ──▶ Stage 1: Feature Spec ──▶ Stage 2: Task Breakdown ──▶ Stage 3: Implementation
-```
+`Stage -1: Reverse ESR -> Stage 0: Capability Map -> Stage 1: Feature Spec -> Stage 2: Task Breakdown -> Stage 3: Implementation`
 
-### Stage -1: Reverse ESR (One Question at a Time)
-1. **Single Blocking Question**: Ask only 1 highest-priority architectural or boundary question per turn — never dump a multi-question survey.
-2. **Concrete Options with `(Recommended)`**: Offer 2–3 concrete options, prefix the preferred choice with `(Recommended)`, and state the trade-off in one sentence.
-3. **X-Y Problem Detection**: If a requested mechanism (`Y`) violates layering or concurrency safety, surface the underlying goal (`X`) and propose a compliant alternative.
-4. **Bug-Report 4-Tuple**: When given a terse bug report, elicit `[Environment, Trigger Input, Expected Behavior, Stack Trace]`.
-
-### Stage 0: Unidirectional Capability Mapping
-Decompose multi-module features into a bottom-up DAG ([questioning-and-capability-mapping.md](references/questioning-and-capability-mapping.md)):
-- Assign each module a stable `module-id` ordered `Contract/Shared -> Storage -> Core/Engine -> Service/Controller -> Interface/UI`.
-- Ensure core domain and storage modules can be unit-tested in memory without host UI/engine dependencies.
-
-### Stage 1: Author `SPEC.md` ([feature-spec-template.md](templates/feature-spec-template.md))
-Include: ① Decision record & In/Out-of-Scope boundaries; ② Layer placement & unidirectional dependencies; ③ Strongly typed DTOs/interfaces, unit suffixes (`*Ms`), and preconditions; ④ Negative space, crash recovery, complexity & memory budgets; ⑤ Falsifiable acceptance test matrix.
-
-### Stages 2 & 3: Exclusive-File Task Breakdown & Red-Green-Refactor Delivery
-Partition into file-disjoint atomic tasks and enforce:
-- Guard-clause control flow ($\text{CC} \le 15, \text{Depth} \le 4$), zero loop heap allocation (`CPX-SPACE-001`), zero $\le 3$-line trampolines (`ARCH-ABS-001`), and 6-field JSDoc headers.
-- Verify compile + unit tests + static rules before claiming completion.
+| Stage | Contract |
+|---|---|
+| **-1: Reverse ESR** | 1 blocking question/turn with 2–3 options (`(Recommended)` first + 1-sentence trade-off); expose X-Y traps (goal `X` when `Y` breaks layering/concurrency); elicit `[Environment, Trigger Input, Expected Behavior, Stack Trace]` for terse bugs |
+| **0: Capability Map** | Bottom-up DAG ([questioning-and-capability-mapping.md](references/questioning-and-capability-mapping.md)) with `module-id` ordered `Contract/Shared -> Storage -> Core/Engine -> Service/Controller -> Interface/UI`; host-free core/storage tests |
+| **1: `SPEC.md`** | Via [feature-spec-template.md](templates/feature-spec-template.md): ① Scope; ② Layer & deps; ③ Typed DTOs, `*Ms`, preconditions; ④ Negative space, crash recovery, complexity/memory budgets; ⑤ Falsifiable acceptance matrix |
+| **2–3: Deliver** | File-disjoint tasks; $\text{CC} \le 15, \text{Depth} \le 4$, zero loop alloc (`CPX-SPACE-001`), zero $\le 3$-line trampolines (`ARCH-ABS-001`), 6-field JSDoc; verify compile + tests + static checks |
 
 ---
 
-## 3. JIT References & Templates
+## 3. JIT Assets
 
-- [questioning-and-capability-mapping.md](references/questioning-and-capability-mapping.md): Reverse ESR protocol, domain inquiry bank, and 5-layer capability mapping guide.
+- [questioning-and-capability-mapping.md](references/questioning-and-capability-mapping.md): Reverse ESR, inquiry bank & 5-layer capability mapping.
 - [feature-spec-template.md](templates/feature-spec-template.md): Parameterized feature specification template.

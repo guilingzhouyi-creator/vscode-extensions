@@ -4,11 +4,9 @@ description: >-
   【触发：style/design/jank/glitch/CSS/IME/dark/motion】Enforce dark lightness steps, single-border CSS, damped spring motion, power-law vignettes, and IME compose locks.
 ---
 
-# interaction-design-physics — UI Engineering & Interaction Physics Specification
+# interaction-design-physics — UI Engineering & Interaction Physics
 
-Governs Webview, frontend, and client presentation layers using closed-form spring physics, perceptual luminance hierarchies, single-border enclosure discipline, and defensive IME/viewport state machines.
-
----
+Governs frontend/Webview layers via closed-form spring kinetics, perceptual luminance steps, single-border enclosure, and defensive IME/viewport state machines.
 
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
@@ -21,34 +19,32 @@ Governs Webview, frontend, and client presentation layers using closed-form spri
 - **何时联动**：Webview jank, frame drops, or IME send glitch → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；Implement damped motion and power-law vignette curves → `webgames-workflow` + `interaction-design-physics` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
-## 1. Five Core Axioms of Interaction Physics
+---
 
-1. **Semantic Luminance Elevation ($S_0 \dots S_n$)**: Separate depth layers via subtle luminance steps; forbid harsh white borders in dark mode — use inset hairline specular highlights (`box-shadow: inset 0 0 0 var(--hairline-width) rgba(255,255,255,0.10)`).
-2. **The 1-Border Rule**: Any visual ray from container background to leaf control may cross at most **1 closed rectangular border**; demote nested pills, buttons, and inputs inside bordered cards to `Ghost` states, surface fills, or single-axis dividers.
-3. **Second-Order Damped Harmonic Oscillator ($m\ddot{x} + c\dot{x} + k(x - x_{\text{target}}) = 0$)**: Forbid mechanical `linear` easing; select from four presets by damping ratio $\zeta = \frac{c}{2\sqrt{mk}}$:
-   - **Snappy** ($k=600, c=30, \zeta=0.612$, overshoot $+8.8\%$, settle $0.22\text{s}$): button clicks, tab switches;
-   - **Gentle** ($k=320, c=28, \zeta=0.783$, overshoot $+1.8\%$, settle $0.35\text{s}$): card expansion, popovers;
-   - **Bouncy** ($k=380, c=18, \zeta=0.462$, overshoot $+19.4\%$, settle $0.58\text{s}$): badge notifications;
-   - **HeavySnap** ($k=1200, c=80, m=0.1, \zeta=3.65$, $0\%$ overshoot, settle $0.14\text{s}$): split-pane snapping, drawers.
-4. **Streaming Viewport Pinning**: Auto-pin when distance to bottom $\Delta h \le 40\text{px}$ (using `behavior: "auto"` during streaming to prevent jitter); reveal jump-to-bottom button when $\Delta h > 120\text{px}$; enforce a $150\text{ms}$ human scroll cooldown lock that overrides programmatic auto-scroll.
-5. **CJK IME Composition Interlock**: Gate Enter submission on $(\neg\text{isComposing}) \land (\text{keyCode} \ne 229)$; pressing `Escape` during composition closes only the IME candidate window without bubbling to close modals.
+## 1. Five Core Physics Axioms
 
-> Full derivations, luminance tables, and state machines: [visual-enclosure-discipline.md](references/visual-enclosure-discipline.md).
+1. **Luminance Elevation ($S_0 \dots S_n$)**: Separate depth via luminance steps; use inset specular hairlines (`box-shadow: inset 0 0 0 var(--hairline-width) rgba(255,255,255,0.10)`), not harsh dark-mode borders.
+2. **1-Border Rule**: Any ray from container to leaf control crosses $\le 1$ closed border; demote nested pills/buttons/inputs to `Ghost`, fills, or single-axis dividers.
+3. **2nd-Order Spring ($m\ddot{x} + c\dot{x} + k(x - x_{\text{target}}) = 0$, $\zeta = \frac{c}{2\sqrt{mk}}$)**: Ban `linear` easing; presets: **Snappy** ($600,30,\zeta=0.612,+8.8\%,0.22\text{s}$), **Gentle** ($320,28,\zeta=0.783,+1.8\%,0.35\text{s}$), **Bouncy** ($380,18,\zeta=0.462,+19.4\%,0.58\text{s}$), **HeavySnap** ($1200,80,m=0.1,\zeta=3.65,0\%,0.14\text{s}$).
+4. **Streaming Viewport Pinning**: Auto-pin at $\Delta h \le 40\text{px}$ (`behavior: "auto"`), show jump pill at $>120\text{px}$, enforce $150\text{ms}$ human scroll lock.
+5. **CJK IME Lock**: Submit only when $(\neg\text{isComposing}) \land (\text{keyCode} \ne 229)$; `Escape` during composition closes only the IME candidate window.
+
+> Derivations & state machines: [visual-enclosure-discipline.md](references/visual-enclosure-discipline.md).
 
 ---
 
-## 2. Physics Subsystems & Reusable Template Scaffolds
+## 2. Physics Subsystems & Templates
 
-| Subsystem | Physical Parameters & Engineering Contract | Template Asset |
+| Subsystem | Key Invariants | Template |
 | :--- | :--- | :--- |
-| **2nd-Order Spring Solver** | Closed-form evaluation for Snappy / Gentle / Bouncy / HeavySnap | [spring-physics-presets.ts](templates/spring-physics-presets.ts) |
-| **Streaming Scroll Pinning** | $40\text{px}$ pin zone, $120\text{px}$ pill trigger, $150\text{ms}$ human scroll lock, `behavior: "auto"` | [scroll-pinning-controller.ts](templates/scroll-pinning-controller.ts) |
-| **7-Stop Power-Law Fade Mask** | $28\text{px}$ feather zone sampled along $y \approx x^{1.5}$ (`0%..100%`), zeroed at scroll bounds | [scroll-fade-container.css](templates/scroll-fade-container.css) |
-| **Fixed-Point Affine Pan/Zoom** | Cursor $(O_x, O_y)$ invariant, wheel $\exp(-\Delta y \times 0.01)$, $4\text{px}$ deadzone, $0.7$rubber-band damping | [affine-pan-zoom-engine.ts](templates/affine-pan-zoom-engine.ts) |
-| **Container Queries & CJK Type** | `576/480/384/320px` 4-tier degradation, `text-wrap: balance`, `tabular-nums`, SVG `-0.125em` baseline | [container-responsive-matrix.css](templates/container-responsive-matrix.css) |
-| **Split-Pane & Iframe Shield** | Mount `iframe { pointer-events: none }` on `pointerdown`, $4\text{px}$ deadzone, double-click 50/50 snap, $<18\%$ collapse | [split-pane-resizer.ts](templates/split-pane-resizer.ts) |
-| **Web Audio Procedural Synth** | Master gain $\le 0.3$, dual harmonic oscillators, $3\sim 5\text{ms}$ linear attack + exponential decay | [procedural-audio-synth.ts](templates/procedural-audio-synth.ts) |
-| **WAI-ARIA Roving Focus** | Single `tabIndex = 0` invariant, 1D/2D orthogonal arrow navigation, wrap-around & RTL mirroring | [roving-focus-controller.ts](templates/roving-focus-controller.ts) |
-| **Ambient Glow & Gamma** | Asymmetric sweep bezier, 3-phase pulse (`0s/0.35s/0.7s`), $8\%$ noise gate & $A^{0.7}$ gamma compression | [thinking-ambient-glow.css](templates/thinking-ambient-glow.css) · [spectral-gamma-compressor.ts](templates/spectral-gamma-compressor.ts) |
-| **Null-Origin Iframe Sandbox** | `sandbox="allow-scripts"` (forbid `allow-same-origin`), verify `event.isTrusted && userActivation` | [sandbox-iframe-bridge.ts](templates/sandbox-iframe-bridge.ts) |
-| **Borderless Segmented Pill** | Zero nested borders, geometric offset indicator driven by Snappy spring | [segmented-control-pill.tsx](templates/segmented-control-pill.tsx) |
+| **Spring Solver** | Closed-form Snappy / Gentle / Bouncy / HeavySnap | [spring-physics-presets.ts](templates/spring-physics-presets.ts) |
+| **Scroll Pinning** | $40\text{px}$ pin, $120\text{px}$ pill, $150\text{ms}$ human lock, `behavior: "auto"` | [scroll-pinning-controller.ts](templates/scroll-pinning-controller.ts) |
+| **Power-Law Fade** | 7-stop $28\text{px}$ feather along $y \approx x^{1.5}$, zeroed at bounds | [scroll-fade-container.css](templates/scroll-fade-container.css) |
+| **Affine Pan/Zoom** | Fixed $(O_x, O_y)$, wheel $\exp(-\Delta y \times 0.01)$, $4\text{px}$ deadzone, $0.7$ damping | [affine-pan-zoom-engine.ts](templates/affine-pan-zoom-engine.ts) |
+| **Responsive & Type** | `576/480/384/320px` queries, `text-wrap: balance`, `tabular-nums`, `-0.125em` SVG | [container-responsive-matrix.css](templates/container-responsive-matrix.css) |
+| **Split-Pane Shield** | `iframe { pointer-events: none }` on `pointerdown`, $4\text{px}$ deadzone, 50/50 snap, $<18\%$ collapse | [split-pane-resizer.ts](templates/split-pane-resizer.ts) |
+| **Procedural Synth** | Master gain $\le 0.3$, dual oscillators, $3\sim 5\text{ms}$ attack + exp decay | [procedural-audio-synth.ts](templates/procedural-audio-synth.ts) |
+| **Roving Focus** | Single `tabIndex = 0`, 1D/2D arrows, wrap & RTL | [roving-focus-controller.ts](templates/roving-focus-controller.ts) |
+| **Ambient & Gamma** | Asymmetric sweep, 3-phase pulse (`0/0.35/0.7s`), $8\%$ gate & $A^{0.7}$ gamma | [thinking-ambient-glow.css](templates/thinking-ambient-glow.css) · [spectral-gamma-compressor.ts](templates/spectral-gamma-compressor.ts) |
+| **Null-Origin Iframe** | `sandbox="allow-scripts"` (no `allow-same-origin`), `isTrusted && userActivation` | [sandbox-iframe-bridge.ts](templates/sandbox-iframe-bridge.ts) |
+| **Segmented Pill** | Zero nested borders, Snappy-spring offset indicator | [segmented-control-pill.tsx](templates/segmented-control-pill.tsx) |

@@ -6,7 +6,7 @@ description: >-
 
 # batch-commit — Six-Layer Topological Atomic Commit & Pre-Flight Gate Workflow
 
-Governs bottom-up 6-layer topological commit batching, parallel session isolation, 5D ELOC differential clamping, structured commit message authoring, 6-class forbidden term interception, and offline gate pre-flight verification.
+Governs bottom-up 6-layer topological commit batching, parallel session isolation, weighted ELOC differential clamping, structured commit message authoring, 6-class forbidden term interception, and offline gate pre-flight verification.
 
 ---
 
@@ -31,9 +31,9 @@ Commit production+tests (**Code Beat**) before audit snapshots (**Telemetry Beat
 
 ## 2. Four-Step S-P-C-V Execution Loop
 
-### Step 1: Staging, Session Mutex & 5D Diff Bounds (`git add <files>`)
+### Step 1: Staging, Session Mutex & Differential Bounds (`git add <files>`)
 1. **Whitelist & Mutex**: Ban `git add .`, `git add -A`, `git checkout -- .`, `git restore .`, `git clean -fd`, `git reset --hard`. Stage only current-batch Path-Jail files (`git add a.ts b.ts`); leave external dirty files in `git status -s` untouched.
-2. **5D ELOC Bounds (`FGT-GAT-001`, SSOT: `scripts/common/diff-bounds-contract.json`)**:
+2. **Weighted ELOC Bounds (`FGT-GAT-001`, SSOT: `scripts/common/diff-bounds-contract.json`)**:
    - **Micro**: Source add new $\le 240$, existing $\le 180$, refactor-witness $\le 260$; test add new $\le 360$, existing $\le 260$, refactor-witness $\le 380$; del plain $\le 120$, witnessed $\le 360$; substantive floor/target `0.45/0.60`, $\text{TSPR}\ge 0.40$.
    - **Macro**: Pure growth add $\le 540$, cross-file refactor add $\le 720$ (`crossFileRefactorMinDelEloc=30`, `crossFileRefactorDelRatio=0.6`), test weight `0.5x`, del $\le 360$, turnover $\ge \Theta_{\text{admission}}\in [3.0, 25.0]$ (`.taxis/telemetry/admission_ledger.ndjson`).
    - **Overflow**: Fix `FILE_ADD_OVERFLOW` / `BATCH_ADD_OVERFLOW` by extracting cohesive submodules ($240$ source / $360$ test ceiling) or splitting commits ([5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)).
@@ -62,4 +62,4 @@ Run `pwsh -File scripts/ps1/pre-commit-gate.ps1` headlessly (`GUARD-AST-001`: fl
 
 - [commit-template-standard.txt](templates/commit-template-standard.txt): Standard structured commit message template.
 - [forbidden-terms-guide.md](references/forbidden-terms-guide.md): Forbidden vocabulary & qualitative assertion guide.
-- [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md): 5D ELOC differential clamping & module deconstruction guide.
+- [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md): Weighted ELOC differential clamping & module deconstruction guide.

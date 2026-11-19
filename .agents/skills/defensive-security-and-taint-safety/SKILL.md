@@ -6,9 +6,7 @@ description: >-
 
 # defensive-security-and-taint-safety — Taint Dataflow, Destructive-Op Guards & Exposure Isolation
 
-Enforces zero-trust taint tracking for recursive file deletion (`GUARD-DESTR-001`), read-only host variable protection (`GUARD-VAR-001`), subprocess injection defense, and client/bundle exposure isolation (`SEC-EXP-*` / `PROD-HYG-*`).
-
----
+Enforces recursive-delete taint guards (`GUARD-DESTR-001`), read-only auto-var protection (`GUARD-VAR-001`), subprocess injection defense, and client/bundle isolation (`SEC-EXP-*` / `PROD-HYG-*`).
 
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
@@ -21,49 +19,32 @@ Enforces zero-trust taint tracking for recursive file deletion (`GUARD-DESTR-001
 - **何时联动**：Audit recursive delete or path-traversal taint risks → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`；Concurrent index tree write crash recovery or unsafe proofs → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
 <!-- SKILL-LINKS:END -->
 
-## 1. Three-Step Taint Guard for Recursive Deletion (`GUARD-DESTR-001` / `EXT-DIR-001`)
+## 1. Three-Step Recursive Delete Guard (`GUARD-DESTR-001` / `EXT-DIR-001`)
 
-`shell-safety` and `scripts/common/validate-destructive-ops.js` trace taint across **assignment chains and loop iterator aliases**. Every recursive delete (`rm -rf`, `Remove-Item -Recurse`, `fs.rmSync`, `shutil.rmtree`) must prove three preconditions:
+`shell-safety` and `validate-destructive-ops.js` trace taint across **assignments and loop aliases**. Every `rm -rf`, `Remove-Item -Recurse`, `fs.rmSync`, or `shutil.rmtree` must prove:
 
-| Step | Mandatory Precondition | Blocked Fatal Anti-Pattern |
+| Step | Mandatory Precondition | Blocked Anti-Pattern |
 | :--- | :--- | :--- |
-| **1. Non-Empty & Non-Root** | Target is non-empty, non-whitespace, and $\notin \{ \texttt{/}, \texttt{\\}, \texttt{\~}, \texttt{\$HOME}, \texttt{\$env:USERPROFILE}, \text{drive root} \}$ | `rm -rf "$TARGET_DIR/"` when `$TARGET_DIR` is unset |
-| **2. Canonical Path Resolution** | Resolve via `path.resolve` / `Resolve-Path` / `realpath -m` to strip `..` traversal segments | `fs.rmSync(path.join(base, userInput), { recursive: true })` without prefix verification |
-| **3. Sandbox Prefix & Depth $\ge 1$** | Resolved path starts with `REPO_ROOT/` or `os.tmpdir()/` and has relative depth $\ge 1$ | Deleting a loop alias derived from `$HOME` (`$d = $HOME; foreach ($x in $d) { rm -rf $x }`) |
+| **1. Non-Empty & Non-Root** | Non-empty, non-whitespace, $\notin \{\texttt{/}, \texttt{\\}, \texttt{\~}, \texttt{\$HOME}, \texttt{\$env:USERPROFILE}, \text{drive root}\}$ | `rm -rf "$TARGET_DIR/"` with unset var |
+| **2. Canonical Resolution** | `path.resolve` / `Resolve-Path` / `realpath -m` stripping `..` | `fs.rmSync(path.join(base, userInput), { recursive: true })` |
+| **3. Sandbox Prefix & Depth $\ge 1$** | Starts with `REPO_ROOT/` or `os.tmpdir()/` with relative depth $\ge 1$ | Deleting `$HOME`-derived loop alias (`$d = $HOME; foreach ($x in $d)`) |
 
-- **Dual-Path `rm` Guard**: In `scripts/ps1/lib/linux-parity.ps1`, both GNU `rm.exe` and fallback `Remove-Item` bindings must invoke `Test-LinuxParityRemovalTarget` before execution.
-- **Parallel Session Protection**: Never run global destructive resets (`git checkout -- .`, `git restore .`, `git clean -fd`, `git reset --hard`) in shared worktrees.
+- **Dual-Path `rm`**: In `linux-parity.ps1`, both GNU `rm.exe` and fallback `Remove-Item` invoke `Test-LinuxParityRemovalTarget`. Never run global resets (`git checkout -- .`, `git restore .`, `git clean -fd`, `git reset --hard`) in shared worktrees.
 
----
+## 2. Auto-Variables, Injection & Client Exposure (`GUARD-VAR-001` / `SEC-*` / `PROD-HYG-*`)
 
-## 2. Read-Only Auto-Variables & Command Injection Defense (`GUARD-VAR-001` / `SH-SEC-001` / `PS-SEC-001`)
-
-1. **No Writes or Shadowing on PowerShell Read-Only Variables (`GUARD-VAR-001`)**:
-   - Never assign to, declare as `param()`, or bind in `foreach` / `catch`: `$HOME`, `$PID`, `$PSHOME`, `$Host`, `$Error`, `$ExecutionContext`, `$ShellId`, `$PSVersionTable`, `$IsWindows`, `$IsLinux`, `$IsMacOS`, `$PSCulture`, `$PSUICulture`, `$PSEdition`.
-2. **Zero Dynamic Code Evaluation (`SEC-VUL-001` / `PS-SEC-001` / `SH-SEC-001`)**:
-   - Forbid `eval`, `new Function()`, `Invoke-Expression` (`iex`), and unescaped string interpolation in `child_process.exec`. Always pass argument arrays (`execFile` / `spawn(cmd, args)`).
+- **PowerShell Auto-Vars (`GUARD-VAR-001`)**: Never assign, `param()`-declare, or loop/catch-bind `$HOME`, `$PID`, `$PSHOME`, `$Host`, `$Error`, `$ExecutionContext`, `$ShellId`, `$PSVersionTable`, `$IsWindows`, `$IsLinux`, `$IsMacOS`, `$PSCulture`, `$PSUICulture`, `$PSEdition`.
+- **Zero Dynamic Eval (`SEC-VUL-001` / `PS-SEC-001` / `SH-SEC-001`)**: Ban `eval`, `new Function()`, `Invoke-Expression` (`iex`), and unescaped `exec` interpolation; pass arg arrays (`execFile` / `spawn`).
+- **Client & Bundle Hygiene (`SEC-EXP-001` ~ `SEC-EXP-005`, `SEC-LEAK-001`, `PROD-HYG-001` ~ `PROD-HYG-003`, `HC-SECRET`)**: Never ship secrets/keys/DB URLs/admin routes (`SEC-EXP-001`/`SEC-LEAK-001`), CSS-only auth (`SEC-EXP-002`), `__debug` stubs (`SEC-EXP-004`/`005`), debug `console.log`/`TODO` (`PROD-HYG-001`), inline sourcemaps (`PROD-HYG-002`), raw `process.env` (`PROD-HYG-003`), or high-entropy tokens (`HC-SECRET` — use `test-placeholder-token-0000`).
 
 ---
 
-## 3. Client Exposure & Production Bundle Hygiene (`SEC-EXP-*` / `PROD-HYG-*`)
-
-1. **Client Exposure Boundary (`SEC-EXP-001` ~ `SEC-EXP-005`)**:
-   - Never bundle server secrets, private keys, DB connection strings, or internal admin endpoints into Webviews or frontend assets (`SEC-EXP-001` / `SEC-LEAK-001`).
-   - Never rely on CSS hiding or client-side conditional rendering for access control (`SEC-EXP-002`).
-   - Strip `__debug` routes, test stubs, and unauthenticated diagnostic endpoints from production builds (`SEC-EXP-004` / `SEC-EXP-005`).
-2. **Production Bundle Hygiene (`PROD-HYG-001` ~ `PROD-HYG-003`) & Secrets (`HC-SECRET`)**:
-   - Strip debug `console.log` / `TODO` (`PROD-HYG-001`), externalize/strip sourcemaps (`PROD-HYG-002`), and never serialize raw `process.env` into client bundles (`PROD-HYG-003`).
-   - Never hardcode high-entropy tokens (`secret-detected` / `high-entropy-token` / `HC-SECRET`); use low-entropy placeholders (`test-placeholder-token-0000`) in fixtures.
-
----
-
-## 4. Verification & JIT Assets
+## 3. Verification & JIT Assets
 
 ```powershell
-node scripts/common/validate-destructive-ops.js
+node scripts/common/validate-destructive-ops.js && node scripts/common/validate-shell-parity.js
 node .agents/skills/defensive-security-and-taint-safety/templates/safe-sandbox-cleanup.js
-node scripts/common/validate-shell-parity.js
 ```
 
-- [taint-dataflow-and-exposure-boundaries.md](references/taint-dataflow-and-exposure-boundaries.md): Assignment/loop-alias taint propagation rules, cross-language sandbox guards, and client exposure audit checklist.
-- [safe-sandbox-cleanup.js](templates/safe-sandbox-cleanup.js): 3-step taint-verified recursive sandbox cleanup template with built-in `runSelfProbes()`.
+- [taint-dataflow-and-exposure-boundaries.md](references/taint-dataflow-and-exposure-boundaries.md): Assignment/loop-alias taint rules, sandbox guards & exposure checklist.
+- [safe-sandbox-cleanup.js](templates/safe-sandbox-cleanup.js): 3-step taint-verified sandbox cleanup scaffold with `runSelfProbes()`.

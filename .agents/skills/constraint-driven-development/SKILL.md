@@ -4,9 +4,9 @@ description: >-
   【触发：verify/merge/bypass/partial/Doubt/Floor/ratchet/gate】Run Floor Guard ratchets and adversarial Doubt loops before delivery; forbid baseline weakening or partial hacks.
 ---
 
-# constraint-driven-development — Floor Guard, Monotonic Ratchet & Adversarial Doubt Cycle
+# constraint-driven-development — Floor Guard, Ratchet & Doubt Cycle
 
-Combines pre-coding **Floor Guard & Monotonic Ratchet** enforcement with pre-delivery **5-Step Adversarial Falsification (Doubt Cycle)** to block threshold relaxation, test weakening, and unverified boundary assumptions.
+Enforces pre-coding **Floor Guard & Monotonic Ratchet** and pre-delivery **5-Step Doubt Cycle** against threshold relaxation, test weakening, and unverified assumptions.
 
 ---
 
@@ -21,47 +21,36 @@ Combines pre-coding **Floor Guard & Monotonic Ratchet** enforcement with pre-del
 - **何时联动**：Stage atomic commits alongside dirty parallel sessions → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；Detect score padding, gaming, or telemetry boundary failures → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
 <!-- SKILL-LINKS:END -->
 
-## 1. The Six Non-Negotiable Floor Guards
+## 1. Six Floor Guards & Monotonic Ratchet
 
-Never make a test or gate pass by degrading any of these six invariants:
-1. **No Threshold Lowering**: Never relax `baseline.json`, `eloc-budget-baseline.json`, linter configs, or gate thresholds.
-2. **No Suppression Silencing**: Never add `@ts-ignore`, `eslint-disable`, or `#[allow(...)]` to hide defects.
-3. **No Test Weakening**: Never delete tests, add `it.skip` (`TST-SKP-001`), or weaken `expect` assertions (`TST-TAU-001`).
-4. **No Placeholder Artifacts**: Never commit 0-byte files (`HYG-EMP-001`), unresolved `TODO`/`FIXME` markers, or empty `catch {}` blocks (`GOV-EXC-001`).
-5. **No Rule Catalog Drift**: Never cite an unregistered rule ID (`RCFG-RULE-DRIFT`).
-6. **No Cross-Session Interference**: Never run `git restore .` or `git clean -fd`, and never touch files modified by external parallel sessions.
+| Guard | Forbidden Bypass |
+|---|---|
+| **No Floor Lowering** | Relaxing `baseline.json`, `eloc-budget-baseline.json`, linters, or gate thresholds |
+| **No Silencing** | Adding `@ts-ignore`, `eslint-disable`, or `#[allow(...)]` |
+| **No Test Weakening** | Deleting tests, `it.skip` (`TST-SKP-001`), or weaker `expect` (`TST-TAU-001`) |
+| **No Placeholders** | 0-byte files (`HYG-EMP-001`), `TODO`/`FIXME`, or empty `catch {}` (`GOV-EXC-001`) |
+| **No Catalog Drift** | Unregistered rule IDs (`RCFG-RULE-DRIFT`) |
+| **Session Isolation** | `git restore .` / `git clean -fd` or editing external parallel dirty files |
 
-- **Monotonic Ratchet Principle**: Coverage, latency baselines (`TB-REGRESSION`), volume baselines (`eloc-budget-baseline.json`), and workspace High/Critical technical debt (**0 items**) move strictly in the improving direction.
-- **Anti-Gaming Circuit Breaker (`BLOCK_GAMING_DETECTED`)**: Refactoring commits with semantic change ratio $\text{ELOC}_{\text{semantic}} \le 15\%$ and zero net technical debt reduction are rejected.
-
----
-
-## 2. Five-Step Adversarial Falsification Loop (The Doubt Cycle)
-
-Before claiming completion on any core branch refactoring, cross-module contract change, concurrency/idempotency logic, or persistence migration, execute:
-
-```text
-1. CLAIM ──▶ 2. EXTRACT ──▶ 3. DOUBT ──▶ 4. RECONCILE ──▶ 5. STOP (<= 3 rounds)
-```
-
-1. **CLAIM**: State in 2–3 lines the exact invariant your change relies on and what breaks if it fails.
-2. **EXTRACT**: Strip subjective narrative and inspect only the raw **Diff Slice (`ARTIFACT`)** against **Pre/Post-Conditions (`CONTRACT`)** to eliminate confirmation bias.
-3. **DOUBT**: Probe five adversarial vectors:
-   - Degenerate empty / oversized / non-ASCII inputs;
-   - Hidden transient heap allocations inside hot loops (`CPX-SPACE-001`);
-   - Early-return resource or handle leaks (`PRF-LEAK-001`);
-   - Cross-layer mutable reference aliasing;
-   - Torn writes or non-idempotent crash replay.
-4. **RECONCILE**: Classify each finding into `[Ambiguous Contract -> update doc]`, `[Real Defect -> fix + add regression test]`, `[Intentional Trade-off -> document in JSDoc]`, or `[Environment Noise -> ignore]`.
-5. **STOP**: Terminate once real defects reach 0 or after 3 rounds (escalate unresolved trade-offs to the user).
+- **Ratchet & Anti-Gaming (`BLOCK_GAMING_DETECTED`)**: Coverage, latency (`TB-REGRESSION`), volume (`eloc-budget-baseline.json`), and High/Critical debt (**0 items**) strictly improve; refactors with $\text{ELOC}_{\text{semantic}} \le 15\%$ and zero net debt cut are rejected.
 
 ---
 
-## 3. Verification & JIT Assets
+## 2. Five-Step Doubt Cycle (`<= 3` Rounds)
+
+Run on core refactors, cross-module contracts, concurrency/idempotency, or persistence migrations:
+`1. CLAIM -> 2. EXTRACT -> 3. DOUBT -> 4. RECONCILE -> 5. STOP`
+- **CLAIM & EXTRACT**: State exact invariant and failure mode (2–3 lines); inspect raw **Diff Slice (`ARTIFACT`)** vs **Pre/Post-Conditions (`CONTRACT`)**.
+- **DOUBT (5 Probes)**: ① Empty/oversized/non-ASCII; ② Loop heap alloc (`CPX-SPACE-001`); ③ Early-return leaks (`PRF-LEAK-001`); ④ Cross-layer mutable aliasing; ⑤ Torn writes / non-idempotent replay.
+- **RECONCILE & STOP**: Bucket as `[Ambiguous Contract -> doc]`, `[Real Defect -> fix + test]`, `[Intentional Trade-off -> JSDoc]`, or `[Env Noise -> ignore]`; stop at 0 defects or 3 rounds.
+
+---
+
+## 3. Verification & Assets
 
 ```powershell
 pwsh -File scripts/ps1/audit-all.ps1
 ```
 
-- [floor-guard.md](references/floor-guard.md): Floor Guard exit-code contracts, 5 adversarial probe checklists, and Doubt Cycle log sheet.
-- [floor-guard-contract.json](templates/floor-guard-contract.json): Machine-verifiable quality budget and Floor Guard configuration template.
+- [floor-guard.md](references/floor-guard.md): Exit-code contracts, 5 probe checklists & Doubt Cycle log.
+- [floor-guard-contract.json](templates/floor-guard-contract.json): Quality budget & Floor Guard template.

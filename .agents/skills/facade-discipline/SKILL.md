@@ -4,9 +4,9 @@ description: >-
   【触发：prune/refactor/bloat/dead/ARCH/facade/wrap/argobj】Dissolve <=3-line pure trampolines (ARCH-ABS-001), pack >=4 args, and enforce substantive frozen facades (>=15 ELOC).
 ---
 
-# facade-discipline — Substantive Facades, Trampoline Ablation & Behavior-Preserving Simplification
+# facade-discipline — Substantive Facades & Trampoline Ablation
 
-Unifies the **Substantive Facade Contract (`ARCH-FAC-001`)**, **$\le 3$-Line Trampoline Ablation (`ARCH-ABS-001`)**, and **100% Behavior-Equivalent Simplification (`SIM-ARGS-001` / `HYG-CLN-001`)**.
+Enforces **Substantive Facades (`ARCH-FAC-001`)**, **$\le 3$-line Trampoline Ablation (`ARCH-ABS-001`)**, and **Behavior-Equivalent Simplification (`SIM-ARGS-001` / `HYG-CLN-001`)**.
 
 ---
 
@@ -21,39 +21,39 @@ Unifies the **Substantive Facade Contract (`ARCH-FAC-001`)**, **$\le 3$-Line Tra
 - **何时联动**：Enrich thin crate facades and eliminate trampolines → `fractal-git-dev` + `facade-discipline` + `rust-engineering`；Split bloated modules and dissolve pass-through trampolines → `auto-refactor-dev` + `facade-discipline` + `complexity-budget`
 <!-- SKILL-LINKS:END -->
 
-## 1. Four Pillars of a Substantive Facade (`ARCH-FAC-001`)
+## 1. Substantive Facade Pillars (`ARCH-FAC-001`)
 
-Every facade, gateway, adapter, or barrel `index.ts` must satisfy $\text{POR} \le 0.60$ ($\text{TSPR} \ge 0.40$) and exhibit at least one substantive capability (never fragment cohesive modules already within $\text{ELOC} \le 900, \text{LOC} \le 1400$):
+Facades/gateways/`index.ts` barrels must satisfy $\text{POR} \le 0.60$ ($\text{TSPR} \ge 0.40$) and $\ge 1$ pillar (never split modules within $\text{ELOC} \le 900, \text{LOC} \le 1400$):
 
-| Pillar | Criterion | Architectural Role |
-| :--- | :--- | :--- |
-| **1. Effective Volume Floor** | $\text{ELOC} \ge 15$ | Implements real orchestration, lifecycle management, daemon error guards, or event bridging |
-| **2. Immutable Snapshot Freeze** | `Object.freeze` / `deepFreeze` | Freezes exported state snapshots, config dictionaries, or SDK contracts against external mutation |
-| **3. Multi-Subdomain Aggregation** | Aggregates $\ge 3$ subdomains | Coordinates $\ge 3$ distinct subsystems (e.g., `PraxisReviewClient` combining scan, graph, diff, MoE routing & guidance) |
-| **4. Boundary Validation** | Explicit schema/precondition guards | Validates inputs and applies fallback defaults at the module boundary |
+| Pillar | Criterion | Role |
+|---|---|---|
+| **Volume** | $\text{ELOC} \ge 15$ | Orchestration, lifecycle, daemon error guards, or event bridging |
+| **Freeze** | `Object.freeze` / `deepFreeze` | Lock exported snapshots, configs, or SDK contracts |
+| **Subdomains** | $\ge 3$ subdomains | Coordinates $\ge 3$ subsystems (e.g. `PraxisReviewClient`) |
+| **Validation** | Explicit schema/preconditions | Input guards & fallback defaults at boundary |
 
-> **AST-Extracted SDK Facades**: In MOD/SDK architectures, offline AST extractors generate read-only SDK facades verified by $\text{Diff}(\text{Core}_{\text{public}}, \text{SDK}_{\text{exported}}) \equiv \emptyset$.
-
----
-
-## 2. Trampoline Ablation (`ARCH-ABS-001`) & Six Simplification Rules
-
-1. **100% Observable Behavior Parity**: Simplification changes internal structure only — never alter inputs/outputs, side-effect ordering, error semantics, or test assertions.
-2. **Ablate $\le 3$-Line Trampolines (`ARCH-ABS-001`)**: Any file with $\text{ELOC} \le 3$ that merely re-exports a single target (`export * from './sub'`) without local logic incurs a $+3.0$-unit cognitive penalty and must be ablated in three steps: ① search all inbound imports $\to$ ② redirect callers to the source module $\to$ ③ delete the trampoline. When creating a new single-module subdirectory, place the implementation directly in `index.ts` ($\text{ELOC} \ge 15$) rather than forwarding to a sibling file.
-3. **Consolidate $\ge 4$ Positional Parameters (`SIM-ARGS-001`)**: Replace parameter lists of $\ge 4$ arguments with a `readonly` parameter interface (`interface XxxParams`), avoiding single-parameter-per-line vertical sprawl that drops token density below $\tau \ge 2.5$ (`VOL-DIL-001`).
-4. **Deduplicate Transport Decoders (`HYG-CLN-001`)**: Share a single pure state-machine decoder across heterogeneous channels (e.g., stdio and socket IPC).
-5. **Preserve 6-Field JSDoc Headers (`CMT-VMD-001`)**: Never delete module header contracts to shrink line counts.
-6. **Single Closed UI Border**: Enforce at most 1 closed border along any visual ray; demote inner controls to `Ghost` or surface fills.
+> AST-extracted SDK facades satisfy $\text{Diff}(\text{Core}_{\text{public}}, \text{SDK}_{\text{exported}}) \equiv \emptyset$.
 
 ---
 
-## 3. Verification & JIT Assets
+## 2. Trampoline Ablation (`ARCH-ABS-001`) & Simplification
+
+| Rule | Invariant |
+|---|---|
+| **Parity** | Preserve I/O, side-effect order, error semantics, and assertions |
+| **Trampolines (`ARCH-ABS-001`)** | Files $\le 3$ ELOC forwarding one target (`export * from './sub'`) incur $+3.0$ cognitive penalty: ① find imports $\to$ ② redirect $\to$ ③ delete. Put single-module code directly in `index.ts` ($\text{ELOC} \ge 15$) |
+| **Args (`SIM-ARGS-001`)** | Pack $\ge 4$ positional args into `readonly interface XxxParams`; keep $\tau \ge 2.5$ (`VOL-DIL-001`) |
+| **Decoder (`HYG-CLN-001`)** | Share one pure state-machine decoder across stdio & socket IPC |
+| **JSDoc & UI (`CMT-VMD-001`)** | Keep 6-field JSDoc; $\le 1$ closed UI border/ray (demote inner controls to `Ghost`/fills) |
+
+---
+
+## 3. Verification & Assets
 
 ```powershell
 node auto-refactor/scripts/validate-facade-governance.js
-node scripts/common/evaluate-eloc-budget.js
-node scripts/common/validate-code-density.js
+node scripts/common/evaluate-eloc-budget.js && node scripts/common/validate-code-density.js
 ```
 
-- [trampoline-elimination-guide.md](references/trampoline-elimination-guide.md): Trampoline detection criteria, 3-step ablation SOP, and before/after density metrics.
-- [contract-facade.ts](templates/contract-facade.ts): Standard multi-subdomain facade template with deep freeze and boundary validation.
+- [trampoline-elimination-guide.md](references/trampoline-elimination-guide.md): Detection, 3-step ablation & density metrics.
+- [contract-facade.ts](templates/contract-facade.ts): Multi-subdomain frozen facade template.

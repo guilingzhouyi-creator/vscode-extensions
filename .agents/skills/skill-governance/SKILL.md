@@ -6,9 +6,7 @@ description: >-
 
 # skill-governance — Engineering Skill Architecture, JIT Disclosure & Mirror Parity
 
-Governs the 4-part physical layout, YAML frontmatter contract, JIT progressive disclosure, and 100% byte-identical dual-directory synchronization across all <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> workspace skills (comprising <!-- METRICS:BEGIN skill-doc-count -->**75 篇**<!-- METRICS:END skill-doc-count --> Markdown documents).
-
----
+Governs 4-part layout, frontmatter, JIT disclosure, and 100% plugin mirror parity across <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> skills (<!-- METRICS:BEGIN skill-doc-count -->**75 篇**<!-- METRICS:END skill-doc-count --> Markdown docs).
 
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
@@ -21,58 +19,39 @@ Governs the 4-part physical layout, YAML frontmatter contract, JIT progressive d
 - **何时联动**：Add or optimize skills, JIT references, and mirror parity → `skill-governance` + `docs-archive-governance` + `batch-commit`；Register rule IDs and verify bidirectional SSOT closure → `rule-catalog-governance` + `skill-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
-## 1. Three-Layer Orthogonal Skill Topology & Four-Part Layout
+## 1. Three-Layer Topology & Four-Part Layout
 
-The <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> skills partition into three orthogonal layers (never duplicate Layer 1/2 axioms inside Layer 3 domain skills):
+The <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> skills partition orthogonally (Layer 3 never duplicates Layers 1–2):
 
-| Layer | Scope | Member Skills | Contract |
-| :--- | :--- | :--- | :--- |
-| **Layer 1: Universal Methodology** (12) | Cross-language craft, algorithms, caching, concurrency & UI physics | `algorithmic-operator-engineering`, `coding-craft`, `complexity-budget`, `constraint-driven-development`, `debugging-and-error-recovery`, `defensive-security-and-taint-safety`, `facade-discipline`, `interaction-design-physics`, `spec-driven-development`, `state-concurrency-and-crash-recovery`, `telemetry-statistical-modeling`, `tiered-cache-and-wal-persistence` | Language-agnostic engineering/math invariants; zero project-specific path hardcoding |
-| **Layer 2: Workspace Governance** (8) | Isomorphic gates, SSOT catalogs & multi-agent orchestration | `batch-commit`, `docs-archive-governance`, `gate-governance`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | Bound directly to `AGENTS.md`, `rule-catalog.json`, `doc-metrics.json`, and `subagent-catalog.json` |
-| **Layer 3: Domain Adapters** (8) | Subsystem architectures & language-specific toolchains | `auto-refactor-dev`, `sparse-moe-and-ast-routing`, `praxis-vfs-and-trajectory-learning`, `workspace-timing-dev`, `webgames-workflow`, `fractal-git-dev`, `taxis-daemon-and-agent-control`, `rust-engineering` | Subsystem boundaries and workflows; delegates generic complexity/facade/gate rules to Layers 1–2 |
+| Layer | Scope | Boundary Contract (full roster in [docs/skill-catalog.md](../../../docs/skill-catalog.md)) |
+| :--- | :--- | :--- |
+| **Layer 1: Methodology** (12) | Craft, algorithms, caching, concurrency, security, UI physics | Language-agnostic invariants; zero project-path hardcoding |
+| **Layer 2: Governance** (8) | Gates, SSOT catalogs, commits, docs, releases, subagents | Bound to `AGENTS.md`, `rule-catalog.json`, `doc-metrics.json`, `subagent-catalog.json` |
+| **Layer 3: Domain** (8) | `auto-refactor`, `workspace-timing`, `WebGames`, `fractal-git`, Rust | Subsystem boundaries only; delegate generic craft/gates to Layers 1–2 |
 
-Each skill under `.agents/skills/<skill-name>/` follows the 4-part layout:
-```text
-.agents/skills/<skill-name>/
-├── SKILL.md       # [Required] High-SNR entrypoint & decision matrix (target 50~200 lines, hard ceiling <= 300 lines)
-├── references/    # [Recommended] Deep-dive specs, math derivations & edge cases loaded on demand (JIT)
-├── templates/     # [Recommended] Reusable code/config/test scaffolds (CC <= 15, Depth <= 4, 6-field JSDoc)
-└── scripts/       # [Optional] Companion validation or synthesis scripts
-```
+Four-part layout under `.agents/skills/<skill-name>/`:
+- `SKILL.md` *(Required)*: High-SNR entrypoint (target 50–250 lines, hard cap $\le 300$).
+- `references/` *(Required)*: Deep-dive specs, proofs, edge cases (JIT loaded).
+- `templates/` *(Required)*: Code/config scaffolds ($\text{CC}\le 15$, $\text{Depth}\le 4$, 6-field JSDoc).
+- `scripts/` *(Optional)*: Companion validation/synthesis scripts.
 
----
+## 2. JIT Disclosure, SSOT Metadata & Hygiene
 
-## 2. JIT Progressive Disclosure, Frontmatter & Hygiene Invariants
+1. **Zero Orphan Assets**: Every file under `references/`, `templates/`, and `scripts/` must be linked from a `.md` file in the same skill (`validate-skills.js`).
+2. **Registry SSOT (`scripts/common/skill-registry.json`)**:
+   - `name` matches folder (`kebab-case`); `description` (`50~200` chars, `【触发：<6~9 triggers>】<pitch>`).
+   - Frontmatter and `<!-- SKILL-LINKS:BEGIN -->...<!-- SKILL-LINKS:END -->` are generated by `sync-skill-metadata.js` — never hand-edit.
+3. **Hygiene & Rule Closure**: Strict `LF`, UTF-8 no BOM, single EOF newline, zero 0-byte files (`HYG-EMP-001`), relative links only (`DOC-LNK-001` / `HC-ABS-PATH`), zero sprint codenames. Every cited rule ID must exist in `rule-catalog.json` (`RCFG-RULE-DRIFT`), and 100% of `error`-severity rules must be covered across `.agents/skills/**/*.md`.
 
-1. **JIT Progressive Disclosure**: Keep `SKILL.md` concise and high-density ($\le 300$ lines); sink exhaustive tables, proofs, and protocol details into `references/*.md` and code scaffolds into `templates/*`. Every file under `references/`, `templates/`, and `scripts/` **must** be linked at least once from a `.md` file in the same skill directory (`validate-skills.js` blocks orphan assets).
-2. **Single-Source Frontmatter & Linkage (`scripts/common/skill-registry.json`)**:
-   - `name` matches folder name (`kebab-case`); `description` (`50~200` chars, `【触发：<6~9 triggers>】<pitch>`) and `<!-- SKILL-LINKS:BEGIN -->...<!-- SKILL-LINKS:END -->` are generated by `node scripts/common/sync-skill-metadata.js` — never hand-edit them without updating `skill-registry.json`.
-3. **Hygiene & Closure**:
-   - Strict `LF` line endings, UTF-8 no BOM, single EOF newline, zero 0-byte files (`HYG-EMP-001`).
-   - Every capitalized rule ID (`ARCH-FAC-001`, `ADV-PRF-002`, `GUARD-AST-001`, etc.) cited outside code fences must exist in `scripts/common/rule-catalog.json` (`RCFG-RULE-DRIFT`), and 100% of `error`-severity catalog rules must be covered across `.agents/skills/**/*.md`.
-   - Use valid relative links only; forbid drive letters or `file:///` URIs (`DOC-LNK-001` / `HC-ABS-PATH`) and sprint codenames.
+## 3. Mirror Sync, Verification & Assets
 
----
-
-## 3. Dual-Directory SSOT Mirroring & Verification
-
-Edit only `.agents/skills/` (SSOT), then synchronize to `.agents/plugins/workspace-governance/skills/`:
+Edit only `.agents/skills/` (SSOT), then sync to `.agents/plugins/workspace-governance/skills/`:
 
 ```bash
-node scripts/common/sync-skill-metadata.js
-node scripts/common/render-skill-catalog.js
-node scripts/common/sync-skills.js
-node scripts/common/validate-skills.js
+node scripts/common/sync-skill-metadata.js && node scripts/common/render-skill-catalog.js
+node scripts/common/sync-skills.js && node scripts/common/validate-skills.js
 ```
 
----
-
-## 4. Reference & Scaffold Assets
-
-| Asset | Purpose |
-| :--- | :--- |
-| [progressive-disclosure-patterns.md](references/progressive-disclosure-patterns.md) | Criteria for splitting content between `SKILL.md`, `references/`, and `templates/` |
-| [skill-activation-and-linkage.md](references/skill-activation-and-linkage.md) | Trigger selection rules, description window constraints, and linkage chain semantics |
-| [docs/skill-catalog.md](../../../docs/skill-catalog.md) | Generated workspace skill catalog (`render-skill-catalog.js`) |
-| [skill-entrypoint-skeleton.md](templates/skill-entrypoint-skeleton.md) | Standard 5-section `SKILL.md` skeleton |
-| [skill-reference-skeleton.md](templates/skill-reference-skeleton.md) | Standard `references/*.md` skeleton |
+- [progressive-disclosure-patterns.md](references/progressive-disclosure-patterns.md): Splitting content across `SKILL.md`, `references/`, and `templates/`.
+- [skill-activation-and-linkage.md](references/skill-activation-and-linkage.md): Trigger rules, description window & linkage chain semantics.
+- [skill-entrypoint-skeleton.md](templates/skill-entrypoint-skeleton.md) / [skill-reference-skeleton.md](templates/skill-reference-skeleton.md): Standard `SKILL.md` and `references/*.md` skeletons.

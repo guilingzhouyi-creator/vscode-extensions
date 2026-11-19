@@ -45,10 +45,10 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
 
 ---
 
-## 3. Praxis SDK, Daemon, Cleanup & 5D Diff Bounds
+## 3. Praxis SDK, Daemon, Cleanup & Differential Bounds
 
 1. **Praxis & Daemon**: `createPraxisClient` emits `DiffAgentFace` + `DiffHumanFace` across L1 $\to$ L2 $\to$ L3 (`shouldEscalateToL3A`), deduplicating <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count --> overlap clusters (`electPrimaryCard`). Ban hot `*Sync` I/O (`PRF-IO-001`); isolate behind `*IoBarrier`; top-cluster IPC constants (`NAM-LEN-002`); `*Ms` (`Brand<T, B>`); atomic `stagingPath` rename.
-2. **5D Bounds (`diff-bounds-contract.ts`)**: Leaf loader for `scripts/common/diff-bounds-contract.json` (`diff-bounds-governor.ts`, `diff-bounds-batch.ts`): source $\le 240/180/260$, test $\le 360/260/380$, del $\le 120/360$, batch add $\le 540/720$ (`0.5x` test), del $\le 360$, $\Theta_{\text{admission}}\in [3.0, 25.0]$, substantive `0.45/0.60`, $\text{TSPR}\ge 0.40$ (`.taxis/telemetry/admission_ledger.ndjson`).
+2. **Differential Bounds (`diff-bounds-contract.ts`)**: Leaf loader for `scripts/common/diff-bounds-contract.json` (`diff-bounds-governor.ts`, `diff-bounds-batch.ts`): source $\le 240/180/260$, test $\le 360/260/380$, del $\le 120/360$, batch add $\le 540/720$ (`0.5x` test), del $\le 360$, $\Theta_{\text{admission}}\in [3.0, 25.0]$, substantive `0.45/0.60`, $\text{TSPR}\ge 0.40$ (`.taxis/telemetry/admission_ledger.ndjson`).
 3. **Gate Chain & Cleanup**: `npm run gate` runs `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `test:no-build`; clean temp dirs via `auto-refactor/scripts/lib/resilient-fs-cleanup.js` (`rmSyncWithRetry`). Fail-closed `validate-native-parity.js`; `crates/**` triggers Cargo; `vitest related` `--passWithNoTests=false`; `validate-rule-dictionary-closure.js` (<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> canonical); `validate-trajectory-ledger.js` + `--revert-timestamp`.
 
 ---

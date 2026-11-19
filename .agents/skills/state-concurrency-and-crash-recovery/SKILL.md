@@ -4,9 +4,9 @@ description: >-
   【触发：drain/isolate/leak/crash/async/mutex/atomic/handle】Enforce symmetric resource disposal, bounded queues, idempotent journal replay, and atomic temp-rename durability.
 ---
 
-# state-concurrency-and-crash-recovery — Bounded Concurrency, Symmetric Lifecycles & Crash-Safe Persistence
+# state-concurrency-and-crash-recovery — Bounded Concurrency & Crash-Safe Persistence
 
-Governs stateful lifecycles, async dispatchers, and crash-safe persistence across `workspace-timing` (RingBuffer + Journal), `auto-refactor` (Daemon & Worker Pool), `WebGames` (`AgentAsyncDispatcher`), and `fractal-git` (CAS + WAL).
+Governs lifecycles, dispatchers, and crash-safe stores across `workspace-timing` (RingBuffer+Journal), `auto-refactor` (Daemon/Pool), `WebGames` (`AgentAsyncDispatcher`), and `fractal-git` (CAS+WAL).
 
 ---
 
@@ -21,36 +21,25 @@ Governs stateful lifecycles, async dispatchers, and crash-safe persistence acros
 - **何时联动**：Persistent daemon IPC, blackboard leases, or quarantine replay → `taxis-daemon-and-agent-control` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`；Concurrent index tree write crash recovery or unsafe proofs → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
 <!-- SKILL-LINKS:END -->
 
-## 1. Four Axioms of Concurrency & Crash Recovery
+## 1. Concurrency & Recovery Axioms
 
-### 1.1 Symmetric Resource Lifecycle (`PRF-LEAK-001` / `RES-*` / `ADV-EVT-*`)
-Write the symmetric release path in the same module at the moment any resource is acquired:
+### 1.1 Symmetric Lifecycle (`PRF-LEAK-001` / `RES-*` / `ADV-EVT-*`)
 
-| Acquisition | Mandatory Symmetric Release | Consequence & Rule ID |
-| :--- | :--- | :--- |
-| `emitter.on(evt, fn)` / Godot `.connect()` | `emitter.off(evt, fn)` / `.disconnect()` | Closure retains AST/scene graph (`PRF-LEAK-001`, `GDM-CONNECT-001`) |
-| `setInterval` / `setTimeout` | `clearInterval` / `clearTimeout` in `dispose()` | Orphan timer fires after host shutdown (`L3-RESOURCE-TOPO`, `VSC-MEM-001`) |
-| `Start-Process` / `child_process.spawn` | Bounded `WaitForExit(timeoutMs)` + `try/finally` `Kill($true)` | Hung child process deadlocks gate/CI (`PS-TRAP-001`) |
-| Async dispatcher `dispatch()` | Expose `pump()`, `flush()`, and `teardown()` | Headless test runner hangs on exit (`ADV-EVT-001`) |
+| Acquisition | Mandatory Release | Rule ID & Impact |
+|---|---|---|
+| `emitter.on()` / `.connect()` | `emitter.off()` / `.disconnect()` | Retains AST/scene (`PRF-LEAK-001`, `GDM-CONNECT-001`) |
+| `setInterval` / `setTimeout` | `clearInterval` / `clearTimeout` in `dispose()` | Post-shutdown fires (`L3-RESOURCE-TOPO`, `VSC-MEM-001`) |
+| `Start-Process` / `spawn` | `WaitForExit(timeoutMs)` + `try/finally` `Kill($true)` | Deadlocks gate/CI (`PS-TRAP-001`) |
+| Async `dispatch()` | Expose `pump()`, `flush()`, `teardown()` | Runner hangs on exit (`ADV-EVT-001`) |
 
-### 1.2 Staging Verification & Atomic Rename (`GOV-PRF-004` / `FGT-STO-001` / `DAT-RES-001`)
-Never overwrite critical state files in place:
-1. Write full payload to a same-volume staging path (`stagingPath`, `compactStagingPath`, or `stagingUri`).
-2. Verify non-zero byte length and structural validity (JSON parse or checksum).
-3. Execute atomic rename (`fs.rename` / `FileAccess`), guaranteeing zero torn or 0-byte files on crash or power loss.
-
-### 1.3 Bounded `RingBuffer` & Idempotent Journal Replay (`UUID-REENTRANT-001` / `VSC-MEM-001`)
-1. **Bounded In-Memory Queues**: Use fixed-capacity `RingBuffer` (32/64 slots) or bounded LRU containers instead of unbounded arrays.
-2. **Dual-Write Append-Only Journal**: Pair in-memory aggregation with an append-only NDJSON journal; on dirty shutdown recovery, replay the journal to reconstruct state.
-3. **Reentrant Idempotency (`UUID-REENTRANT-001`)**: Tag every journal entry and init hook with an idempotent key (`checkpointId` / `sequenceId`) so repeated replay never double-counts.
-
-### 1.4 Non-Blocking Hot-Path I/O & Explicit FSM (`PRF-IO-001`)
-1. **Zero Sync I/O on Event Loops (`PRF-IO-001`)**: Forbid `fs.readFileSync`, `fs.writeFileSync`, and `fs.unlinkSync` inside daemon request handlers, extension activation hot paths, or UI frame loops.
-2. **Discriminated State Machine**: Replace scattered boolean flags (`isLoading`, `isFailed`, `isClosed`) with a single discriminated union (`Idle | Running | Draining | Closed`) that rejects new tasks in `Draining | Closed`.
+### 1.2 Staging, Bounded Replay & Hot-Path FSM
+- **Atomic Rename (`GOV-PRF-004` / `FGT-STO-001` / `DAT-RES-001`)**: Write to same-volume `stagingPath`/`compactStagingPath`/`stagingUri` $\to$ verify non-zero bytes & JSON/checksum $\to$ rename (`fs.rename`/`FileAccess`).
+- **Bounded `RingBuffer` & Idempotent Replay (`UUID-REENTRANT-001` / `VSC-MEM-001`)**: Cap queues via fixed `RingBuffer` (32/64) or bounded LRU; append NDJSON journal entries keyed by `checkpointId`/`sequenceId`.
+- **Zero Hot Sync I/O (`PRF-IO-001`) & FSM**: Ban `fs.readFileSync`/`writeFileSync`/`unlinkSync` in daemon/activation/frame loops. Replace `isLoading`/`isFailed`/`isClosed` flags with `Idle | Running | Draining | Closed`.
 
 ---
 
-## 2. Verification & JIT Assets
+## 2. Verification & Assets
 
 ```powershell
 cd workspace-timing && npm run test:fast
@@ -58,5 +47,5 @@ cd auto-refactor && node scripts/gate-self.js
 node scripts/common/validate-skills.js
 ```
 
-- [crash-safe-journal-and-dispatcher-lifecycle.md](references/crash-safe-journal-and-dispatcher-lifecycle.md): 4-step atomic staging state machine, idempotent journal deduplication, and `pump/flush/teardown` dispatcher protocol.
-- [atomic-journal-store.ts](templates/atomic-journal-store.ts): Bounded `RingBuffer`, atomic staging rename, and idempotent journal replay template.
+- [crash-safe-journal-and-dispatcher-lifecycle.md](references/crash-safe-journal-and-dispatcher-lifecycle.md): 4-step staging FSM, journal dedup & `pump/flush/teardown`.
+- [atomic-journal-store.ts](templates/atomic-journal-store.ts): Bounded `RingBuffer`, atomic rename & idempotent replay template.
