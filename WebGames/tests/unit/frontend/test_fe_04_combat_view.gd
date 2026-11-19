@@ -42,10 +42,15 @@ static func _test_floating_damage_text() -> Dictionary:
 
 static func _test_boss_segmented_hp_bar() -> Dictionary:
 	var view = CombatView.new()
-	view.set_boss_status_snapshot("远古灭世红龙", 80000.0, 100000.0, [
-		{ "part_name": "左龙翼", "hp": 0, "max_hp": 10000, "is_broken": true },
-		{ "part_name": "龙心核", "hp": 50000, "max_hp": 50000, "is_broken": false }
-	])
+	view.apply_snapshot({
+		"boss_name": "远古灭世红龙",
+		"boss_hp": 80000.0,
+		"boss_max_hp": 100000.0,
+		"boss_parts": [
+			{"part_name": "左龙翼", "hp": 0, "max_hp": 10000, "is_broken": true},
+			{"part_name": "龙心核", "hp": 50000, "max_hp": 50000, "is_broken": false}
+		]
+	})
 
 	var passed = (view.boss_parts.size() == 2) and view.boss_parts[0].is_broken and (view.boss_name == "远古灭世红龙")
 	view.free()
@@ -56,7 +61,7 @@ static func _test_boss_segmented_hp_bar() -> Dictionary:
 
 static func _test_combat_settlement_overlay() -> Dictionary:
 	var view = CombatView.new()
-	view.set_settlement_snapshot(true, 500, ["SWORD_LEGEND", "DRAGON_SCALE"], "亚瑟王")
+	view.apply_snapshot({"settlement": {"victory": true, "gold": 500, "items": ["SWORD_LEGEND", "DRAGON_SCALE"], "mvp": "亚瑟王"}})
 
 	var passed = view.is_victory and (view.reward_gold == 500) and (view.mvp_player_name == "亚瑟王")
 	view.free()

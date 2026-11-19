@@ -31,7 +31,7 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_wallet_currency_conversion() -> Dictionary:
 	var view = EconomyTradeView.new()
-	view.set_wallet_snapshot(2, 50, 25, 10)
+	view.apply_snapshot({"wallet_gold": 2, "wallet_silver": 50, "wallet_copper": 25, "wallet_crystals": 10})
 	var total_copper = view.calculate_total_copper_value()
 	# 2*10000 + 50*100 + 25 = 20000 + 5000 + 25 = 25025
 
@@ -44,10 +44,10 @@ static func _test_wallet_currency_conversion() -> Dictionary:
 
 static func _test_shop_shelf_browser() -> Dictionary:
 	var view = EconomyTradeView.new()
-	view.set_shop_shelves_snapshot("中央集市铁匠铺", [
-		{ "item_id": "POTION_HP", "price_gold": 1, "stock": 50 },
-		{ "item_id": "IRON_SWORD", "price_gold": 15, "stock": 3 }
-	])
+	view.apply_snapshot({"shop_title": "中央集市铁匠铺", "shop_shelves": [
+		{"item_id": "POTION_HP", "price_gold": 1, "stock": 50},
+		{"item_id": "IRON_SWORD", "price_gold": 15, "stock": 3}
+	]})
 
 	var passed = (view.shop_shelves.size() == 2) and (view.shop_title == "中央集市铁匠铺")
 	view.free()
@@ -58,7 +58,7 @@ static func _test_shop_shelf_browser() -> Dictionary:
 
 static func _test_price_trend_graph_data() -> Dictionary:
 	var view = EconomyTradeView.new()
-	view.set_price_trend_snapshot([100, 105, 98, 120, 135, 130, 140])
+	view.apply_snapshot({"price_trend": [100, 105, 98, 120, 135, 130, 140]})
 
 	var passed = (view.price_trend_history.size() == 7) and (view.price_trend_history[6] == 140)
 	view.free()
@@ -73,7 +73,7 @@ static func _test_mounted_real_economy_trade() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: EconomyTradeView = mount_handle.get("view", null) as EconomyTradeView
 	if mounted_view != null:
-		mounted_view.set_wallet_snapshot(3, 20, 10, 5)
+		mounted_view.apply_snapshot({"wallet_gold": 3, "wallet_silver": 20, "wallet_copper": 10, "wallet_crystals": 5})
 		mounted_view._on_tab_changed(1)
 		mounted_view._on_shop_confirm_pressed()
 		mounted_view._on_tab_changed(0)

@@ -31,10 +31,10 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_save_slots_hardcore_badge() -> Dictionary:
 	var view = SystemSaveView.new()
-	view.set_save_slots_snapshot([
+	view.apply_snapshot({"save_slots": [
 		{ "slot_id": "SLOT_01", "char_name": "普通骑士", "is_hardcore": false },
 		{ "slot_id": "SLOT_02", "char_name": "死斗狂战", "is_hardcore": true }
-	])
+	]})
 
 	var passed = (view.save_slots.size() == 2) and view.save_slots[1].is_hardcore
 	view.free()
@@ -72,9 +72,9 @@ static func _test_mounted_real_system_save() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: SystemSaveView = mount_handle.get("view", null) as SystemSaveView
 	if mounted_view != null:
-		mounted_view.set_save_slots_snapshot([
+		mounted_view.apply_snapshot({"save_slots": [
 			{ "slot_id": "SLOT_01", "char_name": "铁壁守卫", "is_hardcore": false }
-		])
+		]})
 		mounted_view._get_tabs().execute_gm_command("/help")
 		var cdkey_outcome := mounted_view.submit_cdkey_input("KALAR-REAL-TEST")
 		mounted_view._get_tabs().redeem_cdkey()

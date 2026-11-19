@@ -47,9 +47,9 @@ static func _test_disguise_mask_switching() -> Dictionary:
 
 static func _test_ground_loot_proximity_prompt() -> Dictionary:
 	var view = MiscEdgeView.new()
-	view.set_ground_nearby_loot_snapshot([
+	view.apply_snapshot({"ground_loot": [
 		{ "loot_id": "L1", "item_name": "魔化狼皮", "count": 2 }
-	])
+	]})
 	var passed = (view.ground_nearby_loot.size() == 1)
 	view.free()
 	return {

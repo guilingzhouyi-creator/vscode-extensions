@@ -31,10 +31,10 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_mailbox_list_and_capacity() -> Dictionary:
 	var view = MailSystemView.new()
-	view.set_mailbox_snapshot([
-		{ "mail_id": "M1", "title": "开服福利", "is_read": false, "has_attachment": true, "is_claimed": false },
-		{ "mail_id": "M2", "title": "维护补偿", "is_read": true, "has_attachment": false, "is_claimed": false }
-	])
+	view.apply_snapshot({"mails": [
+		{"mail_id": "M1", "title": "开服福利", "is_read": false, "has_attachment": true, "is_claimed": false},
+		{"mail_id": "M2", "title": "维护补偿", "is_read": true, "has_attachment": false, "is_claimed": false}
+	]})
 
 	var passed = (view.stored_mails.size() == 2) and (view.max_mailbox_capacity == 100)
 	view.free()
@@ -45,9 +45,9 @@ static func _test_mailbox_list_and_capacity() -> Dictionary:
 
 static func _test_mail_read_and_select() -> Dictionary:
 	var view = MailSystemView.new()
-	view.set_mailbox_snapshot([
-		{ "mail_id": "M1", "title": "系统通知", "is_read": false }
-	])
+	view.apply_snapshot({"mails": [
+		{"mail_id": "M1", "title": "系统通知", "is_read": false}
+	]})
 	var res = view.select_mail("M1")
 	var passed = res.success and (view.selected_mail_id == "M1") and view.stored_mails[0].is_read
 	view.free()
@@ -58,10 +58,10 @@ static func _test_mail_read_and_select() -> Dictionary:
 
 static func _test_claim_all_attachments_preview() -> Dictionary:
 	var view = MailSystemView.new()
-	view.set_mailbox_snapshot([
-		{ "mail_id": "M1", "has_attachment": true, "is_claimed": false },
-		{ "mail_id": "M2", "has_attachment": true, "is_claimed": false }
-	])
+	view.apply_snapshot({"mails": [
+		{"mail_id": "M1", "has_attachment": true, "is_claimed": false},
+		{"mail_id": "M2", "has_attachment": true, "is_claimed": false}
+	]})
 	var res = view.claim_all_attachments_preview()
 	var passed = res.success and (res.claimed_mails_count == 2)
 	view.free()
@@ -76,9 +76,9 @@ static func _test_mounted_real_mail_system() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: MailSystemView = mount_handle.get("view", null) as MailSystemView
 	if mounted_view != null:
-		mounted_view.set_mailbox_snapshot([
-			{ "mail_id": "M_REAL_01", "title": "系统补发", "is_read": false, "has_attachment": true, "is_claimed": false }
-		])
+		mounted_view.apply_snapshot({"mails": [
+			{"mail_id": "M_REAL_01", "title": "系统补发", "is_read": false, "has_attachment": true, "is_claimed": false}
+		]})
 		var read_outcome := mounted_view.select_mail("M_REAL_01")
 		mounted_view._tabs.on_save_draft()
 		mounted_view._tabs.on_send()

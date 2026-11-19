@@ -31,9 +31,9 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_bestiary_loading() -> Dictionary:
 	var view = MonsterEcologyView.new()
-	view.set_bestiary_snapshot([
-		{ "monster_id": "M_DRAGON", "name": "烈焰巨龙", "parts": ["龙角", "龙翼", "逆鳞"] }
-	])
+	view.apply_snapshot({"bestiary": [
+		{"monster_id": "M_DRAGON", "name": "烈焰巨龙", "parts": ["龙角", "龙翼", "逆鳞"]}
+	]})
 	var passed = (view.bestiary_entries.size() == 1)
 	view.free()
 	return {
@@ -43,9 +43,9 @@ static func _test_bestiary_loading() -> Dictionary:
 
 static func _test_monster_detail_selection() -> Dictionary:
 	var view = MonsterEcologyView.new()
-	view.set_bestiary_snapshot([
-		{ "monster_id": "M_DRAGON", "name": "烈焰巨龙", "parts": ["龙角", "龙翼", "逆鳞"] }
-	])
+	view.apply_snapshot({"bestiary": [
+		{"monster_id": "M_DRAGON", "name": "烈焰巨龙", "parts": ["龙角", "龙翼", "逆鳞"]}
+	]})
 	var res = view.select_monster_entry("M_DRAGON")
 	var passed = res.success and (view.selected_monster_id == "M_DRAGON")
 	view.free()
@@ -70,9 +70,9 @@ static func _test_mounted_real_monster_ecology() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: MonsterEcologyView = mount_handle.get("view", null) as MonsterEcologyView
 	if mounted_view != null:
-		mounted_view.set_bestiary_snapshot([
-			{ "monster_id": "M_DRAGON", "name": "烈焰巨龙", "parts": ["龙角", "龙翼"] }
-		])
+		mounted_view.apply_snapshot({"bestiary": [
+			{"monster_id": "M_DRAGON", "name": "烈焰巨龙", "parts": ["龙角", "龙翼"]}
+		]})
 		mounted_view._get_tabs()._on_boss_challenge_pressed()
 		mounted_view._get_tabs()._on_tide_join_pressed()
 		mounted_view._get_tabs()._on_tide_leave_pressed()

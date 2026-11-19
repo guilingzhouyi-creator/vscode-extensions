@@ -31,7 +31,7 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_potential_allocation_preview() -> Dictionary:
 	var view = CharacterProgressionView.new()
-	view.set_attributes_snapshot({ "STR": 12, "AGI": 10, "CON": 14, "INT": 8, "WIS": 10, "CHA": 10 }, 3)
+	view.apply_snapshot({"attributes": {"STR": 12, "AGI": 10, "CON": 14, "INT": 8, "WIS": 10, "CHA": 10}, "potential_points": 3})
 
 	var r1 = view.preview_add_point("STR")
 	var r2 = view.preview_add_point("STR")
@@ -48,7 +48,7 @@ static func _test_potential_allocation_preview() -> Dictionary:
 
 static func _test_equipment_slot_mount() -> Dictionary:
 	var view = CharacterProgressionView.new()
-	var sword_data = { "item_id": "KALAR:EQUIP:WEAPON_BLADE:STEEL_SWORD", "name": "精钢长剑", "atk": 25 }
+	var sword_data = {"item_id": "KALAR:EQUIP:WEAPON_BLADE:STEEL_SWORD", "name": "精钢长剑", "atk": 25}
 	var res = view.equip_item_preview("MAIN_HAND", sword_data)
 
 	var passed = res.success and (view.equipped_slots["MAIN_HAND"].item_id == sword_data.item_id)
@@ -74,7 +74,7 @@ static func _test_mounted_real_character_progression() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: CharacterProgressionView = mount_handle.get("view", null) as CharacterProgressionView
 	if mounted_view != null:
-		mounted_view.set_attributes_snapshot({ "STR": 14, "AGI": 11, "CON": 12, "INT": 9, "WIS": 10, "CHA": 10 }, 2)
+		mounted_view.apply_snapshot({"attributes": {"STR": 14, "AGI": 11, "CON": 12, "INT": 9, "WIS": 10, "CHA": 10}, "potential_points": 2})
 		var alloc_reply := mounted_view.preview_add_point("STR")
 		mounted_view._tabs._on_pot_confirm_pressed()
 		mounted_view.switch_tab(CharacterProgressionView.TabType.EQUIPMENT)

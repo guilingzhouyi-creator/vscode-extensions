@@ -31,9 +31,9 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_authored_books_loading() -> Dictionary:
 	var view = GrimoireAuthoringView.new()
-	view.set_authored_books_snapshot([
-		{ "book_id": "B1", "title": "九天御雷真诀", "price": 200, "sales": 15 }
-	])
+	view.apply_snapshot({"authored_books": [
+		{"book_id": "B1", "title": "九天御雷真诀", "price": 200, "sales": 15}
+	]})
 	var passed = (view.authored_books.size() == 1)
 	view.free()
 	return {
@@ -56,9 +56,9 @@ static func _test_ast_editor_node_drag_connect() -> Dictionary:
 
 static func _test_royalty_settlement_view() -> Dictionary:
 	var view = GrimoireAuthoringView.new()
-	view.set_authored_books_snapshot([
-		{ "price": 100, "royalty_rate": 0.2, "sales": 50 } # 100 * 0.2 * 50 = 1000 gold
-	])
+	view.apply_snapshot({"authored_books": [
+		{"price": 100, "royalty_rate": 0.2, "sales": 50} # 100 * 0.2 * 50 = 1000 gold
+	]})
 	var book = view.authored_books[0]
 	var est_income = float(book.price) * book.royalty_rate * float(book.sales)
 	var passed = is_equal_approx(est_income, 1000.0)

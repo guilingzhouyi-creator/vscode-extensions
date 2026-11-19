@@ -31,10 +31,10 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_quest_list_loading() -> Dictionary:
 	var view = QuestCausalityView.new()
-	view.set_quest_list_snapshot([
-		{ "quest_id": "Q_MAIN_01", "title": "瓦尔兰的阴影", "is_completed": false },
-		{ "quest_id": "Q_COMM_02", "title": "讨伐哥布林营地", "is_completed": true }
-	])
+	view.apply_snapshot({"quests": [
+		{"quest_id": "Q_MAIN_01", "title": "瓦尔兰的阴影", "is_completed": false},
+		{"quest_id": "Q_COMM_02", "title": "讨伐哥布林营地", "is_completed": true}
+	]})
 
 	var passed = (view.quest_list.size() == 2)
 	view.free()
@@ -45,9 +45,9 @@ static func _test_quest_list_loading() -> Dictionary:
 
 static func _test_quest_detail_selection() -> Dictionary:
 	var view = QuestCausalityView.new()
-	view.set_quest_list_snapshot([
-		{ "quest_id": "Q_MAIN_01", "title": "主线任务", "branches": ["正面进攻", "密道潜入"] }
-	])
+	view.apply_snapshot({"quests": [
+		{"quest_id": "Q_MAIN_01", "title": "主线任务", "branches": ["正面进攻", "密道潜入"]}
+	]})
 	var res = view.select_quest_detail("Q_MAIN_01")
 
 	var passed = res.success and (view.active_quest_detail.branches.size() == 2)
@@ -59,10 +59,10 @@ static func _test_quest_detail_selection() -> Dictionary:
 
 static func _test_causality_dag_nodes_loading() -> Dictionary:
 	var view = QuestCausalityView.new()
-	view.set_causality_dag_snapshot([
-		{ "node_id": "N1", "event": "拯救铁匠", "next": ["N2"] },
-		{ "node_id": "N2", "event": "开启神殿密室", "next": [] }
-	])
+	view.apply_snapshot({"dag_nodes": [
+		{"node_id": "N1", "event": "拯救铁匠", "next": ["N2"]},
+		{"node_id": "N2", "event": "开启神殿密室", "next": []}
+	]})
 
 	var passed = (view.causality_dag_nodes.size() == 2)
 	view.free()
@@ -77,9 +77,9 @@ static func _test_mounted_real_quest_causality() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: QuestCausalityView = mount_handle.get("view", null) as QuestCausalityView
 	if mounted_view != null:
-		mounted_view.set_quest_list_snapshot([
-			{ "quest_id": "Q_REAL_01", "title": "边疆侦察", "category": "MAIN", "status": "AVAILABLE", "branches": ["强攻", "潜入"] }
-		])
+		mounted_view.apply_snapshot({"quests": [
+			{"quest_id": "Q_REAL_01", "title": "边疆侦察", "category": "MAIN", "status": "AVAILABLE", "branches": ["强攻", "潜入"]}
+		]})
 		var select_outcome := mounted_view.select_quest_detail("Q_REAL_01")
 		mounted_view._get_tabs().on_bounty_tier_changed(0)
 		mounted_view._get_tabs().on_bounty_accept()

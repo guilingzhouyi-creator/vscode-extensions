@@ -42,8 +42,8 @@ static func _test_banner_switch() -> Dictionary:
 static func _test_ten_pull_reveal_flow() -> Dictionary:
 	var view = GachaWishView.new()
 	var mock_items = [
-		{ "item_id": "SWORD_SSR", "rarity": 5, "name": "烈焰裁决" },
-		{ "item_id": "BOW_SR", "rarity": 4, "name": "风行者之弓" }
+		{"item_id": "SWORD_SSR", "rarity": 5, "name": "烈焰裁决"},
+		{"item_id": "BOW_SR", "rarity": 4, "name": "风行者之弓"}
 	]
 	var res = view.execute_pull_preview(10, mock_items)
 	var passed = res.success and (view.anim_state == GachaWishView.WishAnimationState.RESULT_REVEAL) and (view.latest_pull_results.size() == 2)
@@ -70,9 +70,9 @@ static func _test_mounted_real_gacha_wish() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: GachaWishView = mount_handle.get("view", null) as GachaWishView
 	if mounted_view != null:
-		mounted_view._on_banner_switch_pressed("BANNER_STANDARD_WEAPON")
-		mounted_view._on_toggle_history_pressed()
-		mounted_view._on_history_close_pressed()
+		mounted_view.switch_banner("BANNER_STANDARD_WEAPON")
+		mounted_view._get_tabs().on_toggle_history_pressed()
+		mounted_view._get_tabs().on_history_close_pressed()
 		var pull_outcome := mounted_view.execute_pull_preview(1, [])
 		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and bool(pull_outcome.get("success", false)) and mounted_view.current_banner_id == "BANNER_STANDARD_WEAPON"
 	FeMountHelper.unmount_scene(mount_handle)

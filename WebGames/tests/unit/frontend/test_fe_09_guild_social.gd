@@ -31,9 +31,15 @@ static func run_all_tests() -> Dictionary:
 
 static func _test_guild_snapshot_loading() -> Dictionary:
 	var view = GuildSocialView.new()
-	view.set_guild_snapshot("圣光骑士团", 3, 50000, [
-		{ "account_id": "ACC_LEADER", "role": "LEADER", "contribution": 12000 }
-	], [])
+	view.apply_snapshot({
+		"guild_name": "圣光骑士团",
+		"guild_level": 3,
+		"guild_funds": 50000,
+		"members": [
+			{"account_id": "ACC_LEADER", "role": "LEADER", "contribution": 12000}
+		],
+		"techs": []
+	})
 
 	var passed = (view.guild_name == "圣光骑士团") and (view.vault_gold == 50000) and (view.member_roster.size() == 1)
 	view.free()
@@ -57,10 +63,16 @@ static func _test_rbac_management_permissions() -> Dictionary:
 
 static func _test_guild_tech_tree_rendering() -> Dictionary:
 	var view = GuildSocialView.new()
-	view.set_guild_snapshot("商会联盟", 2, 10000, [], [
-		{ "tech_id": "TECH_EXP_BOOST", "level": 2, "max_level": 5 },
-		{ "tech_id": "TECH_VAULT_EXPAND", "level": 1, "max_level": 3 }
-	])
+	view.apply_snapshot({
+		"guild_name": "商会联盟",
+		"guild_level": 2,
+		"guild_funds": 10000,
+		"members": [],
+		"techs": [
+			{"tech_id": "TECH_EXP_BOOST", "level": 2, "max_level": 5},
+			{"tech_id": "TECH_VAULT_EXPAND", "level": 1, "max_level": 3}
+		]
+	})
 
 	var passed = (view.tech_nodes.size() == 2) and (view.tech_nodes[0].level == 2)
 	view.free()
@@ -75,9 +87,15 @@ static func _test_mounted_real_guild_social() -> Dictionary:
 	var passed := bool(mount_handle.get("ok", false))
 	var mounted_view: GuildSocialView = mount_handle.get("view", null) as GuildSocialView
 	if mounted_view != null:
-		mounted_view.set_guild_snapshot("DawnWing", 3, 50000, [
-			{ "account_id": "ACC_LEADER", "role": "LEADER", "contribution": 12000 }
-		], [])
+		mounted_view.apply_snapshot({
+			"guild_name": "DawnWing",
+			"guild_level": 3,
+			"guild_funds": 50000,
+			"members": [
+				{"account_id": "ACC_LEADER", "role": "LEADER", "contribution": 12000}
+			],
+			"techs": []
+		})
 		mounted_view._on_guild_manage_pressed()
 		mounted_view._on_tab_changed(1)
 		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and mounted_view.can_manage_members("LEADER")

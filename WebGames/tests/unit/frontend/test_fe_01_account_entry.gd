@@ -33,6 +33,9 @@ static func run_all_tests() -> Dictionary:
 	}
 
 static func _test_login_register_form_flow() -> Dictionary:
+	var mock_auth := ServiceLocator.get_instance().auth()
+	if mock_auth != null:
+		mock_auth.set("simulate_delay_ms", 0)
 	var view = AccountEntryView.new()
 	view.switch_state(AccountEntryView.EntryState.LOGIN)
 
@@ -49,10 +52,10 @@ static func _test_login_register_form_flow() -> Dictionary:
 
 static func _test_character_slot_selection() -> Dictionary:
 	var view = AccountEntryView.new()
-	view.set_character_slots_snapshot([
-		{ "slot_id": "SLOT_01", "name": "圣骑士艾伦", "level": 15, "class": "PALADIN" },
-		{ "slot_id": "SLOT_02", "name": "游侠罗宾", "level": 8, "class": "RANGER" }
-	])
+	view.apply_snapshot({"character_slots": [
+		{"slot_id": "SLOT_01", "name": "圣骑士艾伦", "level": 15, "class": "PALADIN"},
+		{"slot_id": "SLOT_02", "name": "游侠罗宾", "level": 8, "class": "RANGER"}
+	]})
 
 	var res = view.select_character_slot("SLOT_01")
 	var passed = res.success and (view.selected_character_slot == "SLOT_01") and (view.character_slots.size() == 2)

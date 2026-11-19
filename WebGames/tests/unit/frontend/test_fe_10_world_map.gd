@@ -51,9 +51,9 @@ static func _test_town_selection() -> Dictionary:
 
 static func _test_marching_route_snapshot() -> Dictionary:
 	var view = WorldMapView.new()
-	view.set_marching_route_snapshot([
-		{ "from": "TOWN_VALAN", "to": "TOWN_FOREST", "eta_seconds": 120 }
-	])
+	view.apply_snapshot({"marching_routes": [
+		{"from": "TOWN_VALAN", "to": "TOWN_FOREST", "eta_seconds": 120}
+	]})
 	var passed = (view.marching_routes.size() == 1)
 	view.free()
 	return {
@@ -69,7 +69,7 @@ static func _test_mounted_real_world_map() -> Dictionary:
 	if mounted_view != null:
 		mounted_view.adjust_zoom(0.25)
 		var town_outcome := mounted_view.select_town("TOWN_IRON_CITADEL")
-		mounted_view.apply_snapshot({"mod_world_topology": {"nodes": [{"node_id": "N_VALAN", "name": "Valan"}]}})
+		mounted_view.apply_snapshot({"mod_world_topology": {"nodes": [ {"node_id": "N_VALAN", "name": "Valan"}]}})
 		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and bool(town_outcome.get("success", false))
 	FeMountHelper.unmount_scene(mount_handle)
 	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
