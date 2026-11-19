@@ -432,13 +432,10 @@ for (const id of ids) {
     if [[ "$STREAM_DATA_OK" -eq 0 || ( "$STREAM_EXIT" -ne 0 && "$STREAM_PASSED" -eq 1 ) ]]; then
         if [[ "$AGENT_MODE" -eq 1 ]]; then
             STREAM_RAW=$(cat "$STREAM_OUT" 2>/dev/null || true)
-            record_pre_commit_failure "STAGED-DIFF-14" \
-                "FGT-GAT-001" \
+            record_pre_commit_failure "STAGED-DIFF-14" "FGT-GAT-001" \
                 "Differential stream gate execution failed with exit code ${STREAM_EXIT}" \
                 "Run 'node scripts/common/gate-differential-bounds.js --stream' to inspect output" \
-                "bash scripts/sh/pre-commit-gate.sh --fast" \
-                "${TOUCHED_AUDITABLE%%$'\n'*}" \
-                "$STREAM_RAW"
+                "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$STREAM_RAW"
             cat "$ROOT_DIR/.audit-logs/last-failure.json"
             exit 1
         fi
@@ -448,66 +445,37 @@ for (const id of ids) {
 fi
 
 if [[ -n "$TOUCHED_CODE" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if [[ "$S11_STATUS" != "PASS" ]]; then
-            record_pre_commit_failure "STAGED-SLICE-11" "GUARD-AST-001" "${S11_SUMMARY:-STAGED-SLICE-11 审查未通过或未产出数据 (Fail-Closed)}" "${S11_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_CODE%%$'\n'*}" "$S11_DETAIL"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+    write_step_banner "STAGED-SLICE-11"
+    if report_streaming_step "STAGED-SLICE-11" "GUARD-AST-001" "$S11_STATUS" "$S11_SUMMARY" "$S11_DETAIL" "${TOUCHED_CODE%%$'\n'*}"; then
+        write_step_verdict "STAGED-SLICE-11" PASS "${S11_DETAIL:-暂存区 AST 切片复杂度合规}"
     else
-        write_step_banner "STAGED-SLICE-11"
-        if [[ "$S11_STATUS" != "PASS" ]]; then
-            write_step_verdict "STAGED-SLICE-11" BLOCK "${S11_DETAIL:-暂存区 AST 切片审查未通过}"
-            FAILED=1
-        else
-            write_step_verdict "STAGED-SLICE-11" PASS "${S11_DETAIL:-暂存区 AST 切片复杂度合规}"
-        fi
+        write_step_verdict "STAGED-SLICE-11" BLOCK "${S11_DETAIL:-暂存区 AST 切片审查未通过}"
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]]; then
     write_step_verdict "STAGED-SLICE-11" SKIP "无暂存代码"
 fi
 
 if [[ -n "$TOUCHED_AUDITABLE" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if [[ "$S12_STATUS" != "PASS" ]]; then
-            record_pre_commit_failure "STAGED-DENSITY-12" "VOL-DIL-001" "${S12_SUMMARY:-STAGED-DENSITY-12 审查未通过或未产出数据 (Fail-Closed)}" "${S12_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$S12_DETAIL"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
-        if [[ "$S13_STATUS" != "PASS" ]]; then
-            record_pre_commit_failure "STAGED-VOLUME-13" "VOL-ELOC-001" "${S13_SUMMARY:-STAGED-VOLUME-13 审查未通过或未产出数据 (Fail-Closed)}" "${S13_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$S13_DETAIL"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
-        if [[ "$S14_STATUS" != "PASS" ]]; then
-            record_pre_commit_failure "STAGED-DIFF-14" "FGT-GAT-001" "${S14_SUMMARY:-STAGED-DIFF-14 审查未通过或未产出数据 (Fail-Closed)}" "${S14_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$S14_DETAIL"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+    FIRST_AUDITABLE="${TOUCHED_AUDITABLE%%$'\n'*}"
+    write_step_banner "STAGED-DENSITY-12"
+    if report_streaming_step "STAGED-DENSITY-12" "VOL-DIL-001" "$S12_STATUS" "$S12_SUMMARY" "$S12_DETAIL" "$FIRST_AUDITABLE"; then
+        write_step_verdict "STAGED-DENSITY-12" PASS "${S12_DETAIL:-暂存区代码密度与接线载荷合规}"
     else
-        write_step_banner "STAGED-DENSITY-12"
-        if [[ "$S12_STATUS" != "PASS" ]]; then
-            write_step_verdict "STAGED-DENSITY-12" BLOCK "${S12_DETAIL:-暂存区代码密度与接线载荷审查未通过}"
-            FAILED=1
-        else
-            write_step_verdict "STAGED-DENSITY-12" PASS "${S12_DETAIL:-暂存区代码密度与接线载荷合规}"
-        fi
+        write_step_verdict "STAGED-DENSITY-12" BLOCK "${S12_DETAIL:-暂存区代码密度与接线载荷审查未通过}"
+    fi
 
-        write_step_banner "STAGED-VOLUME-13"
-        if [[ "$S13_STATUS" != "PASS" ]]; then
-            write_step_verdict "STAGED-VOLUME-13" BLOCK "${S13_DETAIL:-暂存区双轨体积与动态包络审查未通过}"
-            FAILED=1
-        else
-            write_step_verdict "STAGED-VOLUME-13" PASS "${S13_DETAIL:-暂存区双轨体积与动态包络合规}"
-        fi
+    write_step_banner "STAGED-VOLUME-13"
+    if report_streaming_step "STAGED-VOLUME-13" "VOL-ELOC-001" "$S13_STATUS" "$S13_SUMMARY" "$S13_DETAIL" "$FIRST_AUDITABLE"; then
+        write_step_verdict "STAGED-VOLUME-13" PASS "${S13_DETAIL:-暂存区双轨体积与动态包络合规}"
+    else
+        write_step_verdict "STAGED-VOLUME-13" BLOCK "${S13_DETAIL:-暂存区双轨体积与动态包络审查未通过}"
+    fi
 
-        write_step_banner "STAGED-DIFF-14"
-        if [[ "$S14_STATUS" != "PASS" ]]; then
-            write_step_verdict "STAGED-DIFF-14" BLOCK "${S14_DETAIL:-暂存区加权有效代码微分边界或准入周转未达标}"
-            FAILED=1
-        else
-            write_step_verdict "STAGED-DIFF-14" PASS "${S14_DETAIL:-暂存区加权有效代码微分边界与准入周转合规}"
-        fi
+    write_step_banner "STAGED-DIFF-14"
+    if report_streaming_step "STAGED-DIFF-14" "FGT-GAT-001" "$S14_STATUS" "$S14_SUMMARY" "$S14_DETAIL" "$FIRST_AUDITABLE"; then
+        write_step_verdict "STAGED-DIFF-14" PASS "${S14_DETAIL:-暂存区加权有效代码微分边界与准入周转合规}"
+    else
+        write_step_verdict "STAGED-DIFF-14" BLOCK "${S14_DETAIL:-暂存区加权有效代码微分边界或准入周转未达标}"
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]]; then
     write_step_verdict "STAGED-DENSITY-12" SKIP "无暂存可审计代码"
@@ -524,8 +492,7 @@ fi
 
 echo "================================================================="
 if [[ "$FAILED" -ne 0 ]]; then
-    DIAG_DIR="$ROOT_DIR/.audit-logs"
-    FAIL_LOG="$DIAG_DIR/last-pre-commit.log"
+    FAIL_LOG="$ROOT_DIR/.audit-logs/last-pre-commit.log"
     RAW_LOG=""
     [[ -f "$FAIL_LOG" ]] && RAW_LOG=$(cat "$FAIL_LOG" 2>/dev/null || true)
     complete_gate_telemetry BLOCK "$STAGED_COUNT" "$RAW_LOG" pre-commit
@@ -536,9 +503,8 @@ if [[ "$FAILED" -ne 0 ]]; then
     echo "   (Agent 消费模式: bash scripts/sh/pre-commit-gate.sh --agent)"
     echo "================================================================="
     exit 1
-else
-    complete_gate_telemetry PASS "$STAGED_COUNT" "" pre-commit
-    echo "✔ Pre-Commit 检查通过"
-    echo "================================================================="
-    exit 0
 fi
+complete_gate_telemetry PASS "$STAGED_COUNT" "" pre-commit
+echo "✔ Pre-Commit 检查通过"
+echo "================================================================="
+exit 0
