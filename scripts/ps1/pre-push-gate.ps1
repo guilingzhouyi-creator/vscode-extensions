@@ -8,11 +8,14 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   pwsh -File scripts/ps1/pre-push-gate.ps1
+#   pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent
+#   pwsh -File scripts/ps1/pre-push-gate.ps1 -Json
 # ==============================================================================
 [CmdletBinding()]
 param(
     [switch]$ViewLog,
     [switch]$Agent,
+    [switch]$Json,
     [string]$PushedSha = "",
     [string]$RemoteSha = "",
     [string]$RefsFile = "",
@@ -25,7 +28,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ($Help) {
-    Write-Output "用法: pwsh -File scripts/ps1/pre-push-gate.ps1 [-Agent] [-ViewLog] [-StaggeredPush] [-Help]"
+    Write-Output "用法: pwsh -File scripts/ps1/pre-push-gate.ps1 [-Agent] [-Json] [-ViewLog] [-StaggeredPush] [-Help]"
     Write-Output "层级流向: 常规推送走 Tier 1 (本地 pre-commit / pre-push) -> Tier 2 (CI)；Tier 1.5 云端预测试机由 -StaggeredPush 或手工 pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice staged 触发。"
     exit 0
 }
@@ -38,11 +41,12 @@ $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+$isMachineMode = [bool]($Agent -or $Json)
 
 # 步骤身份、环境隔离、工具探测与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
 $script:GateRepoRoot = $repoRoot
 $script:GateEntryId = 'pre-push'
-$script:GateSuppressOutput = [bool]$Agent
+$script:GateSuppressOutput = $isMachineMode
 . (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
 Initialize-GateGitIsolation -RepoRoot $repoRoot
 
@@ -67,7 +71,7 @@ if (-not $npmCmd) {
     exit 1
 }
 
-if (-not $Agent) {
+if (-not $isMachineMode) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     Write-GateHost "🔒 执行本地 Pre-Push 推送前回归检查 (PowerShell 版)" -ForegroundColor Cyan
     Write-GateHost "=================================================================" -ForegroundColor Cyan
@@ -78,11 +82,42 @@ $runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 
-if ($Agent) {
+if ($isMachineMode) {
     $staleSnapshot = Join-Path $repoRoot ".audit-logs/last-failure.json"
     if (Test-Path $staleSnapshot) { Remove-Item -Path $staleSnapshot -Force -ErrorAction SilentlyContinue }
 }
 
+
+function Save-PrePushFailureArtifacts {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string]$Command,
+        [Parameter(Mandatory = $true)][int]$ExitCode,
+        [string]$LogFilePath = "",
+        [string]$Summary = ""
+    )
+    $meta = Resolve-StepMeta -StepId $StepId
+    $resolvedSummary = if ($Summary) { $Summary } else { "Step $($meta.Id) ($($meta.Title)) failed with exit code $ExitCode" }
+    Register-GateFailure -StepId $StepId -Command $Command -ExitCode $ExitCode `
+        -Summary $resolvedSummary -TargetFiles @($WorkingDirectory)
+
+    $logDir = Join-Path $repoRoot ".audit-logs"
+    if (-not (Test-Path -LiteralPath $logDir)) {
+        [void](New-Item -ItemType Directory -Path $logDir -Force)
+    }
+    $lastLog = Join-Path $logDir "last-pre-push.log"
+    if ($LogFilePath -and (Test-Path -LiteralPath $LogFilePath)) {
+        Copy-Item -Path $LogFilePath -Destination $lastLog -Force -ErrorAction SilentlyContinue
+        Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog `
+            -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
+    }
+    Write-GateFailureEnvelope -Gate "pre-push" -StepId $meta.Id -StepTitle $meta.Title -RuleId $meta.Rule `
+        -ExitCode $ExitCode -RunId $runId -Command $Command -Summary $resolvedSummary `
+        -VerifyCmd $Command -FastRecheck "pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent" `
+        -TargetFiles @($WorkingDirectory) -LogFile ".audit-logs/last-pre-push.log"
+}
 
 # 步骤身份只来自单源登记表：未知标签直接抛错，绝不回落到合成标识。
 function Invoke-GateStep {
@@ -97,9 +132,10 @@ function Invoke-GateStep {
         [Parameter(Mandatory = $true)]
         [string]$StepId,
         [Parameter(Mandatory = $false)]
-        [int]$TimeoutSeconds = 60
+        [int]$TimeoutSeconds = 0
     )
     $meta = Resolve-StepMeta -StepId $StepId
+    $resolvedTimeout = if ($TimeoutSeconds -gt 0) { $TimeoutSeconds } else { Get-GateStepTimeout -StepId $StepId -DefaultSeconds 60 }
     $logDir = Join-Path $repoRoot ".audit-logs"
     if (-not (Test-Path $logDir)) {
         [void](New-Item -ItemType Directory -Path $logDir -Force)
@@ -115,7 +151,7 @@ function Invoke-GateStep {
         $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
             -RedirectStandardOutput $stepLog -RedirectStandardError $stepErrLog -NoNewWindow -PassThru
 
-        $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $meta.Id -LogFiles @($stepLog, $stepErrLog) -DiagPrefix "timeout-prepush"
+        $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $resolvedTimeout -ProcessName $meta.Id -LogFiles @($stepLog, $stepErrLog) -DiagPrefix "timeout-prepush"
         if (Test-Path $stepErrLog) {
             $errContent = Get-Content -Path $stepErrLog -Raw -ErrorAction SilentlyContinue
             if ($errContent) {
@@ -123,12 +159,15 @@ function Invoke-GateStep {
             }
             Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue
         }
+        $cmdStr = "$FilePath $($ArgumentList -join ' ')"
         if (-not $ok) {
-            if (-not $Agent) { Write-Host "  ✖ BLOCK  $($meta.Id) 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
+            if (-not $isMachineMode) { Write-Host "  ✖ BLOCK  $($meta.Id) 执行超时 (已超过 ${resolvedTimeout} 秒)" -ForegroundColor Red }
+            Save-PrePushFailureArtifacts -StepId $StepId -WorkingDirectory $WorkingDirectory -Command $cmdStr -ExitCode 124 -LogFilePath $stepLog -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code 124"
+            Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail "执行超时（阈值 ${resolvedTimeout}s）"
             return 124
         }
         if ($p.ExitCode -ne 0) {
-            if (-not $Agent) {
+            if (-not $isMachineMode) {
                 Write-GateHost "  ✖ BLOCK  $($meta.Id) 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
                 if (Test-Path $stepLog) {
                     $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
@@ -140,48 +179,8 @@ function Invoke-GateStep {
                     }
                 }
             }
-            $cmdStr = "$FilePath $($ArgumentList -join ' ')"
-            Register-GateFailure -StepId $StepId -Command $cmdStr -ExitCode $p.ExitCode `
-                -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)" `
-                -TargetFiles @($WorkingDirectory)
+            Save-PrePushFailureArtifacts -StepId $StepId -WorkingDirectory $WorkingDirectory -Command $cmdStr -ExitCode $p.ExitCode -LogFilePath $stepLog -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)"
             Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail "退出码 $($p.ExitCode)"
-            # 保留现场快照与 Agent-Native Envelope
-            try {
-                $lastLog = Join-Path $logDir "last-pre-push.log"
-                Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
-                Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
-
-                $violation = [ordered]@{
-                    ruleId = $meta.Rule
-                    severity = "BLOCK"
-                    file = $WorkingDirectory
-                    message = "Step $($meta.Id) failed with exit code $($p.ExitCode)"
-                    verificationCommand = $cmdStr
-                }
-                $envelope = [ordered]@{
-                    protocolVersion = "1.0.0"
-                    runId = $runId
-                    recordedAt = (Get-Date).ToString("o")
-                    status = "BLOCK"
-                    gate = "pre-push"
-                    step = $meta.Id
-                    stepTitle = $meta.Title
-                    stepId = $meta.Id
-                    failedCommand = $cmdStr
-                    exitCode = $p.ExitCode
-                    summary = "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)"
-                    logFile = ".audit-logs/last-pre-push.log"
-                    violations = @($violation)
-                    agentDirectives = [ordered]@{
-                        targetFiles = @($WorkingDirectory)
-                        remediationPriority = @($meta.Rule)
-                        verificationCommand = $cmdStr
-                        fastRecheckCommand = "pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent"
-                    }
-                }
-                $snapshotJson = $envelope | ConvertTo-Json -Depth 5
-                [System.IO.File]::WriteAllText((Join-Path $logDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
-            } catch {}
         } else {
             Write-StepVerdict -StepId $StepId -Status "PASS" -Detail ""
         }
@@ -189,6 +188,84 @@ function Invoke-GateStep {
     } finally {
         if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
         if (Test-Path $stepErrLog) { Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Invoke-GuardBatch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$GroupName
+    )
+    $batchLogDir = Join-Path ([System.IO.Path]::GetTempPath()) ("pre-push-guards-$PID-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    [void](New-Item -ItemType Directory -Path $batchLogDir -Force)
+    $batchErrFile = Join-Path $batchLogDir "batch-stderr.log"
+    $batchPassed = $true
+    try {
+        $guardScript = Join-Path $repoRoot "scripts/common/run-workspace-guards.js"
+        $savedNativePref = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+        $rawOutput = ""
+        $guardExit = 0
+        try {
+            $rawOutput = (& $nodeCmd $guardScript --group $GroupName --json --log-dir $batchLogDir 2>$batchErrFile) -join "`n"
+            $guardExit = $LASTEXITCODE
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $savedNativePref
+        }
+
+        $payload = $null
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($rawOutput)) {
+                $payload = $rawOutput | ConvertFrom-Json
+            }
+        } catch {
+            $payload = $null
+        }
+
+        if ($null -eq $payload -or $null -eq $payload.results) {
+            if (-not $isMachineMode) {
+                Write-GateHost "✖ BLOCK  并发守卫组 '$GroupName' 未返回有效结果 (退出码 $guardExit)" -ForegroundColor Red
+            }
+            $fallbackStep = if ($GroupName -eq "prepush-rules") { "RULE-CATALOG-04" } else { "FEEDBACK-VOCABULARY-23" }
+            $fallbackCode = if ($guardExit -ne 0) { $guardExit } else { 1 }
+            Save-PrePushFailureArtifacts -StepId $fallbackStep -WorkingDirectory $repoRoot `
+                -Command "node scripts/common/run-workspace-guards.js --group $GroupName" -ExitCode $fallbackCode `
+                -LogFilePath $batchErrFile -Summary "Guard batch $GroupName failed to emit JSON results"
+            Write-StepVerdict -StepId $fallbackStep -Status "BLOCK" -Detail "守卫批处理异常 (退出码 $guardExit)"
+            return $false
+        }
+
+        foreach ($r in @($payload.results)) {
+            $stepId = [string]$r.stepId
+            $rExit = [int]$r.exitCode
+            $rLog = if ($r.PSObject.Properties['logFile'] -and $r.logFile) { [string]$r.logFile } else { "" }
+            $rCmd = if ($r.PSObject.Properties['cmd'] -and $r.cmd) { [string]$r.cmd } else { "node scripts/common/run-workspace-guards.js --group $GroupName" }
+            Write-StepBanner -StepId $stepId
+            if ($rExit -eq 0) {
+                Write-StepVerdict -StepId $stepId -Status "PASS" -Detail ""
+            } else {
+                $batchPassed = $false
+                if (-not $isMachineMode -and $rLog -and (Test-Path -LiteralPath $rLog)) {
+                    $tail = Get-Content -Path $rLog -Tail 20 -ErrorAction SilentlyContinue
+                    if ($tail) {
+                        Write-GateHost "   --- 错误日志摘要 ($($r.id)) ---" -ForegroundColor DarkRed
+                        foreach ($line in $tail) {
+                            Write-GateHost "   $line" -ForegroundColor DarkRed
+                        }
+                    }
+                }
+                $meta = Resolve-StepMeta -StepId $stepId
+                Save-PrePushFailureArtifacts -StepId $stepId -WorkingDirectory $repoRoot -Command $rCmd -ExitCode $rExit -LogFilePath $rLog -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code $rExit"
+                Write-StepVerdict -StepId $stepId -Status "BLOCK" -Detail "退出码 $rExit"
+            }
+        }
+        if ($guardExit -ne 0) { $batchPassed = $false }
+        return $batchPassed
+    } finally {
+        if (Test-Path -LiteralPath $batchLogDir) {
+            Remove-Item -LiteralPath $batchLogDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -216,43 +293,29 @@ if (-not $range) {
     if ($hasOriginMain) { $range = "origin/main..HEAD" }
 }
 
-$touchedAr = $false
-$touchedWt = $false
-$touchedWg = $false
-$touchedFg = $false
-$touchedShared = $false
-
-if ($range) {
-    $changedFiles = @()
-    try { $changedFiles = @(git diff --name-only $range 2>$null) } catch { $changedFiles = @() }
-    foreach ($f in $changedFiles) {
-        if ([string]::IsNullOrWhiteSpace($f)) { continue }
-        if ($f -match "^auto-refactor/") {
-            $touchedAr = $true
-        } elseif ($f -match "^workspace-timing/") {
-            $touchedWt = $true
-        } elseif ($f -match "^WebGames/") {
-            $touchedWg = $true
-        } elseif ($f -match "^fractal-git/") {
-            $touchedFg = $true
-        } else {
-            $touchedShared = $true
-        }
-    }
+$impactScript = Join-Path $repoRoot "scripts/common/impact-slice-map.js"
+$impactArgs = if ($range) { @($impactScript, "--resolve-range", $range) } else { @($impactScript, "--resolve-range") }
+$impactJsonRaw = ""
+$impactExit = 0
+$savedNativePref = $PSNativeCommandUseErrorActionPreference
+$PSNativeCommandUseErrorActionPreference = $false
+try {
+    $impactJsonRaw = (& $nodeCmd @impactArgs 2>$null) -join "`n"
+    $impactExit = $LASTEXITCODE
+} finally {
+    $PSNativeCommandUseErrorActionPreference = $savedNativePref
 }
-
-$projectCount = 0
-if ($touchedAr) { $projectCount++ }
-if ($touchedWt) { $projectCount++ }
-if ($touchedWg) { $projectCount++ }
-if ($touchedFg) { $projectCount++ }
-
-# 跨项目、共享治理变更或无明确对比范围时安全回退全量
-$runAll = (-not $range) -or $touchedShared -or ($projectCount -gt 1) -or ($changedFiles.Count -eq 0)
-$runAr = $runAll -or $touchedAr
-$runWt = $runAll -or $touchedWt
-$runWg = $runAll -or $touchedWg
-$runFg = $runAll -or $touchedFg
+if ($impactExit -ne 0 -or [string]::IsNullOrWhiteSpace($impactJsonRaw)) {
+    Write-Host "✖ BLOCK  无法枚举推送范围 '$range' 的变更文件 (退出码 $impactExit)。" -ForegroundColor Red
+    exit 1
+}
+$impact = $impactJsonRaw | ConvertFrom-Json
+$runAll = [bool]$impact.runAll
+$runAr = [bool]$impact.runAr
+$runWt = [bool]$impact.runWt
+$runWg = [bool]$impact.runWg
+$runFg = [bool]$impact.runFg
+$changedCount = [int]$impact.changedCount
 
 $isHistoricalPush = $false
 if ($PushedSha -match '^[0-9a-f]{7,40}$') {
@@ -275,7 +338,7 @@ if ($isStaggered) {
     Write-StepVerdict -StepId "WORKSPACE-GITIGNORE-02" -Status "SKIP" -Detail "错峰历史推进跳过工作区巡检"
 
     $densityArgs = if ($range) { @("scripts/common/validate-code-density.js", "--range", $range) } else { @("scripts/common/validate-code-density.js") }
-    $codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepId "WORKSPACE-DENSITY-03" -TimeoutSeconds 30
+    $codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepId "WORKSPACE-DENSITY-03"
     if ($codeDensity -ne 0) { $failed = $true }
 
     Write-StepVerdict -StepId "RULE-CATALOG-04" -Status "SKIP" -Detail "错峰历史推进跳过工作区规则同步"
@@ -297,13 +360,13 @@ if ($isStaggered) {
     Write-StepVerdict -StepId "DOMAIN-MERMAID-18" -Status "SKIP" -Detail "错峰历史推进跳过工作区图谱校验"
     Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "SKIP" -Detail "错峰历史推进跳过工作区Rust套件"
 
-    $codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepId "COMMIT-CONTRACT-20" -TimeoutSeconds 30
+    $codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepId "COMMIT-CONTRACT-20"
     if ($codeHarness -ne 0) { $failed = $true }
 
     if ($range) {
-        $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21" -TimeoutSeconds 30
+        $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21"
         if ($code -ne 0) { $failed = $true }
-        $codeEntropy = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22" -TimeoutSeconds 30
+        $codeEntropy = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22"
         if ($codeEntropy -ne 0) { $failed = $true }
     } else {
         Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "SKIP" -Detail "无上游对比基准"
@@ -328,12 +391,12 @@ if ($isStaggered) {
     Write-StepVerdict -StepId "DESTRUCTIVE-OPS-38" -Status "SKIP" -Detail "错峰历史推进跳过工作区破坏性操作审查"
 
     if ($refsLineCount -gt 0) {
-        $codeRefSafety = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gate-receipts.js", "verify-refs", "--refs-file", $RefsFile) -WorkingDirectory $repoRoot -StepId "REF-SAFETY-39" -TimeoutSeconds 30
+        $codeRefSafety = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gate-receipts.js", "verify-refs", "--refs-file", $RefsFile) -WorkingDirectory $repoRoot -StepId "REF-SAFETY-39"
         if ($codeRefSafety -ne 0) { $failed = $true }
 
         $receiptArgs = @("scripts/common/gate-receipts.js", "verify-receipts", "--refs-file", $RefsFile)
         if ($AllowBypass) { $receiptArgs += "--allow-bypass" }
-        $codeReceiptAudit = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $receiptArgs -WorkingDirectory $repoRoot -StepId "RECEIPT-AUDIT-40" -TimeoutSeconds 60
+        $codeReceiptAudit = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $receiptArgs -WorkingDirectory $repoRoot -StepId "RECEIPT-AUDIT-40"
         if ($codeReceiptAudit -ne 0) { $failed = $true }
     } else {
         Write-StepVerdict -StepId "REF-SAFETY-39" -Status "SKIP" -Detail "无推送 refs 输入（手动执行门禁）"
@@ -359,33 +422,29 @@ if ($runAll) {
 }
 
 # --- 工作区物理卫生与体积守卫 ---
-$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js") -WorkingDirectory $repoRoot -StepId "WORKSPACE-PHYSICAL-01" -TimeoutSeconds 30
-$codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepId "WORKSPACE-GITIGNORE-02" -TimeoutSeconds 30
+$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js") -WorkingDirectory $repoRoot -StepId "WORKSPACE-PHYSICAL-01"
+$codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepId "WORKSPACE-GITIGNORE-02"
 $densityArgs = if ($range) { @("scripts/common/validate-code-density.js", "--range", $range) } else { @("scripts/common/validate-code-density.js") }
-$codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepId "WORKSPACE-DENSITY-03" -TimeoutSeconds 30
+$codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepId "WORKSPACE-DENSITY-03"
 if ($code -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0) {
     $failed = $true
 }
 
-# --- 单源规则目录与引用闭包 ---
-$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -StepId "RULE-CATALOG-04" -TimeoutSeconds 30
-$codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-id-closure.js") -WorkingDirectory $repoRoot -StepId "RULE-CLOSURE-05" -TimeoutSeconds 30
-$codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepId "DOCS-CONSISTENCY-06" -TimeoutSeconds 30
-$codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepId "RULE-REACHABILITY-07" -TimeoutSeconds 60
-if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0) {
+# --- 单源规则目录与引用闭包 (有界并发批处理) ---
+if (-not (Invoke-GuardBatch -GroupName "prepush-rules")) {
     $failed = $true
 }
 
 # --- auto-refactor 引擎全量门禁与回归套件 ---
 if ($runAr) {
-    $codeRust = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-rust.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-RUST-08" -TimeoutSeconds 60
-    $codeBuild = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BUILD-09" -TimeoutSeconds 90
-    $codeFacade = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-facade-governance.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-FACADE-10" -TimeoutSeconds 60
-    $codeSelf = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-SELF-11" -TimeoutSeconds 60
-    $codeTest = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-TESTS-12" -TimeoutSeconds 180
+    $codeRust = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-rust.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-RUST-08"
+    $codeBuild = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BUILD-09"
+    $codeFacade = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-facade-governance.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-FACADE-10"
+    $codeSelf = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-SELF-11"
+    $codeTest = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-TESTS-12"
     if ($codeRust -ne 0 -or $codeBuild -ne 0 -or $codeFacade -ne 0 -or $codeSelf -ne 0 -or $codeTest -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "ENGINE-RUST-08" -Status "SKIP" -Detail "auto-refactor 未受影响"
     Write-StepVerdict -StepId "ENGINE-BUILD-09" -Status "SKIP" -Detail "auto-refactor 未受影响"
@@ -396,58 +455,58 @@ if ($runAr) {
 
 # --- auto-refactor 多维自审与质量基线 ---
 if ($runAr) {
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BASELINE-13" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BASELINE-13"
     if ($code -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "ENGINE-BASELINE-13" -Status "SKIP" -Detail "auto-refactor 未受影响"
 }
 
 # --- workspace-timing 快速单元测试套件 ---
 if ($runWt) {
-    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-TESTS-14" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-TESTS-14"
     if ($code -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "EXTENSION-TESTS-14" -Status "SKIP" -Detail "workspace-timing 未受影响"
 }
 
 # --- workspace-timing 六层审查门禁 ---
 if ($runWt) {
-    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-REVIEW-15" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-REVIEW-15"
     if ($code -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "EXTENSION-REVIEW-15" -Status "SKIP" -Detail "workspace-timing 未受影响"
 }
 
 # --- auto-refactor 长期轨迹账本物理约束 ---
 if ($runAr) {
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-trajectory-ledger.js") -WorkingDirectory $repoRoot -StepId "LEDGER-CONSTRAINT-16" -TimeoutSeconds 30
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-trajectory-ledger.js") -WorkingDirectory $repoRoot -StepId "LEDGER-CONSTRAINT-16"
     if ($code -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "LEDGER-CONSTRAINT-16" -Status "SKIP" -Detail "账本未受影响"
 }
 
 # --- WebGames 配置架构与必需表一致性 ---
 if ($runWg) {
-    $code = Invoke-GateStep -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -StepId "DOMAIN-AUDIT-17" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -StepId "DOMAIN-AUDIT-17"
     # Mermaid 图由真实解析器校验（audit_docs 的字符启发式无法发现语法破损）；
     # 该步骤此前无任何调用方，导致 349 张图的解析能力长期悬空。
     $codeMermaid = if (Get-Command pwsh -ErrorAction SilentlyContinue) {
-        Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "WebGames/scripts/ps1/check-mermaid.ps1") -WorkingDirectory $repoRoot -StepId "DOMAIN-MERMAID-18" -TimeoutSeconds 120
+        Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "WebGames/scripts/ps1/check-mermaid.ps1") -WorkingDirectory $repoRoot -StepId "DOMAIN-MERMAID-18"
     } else {
         Write-StepVerdict -StepId "DOMAIN-MERMAID-18" -Status "BLOCK" -Detail "未检测到 pwsh，Mermaid 校验无法执行"
         1
     }
     if ($code -ne 0 -or $codeMermaid -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "DOMAIN-AUDIT-17" -Status "SKIP" -Detail "WebGames 未受影响"
     Write-StepVerdict -StepId "DOMAIN-MERMAID-18" -Status "SKIP" -Detail "WebGames 未受影响"
@@ -459,15 +518,15 @@ if ($runFg) {
         Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "BLOCK" -Detail "未检测到 cargo 工具链，fractal-git 回归套件无法执行"
         $failed = $true
     } elseif (Get-Command pwsh -ErrorAction SilentlyContinue) {
-        $code = Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "fractal-git/scripts/ps1/gate-rust.ps1") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 300
+        $code = Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "fractal-git/scripts/ps1/gate-rust.ps1") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19"
         if ($code -ne 0) {
             $failed = $true
-}
+        }
     } else {
-        $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--workspace", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 120
+        $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--workspace", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19"
         if ($code -ne 0) {
             $failed = $true
-}
+        }
     }
 } else {
     Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "SKIP" -Detail "fractal-git 未受影响"
@@ -475,15 +534,15 @@ if ($runFg) {
 
 # --- 待推送提交历史风格与禁词审查 ---
 # 提交信息词法、风格仲裁与债务走廊契约自测：基础件一旦回归，下方历史扫描结论即失去依据
-$codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepId "COMMIT-CONTRACT-20" -TimeoutSeconds 30
+$codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepId "COMMIT-CONTRACT-20"
 if ($codeHarness -ne 0) {
     $failed = $true
 }
 if ($range) {
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21" -TimeoutSeconds 30
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21"
     if ($code -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "SKIP" -Detail "无上游对比基准"
 }
@@ -491,96 +550,16 @@ if ($range) {
 # --- CHANGE-ENTROPY-22: 推送集变更熵与跨域扩散审查 (GUARD-ENT-001) ---
 # 横幅由 Invoke-GateStep 统一渲染：调用点再打印一次会让同一标识出现两条横幅。
 if ($range) {
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22" -TimeoutSeconds 30
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22"
     if ($code -ne 0) {
         $failed = $true
-}
+    }
 } else {
     Write-StepVerdict -StepId "CHANGE-ENTROPY-22" -Status "SKIP" -Detail "无推送范围"
 }
 
-$codeFeedback = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-feedback.js") -WorkingDirectory $repoRoot -StepId "FEEDBACK-VOCABULARY-23" -TimeoutSeconds 30
-if ($codeFeedback -ne 0) {
-    $failed = $true
-}
-
-# --- GATE-ORDERING-24: 门禁助手定义先于调用与判定词表闭包 (GUARD-ORD-001) ---
-# 该守卫读取步骤登记表枚举入口脚本，故置于末位：新增入口会自动纳入审查。
-$codeOrdering = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-ordering.js") -WorkingDirectory $repoRoot -StepId "GATE-ORDERING-24" -TimeoutSeconds 30
-if ($codeOrdering -ne 0) {
-    $failed = $true
-}
-# 守卫的检出能力必须自证：仅靠干净代码上的退出码无法区分「探测器工作」与「探测器从不触发」。
-$codeGuardProof = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/test-gate-guards.js") -WorkingDirectory $repoRoot -StepId "GATE-PROOF-25" -TimeoutSeconds 60
-if ($codeGuardProof -ne 0) {
-    $failed = $true
-}
-# 步骤判定覆盖守卫：登记表中的每个步骤都必须在两个平台可达且能呈现终态判定。
-$codeCoverage = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-verdicts.js") -WorkingDirectory $repoRoot -StepId "GATE-COVERAGE-26" -TimeoutSeconds 30
-if ($codeCoverage -ne 0) {
-    $failed = $true
-}
-# 规模计数真实性：成功信息里的数字必须来自实测，写死的常量会静默过期。
-$codeCounts = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-hardcoded-counts.js") -WorkingDirectory $repoRoot -StepId "GATE-COUNT-27" -TimeoutSeconds 30
-if ($codeCounts -ne 0) {
-    $failed = $true
-}
-# 块链分支合法性：重复的 else 分支解析器不报错，只在运行时于该行失败。
-$codeChains = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-block-chains.js") -WorkingDirectory $repoRoot -StepId "GATE-CHAIN-28" -TimeoutSeconds 30
-if ($codeChains -ne 0) {
-    $failed = $true
-}
-# 文档规模数字真源渲染：治理文档里的规则数、步骤数、技能数必须与真源一致，禁止手写过期字面量。
-$codeDocMetrics = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/sync-doc-metrics.js") -WorkingDirectory $repoRoot -StepId "DOC-METRICS-29" -TimeoutSeconds 30
-if ($codeDocMetrics -ne 0) {
-    $failed = $true
-}
-# Linux 命令面契约：AGENTS.md 承诺的每个命令都必须真实可绑定，且兼容层同时具备 GNU 与降级两条路径。
-$codeParity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-shell-parity.js") -WorkingDirectory $repoRoot -StepId "SHELL-PARITY-30" -TimeoutSeconds 60
-if ($codeParity -ne 0) {
-    $failed = $true
-}
-# 专员注册表：预置与已入库的单源模板必须 1:1，插件镜像被 gitignore 后仍是派生副本而非真源。
-$codeSubagent = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js") -WorkingDirectory $repoRoot -StepId "SUBAGENT-CATALOG-31" -TimeoutSeconds 60
-if ($codeSubagent -ne 0) {
-    $failed = $true
-}
-# 跨文档引用：按名指到具体条目，按序号引用的地方会在行序变化后静默指错。
-$codeDOCANCHORS32 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-doc-anchors.js") -WorkingDirectory $repoRoot -StepId "DOC-ANCHORS-32" -TimeoutSeconds 60
-if ($codeDOCANCHORS32 -ne 0) {
-    $failed = $true
-}
-# 指标覆盖：声明了却没人渲染的指标是空头承诺，渲染了却没声明的区域无法再生成。
-$codeMETRICCOVERAGE33 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-metric-coverage.js") -WorkingDirectory $repoRoot -StepId "METRIC-COVERAGE-33" -TimeoutSeconds 60
-if ($codeMETRICCOVERAGE33 -ne 0) {
-    $failed = $true
-}
-# 规则族契约：族名必须在分类学中有行、层值必须在六层内，三份登记必须逐族相等。
-$codeFAMILYCONTRACT34 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-family-contract.js") -WorkingDirectory $repoRoot -StepId "FAMILY-CONTRACT-34" -TimeoutSeconds 60
-if ($codeFAMILYCONTRACT34 -ne 0) {
-    $failed = $true
-}
-# 文档可达性：规范文档必须至少被另一份文档指名，否则读者顺着索引永远走不到。
-$codeDOCREACH35 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-doc-reachability.js") -WorkingDirectory $repoRoot -StepId "DOC-REACH-35" -TimeoutSeconds 60
-if ($codeDOCREACH35 -ne 0) {
-    $failed = $true
-}
-# 提交历史冻结清单：允许规则收紧后不追溯阻断已写就的历史，但清单本身必须无法用作自我豁免。
-$codeCHB36 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-history-baseline.js") -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-BASELINE-36" -TimeoutSeconds 60
-if ($codeCHB36 -ne 0) {
-    $failed = $true
-}
-
-# 规则源一致性：规则源跨目录严重级必须与 SSOT 完全一致。
-$codeSource37 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-source-consistency.js") -WorkingDirectory $repoRoot -StepId "RULE-SOURCE-37" -TimeoutSeconds 30
-if ($codeSource37 -ne 0) {
-    $failed = $true
-}
-
-# 破坏性删除溯源：事故形态是「变量名与只读自动变量同名 -> 赋值抛错被忽略 -> 删除作用于用户目录」，
-# 两条链路任一处被拦截都不会发生，故静态审查同时覆盖操作数溯源与自动变量遮蔽。
-$codeDestructive38 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-destructive-ops.js") -WorkingDirectory $repoRoot -StepId "DESTRUCTIVE-OPS-38" -TimeoutSeconds 60
-if ($codeDestructive38 -ne 0) {
+# --- 门禁自证与全工作区治理守卫 (有界并发批处理) ---
+if (-not (Invoke-GuardBatch -GroupName "prepush-governance")) {
     $failed = $true
 }
 
@@ -591,7 +570,7 @@ if ($RefsFile -ne "" -and (Test-Path $RefsFile -PathType Leaf)) {
     $refsLineCount = @(Get-Content $RefsFile -Encoding utf8 | Where-Object { $_.Trim() -ne "" }).Count
 }
 if ($refsLineCount -gt 0) {
-    $codeRefSafety = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gate-receipts.js", "verify-refs", "--refs-file", $RefsFile) -WorkingDirectory $repoRoot -StepId "REF-SAFETY-39" -TimeoutSeconds 30
+    $codeRefSafety = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gate-receipts.js", "verify-refs", "--refs-file", $RefsFile) -WorkingDirectory $repoRoot -StepId "REF-SAFETY-39"
     if ($codeRefSafety -ne 0) {
         $failed = $true
     }
@@ -606,7 +585,7 @@ if ($refsLineCount -gt 0) {
     if ($AllowBypass) {
         $receiptArgs += "--allow-bypass"
     }
-    $codeReceiptAudit = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $receiptArgs -WorkingDirectory $repoRoot -StepId "RECEIPT-AUDIT-40" -TimeoutSeconds 60
+    $codeReceiptAudit = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $receiptArgs -WorkingDirectory $repoRoot -StepId "RECEIPT-AUDIT-40"
     if ($codeReceiptAudit -ne 0) {
         $failed = $true
     }
@@ -616,16 +595,16 @@ if ($refsLineCount -gt 0) {
 
 # 四方闭合：技能注册表、原型技能清单、专员模板与 DSH 写路径策略各自自洽却互相矛盾的缺陷，
 # 任何单点校验都看不见，必须交叉比对。
-$codeCascade41 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -StepId "CASCADE-COHERENCE-41" -TimeoutSeconds 60
+$codeCascade41 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -StepId "CASCADE-COHERENCE-41"
 if ($codeCascade41 -ne 0) {
     $failed = $true
 }
 
 if ($runAr) {
-    $codeFormat42 = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "format:check") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-FORMAT-42" -TimeoutSeconds 60
-    $codeLint43 = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "lint") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-LINT-43" -TimeoutSeconds 120
-    $codeComments44 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-comments.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-COMMENTS-44" -TimeoutSeconds 60
-    $codeRedundancy45 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-redundancy-governance.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-REDUNDANCY-45" -TimeoutSeconds 60
+    $codeFormat42 = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "format:check") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-FORMAT-42"
+    $codeLint43 = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "lint") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-LINT-43"
+    $codeComments44 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-comments.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-COMMENTS-44"
+    $codeRedundancy45 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-redundancy-governance.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-REDUNDANCY-45"
     if ($codeFormat42 -ne 0 -or $codeLint43 -ne 0 -or $codeComments44 -ne 0 -or $codeRedundancy45 -ne 0) {
         $failed = $true
     }
@@ -638,8 +617,7 @@ if ($runAr) {
 }
 
 
-$changedCount = if ($changedFiles) { $changedFiles.Count } else { 0 }
-if ($Agent) {
+if ($isMachineMode) {
     if ($failed) {
         $failLog = Join-Path $repoRoot ".audit-logs/last-pre-push.log"
         $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
