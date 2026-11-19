@@ -92,6 +92,30 @@ static func get_active_world_id() -> String:
 static func get_active_character_id() -> String:
 	return _state.character_id
 
+## 获取当前角色钱包金币余额（O(1) 标量直读）
+static func get_wallet_gold() -> int:
+	return _state.wallet_gold
+
+## 获取当前角色钱包魔单晶余额（O(1) 标量直读）
+static func get_wallet_mana_monocrystals() -> int:
+	return _state.wallet_mana_monocrystals
+
+## 获取当前生命值（O(1) 标量直读）
+static func get_hp_current() -> float:
+	return _state.hp_current
+
+## 获取当前最大生命值（O(1) 标量直读）
+static func get_hp_max() -> float:
+	return _state.hp_max
+
+## 获取当前法力值（O(1) 标量直读）
+static func get_mp_current() -> float:
+	return _state.mp_current
+
+## 获取当前行动力（O(1) 标量直读）
+static func get_ap_current() -> float:
+	return _state.ap_current
+
 ## 获取当前活跃会话令牌（由已注入的安全混淆器或安全备用流还原）
 static func get_active_session_token() -> String:
 	if _masked_token.is_empty():

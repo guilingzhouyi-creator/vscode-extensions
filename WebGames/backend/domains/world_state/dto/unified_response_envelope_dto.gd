@@ -26,8 +26,8 @@ func reset_state() -> void:
 	success = false
 	error_code = ""
 	error_message = ""
-	data.clear()
-	causal_delta.clear()
+	data = {}
+	causal_delta = {}
 	server_timestamp_ms = 0
 
 ## 序列化当前对象为通用字典传输结构

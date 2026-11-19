@@ -32,7 +32,7 @@ func advance_world_time(units: int = 1) -> void:
 	var old_days: int = int(world_time.get("day", 1)) - 1
 	if new_days > old_days:
 		world_time["day"] = old_days + 1 + (new_days - old_days)
-	EventBusCore.get_instance().emit_domain_event("world.time_advanced", {"args": [units], "summary": {"world_id": world_id, "tick": world_time["tick"], "day": world_time["day"]}})
+	EventBusCore.get_instance().emit_domain_event("world.time_advanced", {"category_key": "travel", "args": [units], "summary": {"world_id": world_id, "tick": world_time["tick"], "day": world_time["day"]}})
 
 ## 旧档缺字段归一化：tick/day/month/year 缺失或为负值时按默认补齐（不信任旧档字典结构）
 func _normalize_world_time() -> void:

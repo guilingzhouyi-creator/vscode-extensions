@@ -77,7 +77,21 @@ static func create_human_request(
 	character_id: String = ""
 ) -> ClientRequestEnvelopeDTO:
 	return _build_request_envelope(
-		ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI, domain, action_type, payload, session_token, account_id, character_id
+		ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI, domain, action_type, payload, session_token, account_id, character_id, false, true
+	)
+
+## 从对象池借出人类 UI 请求信封并填充字段（供同步桥接热路径复用，调用方须配对 recycle_request_envelope）
+static func borrow_human_request(
+	domain: String,
+	action_type: String,
+	payload: Dictionary = {},
+	session_token: String = "",
+	account_id: String = "",
+	character_id: String = "",
+	should_deep_copy_payload: bool = true
+) -> ClientRequestEnvelopeDTO:
+	return _build_request_envelope(
+		ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI, domain, action_type, payload, session_token, account_id, character_id, true, should_deep_copy_payload
 	)
 
 ## 从既有 AgentActionPacketDTO 转换为统一请求信封（实现双通道统一收口）
@@ -117,7 +131,7 @@ static func create_agent_request(
 	session_token: String = ""
 ) -> ClientRequestEnvelopeDTO:
 	return _build_request_envelope(
-		ClientRequestEnvelopeDTO.ACTOR_AGENT, domain, action_type, payload, session_token, account_id, character_id
+		ClientRequestEnvelopeDTO.ACTOR_AGENT, domain, action_type, payload, session_token, account_id, character_id, false, true
 	)
 
 static func _build_request_envelope(
@@ -127,17 +141,24 @@ static func _build_request_envelope(
 	payload: Dictionary,
 	session_token: String,
 	account_id: String,
-	character_id: String
+	character_id: String,
+	use_pool: bool = false,
+	should_deep_copy_payload: bool = true
 ) -> ClientRequestEnvelopeDTO:
 	var is_human: bool = (actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI)
 	var id_prefix: String = "REQ_H" if is_human else "REQ_A"
-	var request := ClientRequestEnvelopeDTO.new()
+	var request := borrow_request_envelope() if use_pool else ClientRequestEnvelopeDTO.new()
 	request.request_id = "%s_%d_%d" % [id_prefix, Time.get_ticks_msec(), _request_counter]
 	_request_counter += 1
 	request.actor_type = actor_type
 	request.domain = domain
 	request.action_type = action_type
-	request.payload = payload.duplicate(true)
+	if payload.is_empty():
+		request.payload = {}
+	elif should_deep_copy_payload:
+		request.payload = payload.duplicate(true)
+	else:
+		request.payload = payload
 	request.session_token = session_token
 	request.account_id = account_id
 	request.character_id = character_id
@@ -149,7 +170,7 @@ static func _build_request_envelope(
 	request.client_timestamp_ms = Time.get_ticks_msec()
 	return request
 
-## 创建标准服务端响应信封
+## 创建标准服务端响应信封（优先复用空闲池实例并全字段覆写，保持独立 borrow 计数守恒）
 static func create_response(
 	request_id: String,
 	is_succeeded: bool,
@@ -158,13 +179,13 @@ static func create_response(
 	error_message: String = "",
 	causal_delta: Dictionary = {}
 ) -> UnifiedResponseEnvelopeDTO:
-	var response := UnifiedResponseEnvelopeDTO.new()
+	var response: UnifiedResponseEnvelopeDTO = _response_pool.pop_back() if not _response_pool.is_empty() else UnifiedResponseEnvelopeDTO.new()
 	response.request_id = request_id
 	response.success = is_succeeded
 	response.error_code = error_code
 	response.error_message = error_message
-	response.data = response_payload.duplicate(true)
-	response.causal_delta = causal_delta.duplicate(true)
+	response.data = {} if response_payload.is_empty() else response_payload.duplicate(true)
+	response.causal_delta = {} if causal_delta.is_empty() else causal_delta.duplicate(true)
 	response.server_timestamp_ms = Time.get_ticks_msec()
 	return response
 

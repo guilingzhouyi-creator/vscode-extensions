@@ -63,6 +63,8 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	}
 ]
 
+const EMPTY_QUEST_PARAMS: Dictionary = {"quest_id": []}
+
 ## 原位填充动态行动空间（借还守恒，零堆分配）
 static func resolve_action_space_into(
 	snapshot: AuthoritativeHudSnapshotDTO,
@@ -94,7 +96,7 @@ static func resolve_action_space_into(
 	if can_claim:
 		target_actions[2].allowed_parameters = {"quest_id": [snapshot.quest_tracker.tracked_quest_id]}
 	else:
-		target_actions[2].allowed_parameters = {"quest_id": []}
+		target_actions[2].allowed_parameters = EMPTY_QUEST_PARAMS
 
 	# 4. 查验背包槽位判定
 	_populate_directive(target_actions[3], STATIC_DIR_SPECS[3], true, "", is_human_interacting)

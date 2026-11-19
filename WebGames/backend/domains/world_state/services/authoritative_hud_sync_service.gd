@@ -126,7 +126,18 @@ static func is_human_interacting() -> bool:
 		return _is_human_interacting_override
 	return HumanControlLeaseManager.is_lease_active()
 
-## 7.1 HUD 领域事件信道订阅门面（精准子信道分流与通用域事件隔离，兼容既有 4 参调用）
+const PROLOGUE_HUD_CHANNELS: Array[String] = [
+	"prologue.step_advanced",
+	"prologue.completed",
+	"world_gateway.prologue_handed_off",
+]
+const WORLD_ENTRY_HUD_CHANNELS: Array[String] = [
+	"world_gateway.world_entered",
+	"world_gateway.prologue_handed_off",
+	"world.entered",
+]
+
+## 7.1 HUD 领域事件信道订阅门面（精准子信道直连分流，消除对通用域信道的泛化占用）
 static func subscribe_hud_channels(
 	on_snapshot: Callable,
 	on_wallet: Callable,
@@ -148,17 +159,11 @@ static func subscribe_hud_channels(
 	if on_clock_advanced.is_valid():
 		tokens.append(bus.on_channel(EventChannelDefinition.WORLD_CLOCK_ADVANCED, on_clock_advanced))
 	if on_prologue.is_valid():
-		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(event_packet: Variant) -> void:
-			var channel_name := _extract_event_channel_name(event_packet)
-			if channel_name.begins_with("prologue.") or channel_name == "world_gateway.prologue_handed_off":
-				on_prologue.call(event_packet)
-		))
+		for prologue_channel in PROLOGUE_HUD_CHANNELS:
+			tokens.append(bus.on_channel(prologue_channel, on_prologue))
 	if on_world_entered.is_valid():
-		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(event_packet: Variant) -> void:
-			var channel_name := _extract_event_channel_name(event_packet)
-			if channel_name == "world_gateway.world_entered" or channel_name == "world_gateway.prologue_handed_off" or channel_name == "world.entered":
-				on_world_entered.call(event_packet)
-		))
+		for world_channel in WORLD_ENTRY_HUD_CHANNELS:
+			tokens.append(bus.on_channel(world_channel, on_world_entered))
 	return tokens
 
 ## 7.2 幂等注销由 subscribe_hud_channels 返回的全部订阅令牌（零残留）
@@ -196,6 +201,18 @@ static func get_agent_telemetry_packet(
 		snapshot, previous_slice, sequence_index, cause, is_human_active, initiator
 	)
 
+static var _defaults_config_version: int = -1
+static var _cached_default_hp_max: float = 100.0
+static var _cached_default_ap_max: float = 10.0
+
+static func _sync_hud_defaults_cache() -> void:
+	var current_version := GameConfig.config_reload_version()
+	if _defaults_config_version == current_version:
+		return
+	_cached_default_hp_max = maxf(1.0, GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0))
+	_cached_default_ap_max = maxf(1.0, GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0))
+	_defaults_config_version = current_version
+
 ## 9. Agent 专用推流：向伴侣总线广播标准原子遥测数据包
 static func publish_agent_telemetry_packet(packet: AgentHudTelemetryPacketDTO) -> void:
 	if packet == null:
@@ -203,16 +220,17 @@ static func publish_agent_telemetry_packet(packet: AgentHudTelemetryPacketDTO) -
 	var bus := CompanionObserverBus.get_instance()
 	if bus == null:
 		return
-	bus.broadcast_event("agent_hud_packet_streamed", packet.to_dto())
+	bus.broadcast_owned_event("agent_hud_packet_streamed", packet.to_dto())
 
 # ==============================================================================
 # 内部聚合解析函数（平铺控制流，CC <= 5，Depth <= 2）
 # ==============================================================================
 
 static func _apply_safe_defaults(snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	snapshot.hp_max = maxf(1.0, GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0))
+	_sync_hud_defaults_cache()
+	snapshot.hp_max = _cached_default_hp_max
 	snapshot.mp_max = 100.0
-	snapshot.ap_max = maxf(1.0, GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0))
+	snapshot.ap_max = _cached_default_ap_max
 	snapshot.hp_current = snapshot.hp_max
 	snapshot.mp_current = snapshot.mp_max
 	snapshot.ap_current = snapshot.ap_max
@@ -253,12 +271,10 @@ static func _resolve_physiology(context: Dictionary, snapshot: AuthoritativeHudS
 	if raw_attribute_levels is Dictionary and not raw_attribute_levels.is_empty():
 		snapshot.attribute_levels = raw_attribute_levels.duplicate()
 
-	var default_max_health_points := GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0)
-	var default_max_action_points := GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0)
-
-	snapshot.hp_max = maxf(1.0, float(context.get("hp_max", default_max_health_points)))
+	_sync_hud_defaults_cache()
+	snapshot.hp_max = maxf(1.0, float(context.get("hp_max", _cached_default_hp_max)))
 	snapshot.mp_max = maxf(1.0, float(context.get("mp_max", 100.0)))
-	snapshot.ap_max = maxf(1.0, float(context.get("ap_max", default_max_action_points)))
+	snapshot.ap_max = maxf(1.0, float(context.get("ap_max", _cached_default_ap_max)))
 
 	snapshot.hp_current = maxf(0.0, float(context.get("hp_current", snapshot.hp_max)))
 	snapshot.mp_current = maxf(0.0, float(context.get("mp_current", snapshot.mp_max)))

@@ -14,6 +14,23 @@ extends RefCounted
 static var _boss_encounters: Dictionary = {}
 static var _quest_records: Dictionary = {}
 static var _authored_books: Array = []
+static var _combat_config_version: int = -1
+static var _cached_default_hp: float = 1000.0
+static var _cached_default_ap_cost: float = 2.0
+static var _cached_base_skill_damage: float = 250.0
+static var _cached_sell_back_ratio: float = 0.70
+static var _cached_gacha_pull_cost: int = 160
+
+static func _sync_gameplay_config_cache() -> void:
+	var current_version := GameConfig.config_reload_version()
+	if _combat_config_version == current_version:
+		return
+	_cached_default_hp = GameConfig.get_float("domains.combat", "player_defaults/hp_max", 1000.0)
+	_cached_default_ap_cost = float(abs(GameConfig.get_int("domains.combat", "card_defaults/ap_cost", -2)))
+	_cached_base_skill_damage = GameConfig.get_float("domains.combat", "damage_defaults/base_skill_damage", 250.0)
+	_cached_sell_back_ratio = clampf(GameConfig.get_float("domains.economy", "shop/sell_back_ratio", 0.70), 0.05, 1.0)
+	_cached_gacha_pull_cost = maxi(1, GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_gold", 160))
+	_combat_config_version = current_version
 
 ## 分发核心玩法领域客户端协议动作并返回统一响应包
 static func dispatch(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
@@ -54,10 +71,11 @@ static func _resolve_boss(battle_identifier: String) -> WorldBossAggregate:
 	return boss_entity
 
 static func _handle_combat(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
+	_sync_gameplay_config_cache()
 	var boss_entity := _resolve_boss(str(payload_map.get("target_id", "")))
-	var live_context := WorldSessionRuntimeService.build_live_hud_context() if WorldSessionRuntimeService.has_active_world() else {}
+	var has_active_world := WorldSessionRuntimeService.has_active_world()
 	if action_type == "GET_COMBAT_SNAPSHOT":
-		var default_health := GameConfig.get_float("domains.combat", "player_defaults/hp_max", 1000.0)
+		var default_health := _cached_default_hp
 		return UnifiedProtocolFactory.create_response(request_id, true, {
 			"battle_id": boss_entity.boss_uid,
 			"boss_uid": boss_entity.boss_uid,
@@ -67,19 +85,19 @@ static func _handle_combat(request_id: String, action_type: String, payload_map:
 			"boss_max_hp": boss_entity.phase_max_hp,
 			"shield_hp": boss_entity.mechanism_shield_hp,
 			"defeated": boss_entity.is_defeated,
-			"player_hp": float(live_context.get("hp_current", default_health)),
-			"player_max_hp": float(live_context.get("hp_max", default_health)),
-			"player_mp": float(live_context.get("mp_current", 50.0)),
-			"player_ap": float(live_context.get("ap_current", 10.0)),
+			"player_hp": WorldSessionRuntimeService.get_hp_current() if has_active_world else default_health,
+			"player_max_hp": WorldSessionRuntimeService.get_hp_max() if has_active_world else default_health,
+			"player_mp": WorldSessionRuntimeService.get_mp_current() if has_active_world else 50.0,
+			"player_ap": WorldSessionRuntimeService.get_ap_current() if has_active_world else 10.0,
 		}, "", "Combat snapshot resolved")
 	if action_type == "CAST_SKILL":
 		var skill_identifier := str(payload_map.get("skill_id", "")).strip_edges()
-		var default_ap_cost := float(abs(GameConfig.get_int("domains.combat", "card_defaults/ap_cost", -2)))
+		var default_ap_cost := _cached_default_ap_cost
 		var action_point_cost := maxf(0.0, float(payload_map.get("ap_cost", default_ap_cost)))
-		var base_damage := float(payload_map.get("base_damage", GameConfig.get_float("domains.combat", "damage_defaults/base_skill_damage", 250.0)))
+		var base_damage := float(payload_map.get("base_damage", _cached_base_skill_damage))
 		var mana_point_cost := maxf(0.0, float(payload_map.get("mp_cost", maxf(5.0, default_ap_cost * 2.5))))
 		var damage_multiplier := clampf(float(payload_map.get("skill_multiplier", 1.0)), 0.1, 10.0)
-		if WorldSessionRuntimeService.has_active_world():
+		if has_active_world:
 			WorldSessionRuntimeService.apply_mutation_and_sync({"ap_delta": - action_point_cost, "mp_delta": - mana_point_cost, "cause": skill_identifier}, -1, false)
 		var damage_outcome := ConfigurablePhaseTransitionFSM.apply_boss_damage(boss_entity, "PLAYER", base_damage * damage_multiplier)
 		return UnifiedProtocolFactory.create_response(request_id, true, {
@@ -94,48 +112,48 @@ static func _handle_combat(request_id: String, action_type: String, payload_map:
 	return UnifiedProtocolFactory.create_unhandled_action_response(request_id, action_type)
 
 static func _handle_economy(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
-	var live_context := WorldSessionRuntimeService.build_live_hud_context() if WorldSessionRuntimeService.has_active_world() else {}
-	var current_gold := int(live_context.get("wallet_gold", int(payload_map.get("wallet_gold", 0))))
+	_sync_gameplay_config_cache()
+	var has_active_world := WorldSessionRuntimeService.has_active_world()
+	var current_gold := WorldSessionRuntimeService.get_wallet_gold() if has_active_world else int(payload_map.get("wallet_gold", 0))
 	if action_type == "SHOP_BUY" or action_type == "AUCTION_BUYOUT" or action_type == "AUCTION_BID":
 		var unit_price := maxi(0, int(payload_map.get("unit_price", 0)))
 		var purchase_count := maxi(1, int(payload_map.get("quantity", 1)))
 		var total_cost := unit_price * purchase_count
-		if WorldSessionRuntimeService.has_active_world() and current_gold < total_cost:
+		if has_active_world and current_gold < total_cost:
 			return UnifiedProtocolFactory.create_response(request_id, false, {"wallet_gold": current_gold}, "ERR_INSUFFICIENT_GOLD", "Insufficient gold for purchase")
 		var updated_gold := current_gold - total_cost
-		if WorldSessionRuntimeService.has_active_world():
+		if has_active_world:
 			var snapshot_after := WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": - total_cost, "reason": action_type}, -1, false)
 			updated_gold = snapshot_after.wallet_gold
 		return UnifiedProtocolFactory.create_response(request_id, true, {"wallet_gold": updated_gold, "delta_gold": - total_cost}, "", "Economy debit completed")
 	if action_type == "SHOP_SELL":
 		var unit_price := maxi(0, int(payload_map.get("unit_price", 0)))
 		var sell_count := maxi(1, int(payload_map.get("quantity", 1)))
-		var sell_ratio := clampf(GameConfig.get_float("domains.economy", "shop/sell_back_ratio", 0.70), 0.05, 1.0)
-		var payout_gold := int(round(float(unit_price * sell_count) * sell_ratio))
+		var payout_gold := int(round(float(unit_price * sell_count) * _cached_sell_back_ratio))
 		var updated_gold := current_gold + payout_gold
-		if WorldSessionRuntimeService.has_active_world():
+		if has_active_world:
 			var snapshot_after := WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": payout_gold, "reason": "SHOP_SELL"}, -1, false)
 			updated_gold = snapshot_after.wallet_gold
 		return UnifiedProtocolFactory.create_response(request_id, true, {"wallet_gold": updated_gold, "delta_gold": payout_gold}, "", "Shop sell settled")
 	if action_type == "EXCHANGE_CURRENCY":
 		var delta_gold := int(payload_map.get("delta_gold", 0))
 		var delta_crystals := int(payload_map.get("delta_crystals", 0))
-		if WorldSessionRuntimeService.has_active_world():
+		if has_active_world:
 			var snapshot_after := WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": delta_gold, "wallet_mana_monocrystals_delta": delta_crystals, "reason": "EXCHANGE_CURRENCY"}, -1, false)
 			return UnifiedProtocolFactory.create_response(request_id, true, {"wallet_gold": snapshot_after.wallet_gold, "wallet_mana_monocrystals": snapshot_after.wallet_mana_monocrystals}, "", "Currency exchange settled")
 		return UnifiedProtocolFactory.create_response(request_id, true, {"wallet_gold": maxi(0, current_gold + delta_gold)}, "", "Currency exchange settled")
 	return UnifiedProtocolFactory.create_unhandled_action_response(request_id, action_type)
 
 static func _handle_gacha(request_id: String, action_type: String, payload_map: Dictionary) -> UnifiedResponseEnvelopeDTO:
-	var pull_cost := maxi(1, GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_gold", 160))
+	_sync_gameplay_config_cache()
 	if action_type == "PULL_GACHA":
 		var pull_count := maxi(1, int(payload_map.get("pull_count", 1)))
-		var total_cost := pull_cost * pull_count
-		var live_context := WorldSessionRuntimeService.build_live_hud_context() if WorldSessionRuntimeService.has_active_world() else {}
-		var current_gold := int(live_context.get("wallet_gold", total_cost))
-		if WorldSessionRuntimeService.has_active_world() and current_gold < total_cost:
+		var total_cost := _cached_gacha_pull_cost * pull_count
+		var has_active_world := WorldSessionRuntimeService.has_active_world()
+		var current_gold := WorldSessionRuntimeService.get_wallet_gold() if has_active_world else total_cost
+		if has_active_world and current_gold < total_cost:
 			return UnifiedProtocolFactory.create_response(request_id, false, {"wallet_gold": current_gold}, "ERR_INSUFFICIENT_CURRENCY", "Insufficient currency for wish")
-		if WorldSessionRuntimeService.has_active_world():
+		if has_active_world:
 			WorldSessionRuntimeService.apply_mutation_and_sync({"wallet_gold_delta": - total_cost, "reason": "PULL_GACHA"}, -1, false)
 		return UnifiedProtocolFactory.create_response(request_id, true, {"pull_count": pull_count, "spent": total_cost, "rate_5star": GachaProbabilitySolver.calculate_current_5star_rate(pull_count)}, "", "Gacha pull settled")
 	return UnifiedProtocolFactory.create_unhandled_action_response(request_id, action_type)

@@ -58,9 +58,10 @@ func _notification(what: int) -> void:
 			_task_id = -1
 
 func _rebuild_sink_callables_unlocked() -> void:
-	_sink_callables.clear()
+	var updated_snapshot: Array[Callable] = []
 	for sink_callable in _sinks.values():
-		_sink_callables.append(sink_callable as Callable)
+		updated_snapshot.append(sink_callable as Callable)
+	_sink_callables = updated_snapshot
 
 ## 注册遥测消费下沉端点 (Callable 接收 packet: AgentHudTelemetryPacketDTO)
 func register_sink(sink_id: String, consumer: Callable) -> void:
@@ -154,9 +155,13 @@ func _process_worker_queue() -> void:
 			_notify_all_sinks(packet)
 
 func _notify_all_sinks(packet: AgentHudTelemetryPacketDTO) -> void:
-	_mutex.lock()
-	var sink_callables: Array[Callable] = _sink_callables.duplicate()
-	_mutex.unlock()
+	var sink_callables: Array[Callable]
+	if _is_deterministic_mode:
+		sink_callables = _sink_callables
+	else:
+		_mutex.lock()
+		sink_callables = _sink_callables
+		_mutex.unlock()
 	for sink_callable in sink_callables:
 		if sink_callable.is_valid():
 			sink_callable.call(packet)

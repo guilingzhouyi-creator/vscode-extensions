@@ -97,21 +97,21 @@ func load_all() -> Dictionary:
 	AtomicFileWriter.ensure_directory(catalog_directory)
 
 	if not FileAccess.file_exists(catalog_path):
-		return {"success": true, "count": 0, "error": ""}
+		return {"success": true, "count": 0, "error_code": ""}
 
 	var file := FileAccess.open(catalog_path, FileAccess.READ)
 	if file == null:
-		return {"success": false, "count": 0, "error": "CATALOG_OPEN_FAILED"}
+		return {"success": false, "count": 0, "error_code": "CATALOG_OPEN_FAILED"}
 	var content := file.get_as_text()
 	file.close()
 
 	var json := JSON.new()
 	if json.parse(content) != OK:
-		return {"success": false, "count": 0, "error": "CATALOG_JSON_PARSE_ERROR"}
+		return {"success": false, "count": 0, "error_code": "CATALOG_JSON_PARSE_ERROR"}
 
 	var parsed: Variant = json.get_data()
 	if not parsed is Dictionary:
-		return {"success": false, "count": 0, "error": "INVALID_CATALOG_ROOT"}
+		return {"success": false, "count": 0, "error_code": "INVALID_CATALOG_ROOT"}
 
 	var root_dictionary: Dictionary = parsed
 	var raw_worlds: Dictionary = root_dictionary.get("worlds", {})
@@ -122,7 +122,7 @@ func load_all() -> Dictionary:
 			if archive_summary != null and not archive_summary.world_id.is_empty():
 				_worlds_cache[archive_summary.world_id] = archive_summary
 
-	return {"success": true, "count": _worlds_cache.size(), "error": ""}
+	return {"success": true, "count": _worlds_cache.size(), "error_code": ""}
 
 func _ensure_catalog_loaded() -> void:
 	if not _loaded:
@@ -193,16 +193,16 @@ func create_world(
 	template_id: String = "WORLD_DEFAULT"
 ) -> Dictionary:
 	if world_id.is_empty() or world_name.is_empty():
-		return {"success": false, "error": "INVALID_ARGUMENT"}
+		return {"success": false, "error_code": "INVALID_ARGUMENT"}
 
 	_ensure_catalog_loaded()
 
 	var max_worlds: int = GameConfig.get_int(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/max_worlds", 10)
 	if _worlds_cache.size() >= max_worlds:
-		return {"success": false, "error": "MAX_WORLDS_EXCEEDED"}
+		return {"success": false, "error_code": "MAX_WORLDS_EXCEEDED"}
 
 	if _worlds_cache.has(world_id):
-		return {"success": false, "error": "WORLD_ALREADY_EXISTS"}
+		return {"success": false, "error_code": "WORLD_ALREADY_EXISTS"}
 
 	var world_directory := get_world_dir(world_id)
 	AtomicFileWriter.ensure_directory(world_directory)
@@ -221,7 +221,7 @@ func create_world(
 	}
 	var metadata_write_outcome := _atomic_write_file(world_directory + "world_meta.json", JSON.stringify(metadata_payload, "\t"))
 	if not bool(metadata_write_outcome.get("success", false)):
-		return {"success": false, "error": "WORLD_META_WRITE_FAILED", "detail": metadata_write_outcome.get("error", "")}
+		return {"success": false, "error_code": "WORLD_META_WRITE_FAILED", "detail": metadata_write_outcome.get("error_code", "")}
 
 	# 2. 创建初始 world_state.json (WorldInstance 实体序列化)
 	var world_instance := WorldInstance.new(world_id)
@@ -230,7 +230,7 @@ func create_world(
 	var serialized_state := world_instance.serialize()
 	var state_write_outcome := _atomic_write_file(world_directory + "world_state.json", JSON.stringify(serialized_state, "\t"))
 	if not bool(state_write_outcome.get("success", false)):
-		return {"success": false, "error": "WORLD_STATE_WRITE_FAILED", "detail": state_write_outcome.get("error", "")}
+		return {"success": false, "error_code": "WORLD_STATE_WRITE_FAILED", "detail": state_write_outcome.get("error_code", "")}
 
 	# 3. 构建摘要条目登记至索引并原子更新 world_catalog.json
 	var summary := WorldArchiveSummaryDTO.new(
@@ -248,7 +248,7 @@ func create_world(
 	_worlds_cache[world_id] = summary
 	var catalog_write_outcome := _save_catalog_internal()
 	if not bool(catalog_write_outcome.get("success", false)):
-		return {"success": false, "error": "CATALOG_WRITE_FAILED", "detail": catalog_write_outcome.get("error", "")}
+		return {"success": false, "error_code": "CATALOG_WRITE_FAILED", "detail": catalog_write_outcome.get("error_code", "")}
 
 	return {
 		"success": true,
@@ -291,7 +291,7 @@ func load_world(world_id: String) -> WorldInstance:
 ## 原子写落盘更新目标世界的 world_state.json 与总索引表中的最后游玩时间
 func save_world(world_instance: WorldInstance) -> Dictionary:
 	if world_instance == null or world_instance.world_id.is_empty():
-		return {"success": false, "error": "INVALID_INSTANCE"}
+		return {"success": false, "error_code": "INVALID_INSTANCE"}
 
 	_ensure_catalog_loaded()
 	var resolved_world_id := world_instance.world_id
@@ -301,7 +301,7 @@ func save_world(world_instance: WorldInstance) -> Dictionary:
 	var serialized_state := world_instance.serialize()
 	var state_write_outcome := _atomic_write_file(world_directory + "world_state.json", JSON.stringify(serialized_state, "\t"))
 	if not bool(state_write_outcome.get("success", false)):
-		return {"success": false, "error": "WORLD_STATE_WRITE_FAILED", "detail": state_write_outcome.get("error", "")}
+		return {"success": false, "error_code": "WORLD_STATE_WRITE_FAILED", "detail": state_write_outcome.get("error_code", "")}
 
 	var current_timestamp := int(Time.get_unix_time_from_system())
 	var summary: WorldArchiveSummaryDTO = _worlds_cache.get(resolved_world_id, null)
@@ -326,7 +326,7 @@ func save_world(world_instance: WorldInstance) -> Dictionary:
 
 	var catalog_write_outcome := _save_catalog_internal()
 	if not bool(catalog_write_outcome.get("success", false)):
-		return {"success": false, "error": "CATALOG_WRITE_FAILED", "detail": catalog_write_outcome.get("error", "")}
+		return {"success": false, "error_code": "CATALOG_WRITE_FAILED", "detail": catalog_write_outcome.get("error_code", "")}
 
 	return {"success": true, "world_id": resolved_world_id}
 
@@ -354,12 +354,12 @@ func delete_world(world_id: String) -> bool:
 func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 	var write_outcome: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content)
 	if bool(write_outcome.get("success", false)):
-		return {"success": true, "error": ""}
+		return {"success": true, "error_code": ""}
 	var stage: String = str(write_outcome.get("error_stage", ""))
 	var error_code: int = int(write_outcome.get("error_code", ERR_FILE_CANT_WRITE))
 	if stage == "tmp_open":
-		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
-	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
+		return {"success": false, "error_code": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
+	return {"success": false, "error_code": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
 
 func _remove_directory_recursive(directory_path: String) -> void:
 	if not DirAccess.dir_exists_absolute(directory_path):

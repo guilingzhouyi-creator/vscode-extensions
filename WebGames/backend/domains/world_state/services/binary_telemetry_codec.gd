@@ -203,32 +203,42 @@ static func decode_from_bytes(
 		var phase_code: int = stream_buffer.get_u8()
 		observation_slice.day_phase_key = str(CODE_TO_PHASE.get(phase_code, "UNKNOWN"))
 
-	# 3. 还原因果差分
-	packet.causal_deltas.clear()
+	# 3. 还原因果差分（原位复用已有条目槽位以减少堆分配）
 	var delta_count: int = stream_buffer.get_u8()
+	var existing_delta_count: int = packet.causal_deltas.size()
 	for delta_index in range(delta_count):
-		packet.causal_deltas.append(_decode_causal_delta_entry(stream_buffer))
+		var delta_entry: HudCausalDeltaDTO = packet.causal_deltas[delta_index] if delta_index < existing_delta_count else null
+		var populated_delta := _decode_causal_delta_entry(stream_buffer, delta_entry)
+		if delta_index >= existing_delta_count:
+			packet.causal_deltas.append(populated_delta)
+	if packet.causal_deltas.size() > delta_count:
+		packet.causal_deltas.resize(delta_count)
 
-	# 4. 还原行动空间
-	packet.action_space.clear()
+	# 4. 还原行动空间（原位复用已有条目槽位以减少堆分配）
 	var action_count: int = stream_buffer.get_u8()
+	var existing_action_count: int = packet.action_space.size()
 	for action_index in range(action_count):
-		packet.action_space.append(_decode_action_directive_entry(stream_buffer))
+		var directive_entry: AgentActionDirectiveDTO = packet.action_space[action_index] if action_index < existing_action_count else null
+		var populated_directive := _decode_action_directive_entry(stream_buffer, directive_entry)
+		if action_index >= existing_action_count:
+			packet.action_space.append(populated_directive)
+	if packet.action_space.size() > action_count:
+		packet.action_space.resize(action_count)
 
 	return packet
 
-static func _decode_causal_delta_entry(stream_buffer: StreamPeerBuffer) -> HudCausalDeltaDTO:
+static func _decode_causal_delta_entry(stream_buffer: StreamPeerBuffer, reused_delta: HudCausalDeltaDTO = null) -> HudCausalDeltaDTO:
 	var field_code: int = stream_buffer.get_u8()
 	var delta_amount: float = stream_buffer.get_float()
-	var delta := HudCausalDeltaDTO.new()
+	var delta: HudCausalDeltaDTO = reused_delta if reused_delta != null else HudCausalDeltaDTO.new()
 	delta.target_field = str(CODE_TO_FIELD.get(field_code, "unknown"))
 	delta.delta_amount = delta_amount
 	return delta
 
-static func _decode_action_directive_entry(stream_buffer: StreamPeerBuffer) -> AgentActionDirectiveDTO:
+static func _decode_action_directive_entry(stream_buffer: StreamPeerBuffer, reused_directive: AgentActionDirectiveDTO = null) -> AgentActionDirectiveDTO:
 	var directive_code: int = stream_buffer.get_u8()
 	var executable_marker: int = stream_buffer.get_u8()
-	var directive := AgentActionDirectiveDTO.new()
+	var directive: AgentActionDirectiveDTO = reused_directive if reused_directive != null else AgentActionDirectiveDTO.new()
 	directive.directive_id = str(CODE_TO_DIR.get(directive_code, "UNKNOWN_DIRECTIVE"))
 	directive.is_executable = (executable_marker == 1)
 	return directive

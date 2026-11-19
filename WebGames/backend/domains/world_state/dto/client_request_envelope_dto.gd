@@ -35,7 +35,7 @@ func reset_state() -> void:
 	actor_type = ACTOR_HUMAN_UI
 	domain = ""
 	action_type = ""
-	payload.clear()
+	payload = {}
 	lease_nonce = 0
 	client_timestamp_ms = 0
 

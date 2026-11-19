@@ -102,37 +102,49 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 # 会话鉴权门禁与令牌核验
 # ==============================================================================
 
-static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
-	var unauthorized_error_code := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/errors/unauthorized", "ERR_UNAUTHORIZED")
-	var anonymous_actions: Array = GameConfig.get_array(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/anonymous_allowed_actions", [])
-	var is_anonymous_action := anonymous_actions.has(request.action_type)
+static var _auth_policy_version: int = -1
+static var _cached_unauthorized_error_code: String = "ERR_UNAUTHORIZED"
+static var _cached_anonymous_actions_set: Dictionary = {}
+static var _cached_require_session_auth: bool = true
 
-	if _is_revoked_non_anonymous_request(request, is_anonymous_action):
-		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, {"revoked": true}, unauthorized_error_code, "Session token revoked or expired, access denied"
-		)
+static func _sync_auth_policy_cache() -> void:
+	var current_version: int = GameConfig.config_reload_version()
+	if _auth_policy_version == current_version:
+		return
+	_cached_unauthorized_error_code = GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/errors/unauthorized", "ERR_UNAUTHORIZED")
+	_cached_require_session_auth = GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true)
+	_cached_anonymous_actions_set.clear()
+	var allowed_actions: Array = GameConfig.get_array(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/anonymous_allowed_actions", [])
+	for action_entry in allowed_actions:
+		_cached_anonymous_actions_set[str(action_entry)] = true
+	_auth_policy_version = current_version
+
+static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
+	_sync_auth_policy_cache()
+	var is_anonymous_action := _cached_anonymous_actions_set.has(request.action_type)
 
 	if _is_agent_blocked_request(request):
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, false, {}, "ERR_AGENT_PRIVILEGE_BLOCKED", "Agent actor is prohibited from executing account or gateway mutation directives"
 		)
 
-	if is_anonymous_action or not GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true):
+	if is_anonymous_action:
 		return null
 
-	var validation_result := AuthService.validate_token(request.session_token, request.account_id)
-	if not bool(validation_result.get("success", false)):
+	var session_check := AuthService.validate_session_request(request.session_token, request.account_id, _cached_require_session_auth)
+	if bool(session_check.get("revoked_or_expired", false)):
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, validation_result, unauthorized_error_code, "Protected business requests must provide a valid authenticated session token"
+			request.request_id, false, {"revoked": true}, _cached_unauthorized_error_code, "Session token revoked or expired, access denied"
+		)
+	if not _cached_require_session_auth:
+		return null
+	if not bool(session_check.get("success", false)):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, session_check, _cached_unauthorized_error_code, "Protected business requests must provide a valid authenticated session token"
 		)
 	if request.account_id.is_empty():
-		request.account_id = String(validation_result.get("account_id", ""))
+		request.account_id = String(session_check.get("account_id", ""))
 	return null
-
-static func _is_revoked_non_anonymous_request(request: ClientRequestEnvelopeDTO, is_anonymous_action: bool) -> bool:
-	if is_anonymous_action or request.session_token.is_empty():
-		return false
-	return AuthService.is_token_revoked_or_expired(request.session_token)
 
 static func _is_agent_blocked_request(request: ClientRequestEnvelopeDTO) -> bool:
 	if request.actor_type != ClientRequestEnvelopeDTO.ACTOR_AGENT:
