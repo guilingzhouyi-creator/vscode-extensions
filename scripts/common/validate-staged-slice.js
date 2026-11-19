@@ -296,17 +296,14 @@ function getStagedHunkMap(explicitFiles) {
   return map;
 }
 
-const { ts, isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName, analyzeFunction } = analyzers;
-
 function readStagedContentSafe(filePath) {
   const rel = path.relative(REPO_ROOT, filePath).replace(/\\/g, "/");
   try {
-    // Argument array: a staged filename containing shell metacharacters stays a single path.
     return execFileSync("git", ["show", `:${rel}`], {
       cwd: REPO_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "ignore"],
-      env: getGitEnv(),
+      env: getSafeGitEnv(REPO_ROOT),
     });
   } catch {
     return fs.readFileSync(filePath, "utf8");
@@ -315,9 +312,6 @@ function readStagedContentSafe(filePath) {
 
 /**
  * Reads every staged blob under review in a single Git process.
- *
- * Without this, each reviewed file costs its own `git show` spawn, which
- * dominates wall time once a commit touches more than a handful of modules.
  *
  * @param {string[]} filePaths - Absolute or repo-relative paths.
  * @returns {Map<string, string>} Absolute path -> staged text content.
@@ -345,20 +339,15 @@ function prefetchStagedContents(filePaths) {
   return result;
 }
 
-function isFunctionInChangedLines(node, sourceFile, changedLines) {
-  if (!changedLines || changedLines.size === 0) return true;
-  const { line: startLine } = sourceFile.getLineAndCharacterOfPosition(
-    node.getStart(sourceFile),
-  );
-  const { line: endLine } = sourceFile.getLineAndCharacterOfPosition(
-    node.getEnd(),
-  );
-  for (let l = startLine + 1; l <= endLine + 1; l++) {
-    if (changedLines.has(l)) return true;
-  }
-  return false;
-}
-
+/**
+ * Analyzes raw source text against resolved complexity and naming thresholds.
+ *
+ * @param {string} content - Source code text
+ * @param {string} [filePath] - File path for dialect and project config lookup
+ * @param {Record<string, any>} [overrides] - Explicit threshold overrides
+ * @param {Set<number>|null} [changedLines] - Optional changed line set for hunk slicing
+ * @returns {Array<object>} Detected findings
+ */
 function analyzeSourceText(
   content,
   filePath = "anonymous.ts",
@@ -366,49 +355,18 @@ function analyzeSourceText(
   changedLines = null,
 ) {
   const cfg = resolveConfig(filePath, overrides);
-  const isJs =
-    filePath.endsWith(".js") ||
-    filePath.endsWith(".mjs") ||
-    filePath.endsWith(".cjs");
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    isJs ? ts.ScriptKind.JS : ts.ScriptKind.TS,
-  );
-
-  const { totalLines, eloc, noiseRatio } = calculateElocAndNoise(content);
-  const findings = [];
-
-  const checkNoise =
-    !changedLines || changedLines.size === 0 || changedLines.size > 20;
-  if (noiseRatio > cfg.maxNoiseRatio && totalLines > 60 && checkNoise) {
-    findings.push({
-      rule: "GUARD-AST-001",
-      severity: "error",
-      message: `代码稀释/注水指数超标 (kappa_noise = ${noiseRatio.toFixed(2)} > ${cfg.maxNoiseRatio})，有效代码行过低 (${eloc}/${totalLines})`,
-      line: 1,
-      actual: `kappa_noise = ${noiseRatio.toFixed(2)}`,
-      expected: `kappa_noise <= ${cfg.maxNoiseRatio}`,
-      suggestedFix: "精简多余空行与无意义注释堆叠，提高代码紧凑度与语义密度",
-    });
-  }
-
-  function visit(node) {
-    if (isFunctionNode(node)) {
-      if (isFunctionInChangedLines(node, sourceFile, changedLines)) {
-        const fnFindings = analyzeFunction(node, sourceFile, cfg);
-        findings.push(...fnFindings);
-      }
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return findings;
+  return analyzers.collectSourceSliceFindings(content, filePath, cfg, changedLines);
 }
 
+/**
+ * Reads staged or working-tree file content and executes slice analysis.
+ *
+ * @param {string} filePath - Absolute path to file
+ * @param {Record<string, any>} [overrides] - Explicit threshold overrides
+ * @param {Set<number>|null} [changedLines] - Changed lines filter
+ * @param {Map<string, string>|null} [prefetched] - Optional preloaded staged content map
+ * @returns {Array<object>} Detected findings
+ */
 function analyzeFile(filePath, overrides = {}, changedLines = null, prefetched = null) {
   const cached = prefetched && prefetched.get(filePath);
   const content = cached !== undefined ? cached : readStagedContentSafe(filePath);
@@ -416,15 +374,7 @@ function analyzeFile(filePath, overrides = {}, changedLines = null, prefetched =
 }
 
 /**
- * Handle early exit when no staged TS/JS files require review.
- *
- * @param {boolean} isAgentMode - Autonomous Agent format flag.
- */
-/**
  * Reads the staged hunk map, blocking when the repository cannot be enumerated.
- *
- * An unreadable index and an empty index both yield no files, but only the second is a legitimate
- * pass. Treating the first as empty would report a clean review that never happened.
  *
  * @param {string[]} explicitFiles - Explicit CLI targets.
  * @param {boolean} isAgentMode - Autonomous Agent format flag.
@@ -435,10 +385,23 @@ function readStagedHunkMapOrBlock(explicitFiles, isAgentMode) {
     return getStagedHunkMap(explicitFiles);
   } catch (err) {
     if (isAgentMode) {
-      console.log(JSON.stringify({ protocolVersion: "1.0.0", status: "BLOCK", gate: "pre-commit:ast-slice", summary: err.message }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            protocolVersion: "1.0.0",
+            status: "BLOCK",
+            gate: "pre-commit:ast-slice",
+            summary: err.message,
+          },
+          null,
+          2,
+        ),
+      );
     } else {
       console.error(`  ✖ BLOCK  ${err.message}`);
-      console.error("  👉 修复指引: 确认当前目录是完整 Git 仓库（git status 可用），或显式传入文件路径跳过索引枚举。");
+      console.error(
+        "  👉 修复指引: 确认当前目录是完整 Git 仓库（git status 可用），或显式传入文件路径跳过索引枚举。",
+      );
     }
     process.exit(1);
   }
@@ -477,23 +440,21 @@ function collectHunkSliceViolations(hunkMap, flags) {
   for (const [file, info] of hunkMap.entries()) {
     const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
     const findings = analyzeFile(file, flags, info.changedLines, prefetched);
-    if (findings.length === 0) {
-      continue;
-    }
+    if (findings.length === 0) continue;
     for (const f of findings) {
+      const defaultExpected =
+        f.rule === "CPX-BUD-001"
+          ? "CC <= 15"
+          : f.rule === "CPX-NEST-001"
+            ? "Depth <= 4"
+            : "Noise <= 4.0";
       allViolations.push({
         ruleId: f.rule,
         severity: "BLOCK",
         file: rel,
         line: f.line,
         actual: f.actual || f.message,
-        expected:
-          f.expected ||
-          (f.rule === "CPX-BUD-001"
-            ? "CC <= 15"
-            : f.rule === "CPX-NEST-001"
-              ? "Depth <= 4"
-              : "Noise <= 4.0"),
+        expected: f.expected || defaultExpected,
         message: f.message,
         actionableFix: f.suggestedFix || "平铺控制流或拆分复杂函数",
         verificationCommand: `node scripts/common/validate-staged-slice.js ${rel}`,
@@ -518,9 +479,7 @@ function recordSliceFailureSnapshot(allViolations) {
       exitCode: 1,
       summary: `AST slice review blocked commit due to ${allViolations.length} complexity or nesting violations.`,
       violations: allViolations,
-      targetFiles: Array.from(
-        new Set(allViolations.map((v) => v.file).filter(Boolean)),
-      ),
+      targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
       verificationCommand: "node scripts/common/validate-staged-slice.js",
     });
   } catch {
@@ -546,12 +505,8 @@ function renderSliceViolations(allViolations, isAgentMode) {
       summary: `AST slice review blocked commit due to ${allViolations.length} complexity or nesting violations.`,
       violations: allViolations,
       agentDirectives: {
-        targetFiles: Array.from(
-          new Set(allViolations.map((v) => v.file).filter(Boolean)),
-        ),
-        remediationPriority: Array.from(
-          new Set(allViolations.map((v) => v.ruleId)),
-        ),
+        targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
+        remediationPriority: Array.from(new Set(allViolations.map((v) => v.ruleId))),
         verificationCommand: "node scripts/common/validate-staged-slice.js",
         fastRecheckCommand: "node scripts/common/validate-staged-slice.js",
       },
@@ -565,16 +520,13 @@ function renderSliceViolations(allViolations, isAgentMode) {
     if (!fileGroups.has(v.file)) fileGroups.set(v.file, []);
     fileGroups.get(v.file).push(v);
   }
-
   for (const [rel, violations] of fileGroups) {
     console.error(`  ✖ BLOCK ${rel}:`);
     for (const v of violations) {
-      console.error(
-        `     - L${v.line} [${v.ruleId}] ${v.message}${v.actionableFix ? " → 建议: " + v.actionableFix : ""}`,
-      );
+      const fixSuffix = v.actionableFix ? ` → 建议: ${v.actionableFix}` : "";
+      console.error(`     - L${v.line} [${v.ruleId}] ${v.message}${fixSuffix}`);
     }
   }
-
   console.error(
     `\n❌ [AST 切片审查阻断] 共发现 ${allViolations.length} 处关键架构/复杂度违规！请重构后重新提交。`,
   );
@@ -602,12 +554,15 @@ function renderSliceSuccess(isAgentMode) {
     );
   } else {
     console.log(
-      `  ✔ 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
+      "  ✔ 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）",
     );
   }
   process.exit(0);
 }
 
+/**
+ * CLI entry point for AST staged slice complexity validation.
+ */
 function run() {
   const { flags, explicitFiles } = parseCliFlags(process.argv.slice(2));
   const isAgentMode = Boolean(flags.agentMode);
@@ -642,12 +597,12 @@ module.exports = {
   DEFAULT_CONFIG,
   resolveConfig,
   isEligibleSourcePath,
-  isExportedFunction,
-  calculateComplexity,
-  hasLoopConstruct,
-  checkNesting,
-  validateFunctionName,
-  analyzeFunction,
+  isExportedFunction: analyzers.isExportedFunction,
+  calculateComplexity: analyzers.calculateComplexity,
+  hasLoopConstruct: analyzers.hasLoopConstruct,
+  checkNesting: analyzers.checkNesting,
+  validateFunctionName: analyzers.validateFunctionName,
+  analyzeFunction: analyzers.analyzeFunction,
   analyzeSourceText,
   analyzeFile,
   run,
