@@ -35,7 +35,7 @@ const {
   checkHeadReceipt,
 } = require('./git-env');
 const checks = require('./lib/fast-staged-checks');
-const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength } = checks;
+const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength, validateFileEol, validateFileBom, validateFileTerminalNewline, validateFileIndent } = checks;
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -210,122 +210,6 @@ function getStagedDiff(repoRoot, range = '') {
     stdio: STDIO_PIPE,
     maxBuffer: MAX_DIFF_BUFFER_BYTES,
   });
-}
-
-/**
- * Validates cross-platform line ending contract (.ps1 must be CRLF, others must be LF).
- *
- * @param {string} file - Relative file path.
- * @param {Buffer} buffer - Raw file byte buffer.
- * @param {Array} lineEndingViolations - Collector array for LINE-ENDING findings.
- */
-function validateFileEol(file, buffer, lineEndingViolations) {
-  const hasCR = buffer.includes(BYTE_CR);
-  if (file.endsWith('.ps1') && !hasCR) {
-    lineEndingViolations.push(
-      createViolation({
-        ruleId: RULE_HYG_EOL_001,
-        file,
-        message: `PowerShell 脚本必须使用 CRLF 换行符: ${file}`,
-        actual: EOL_LF,
-        expected: EOL_CRLF,
-        actionableFix: VIOLATION_TPLS.EOL_PS1.actionableFix,
-      }),
-    );
-  } else if (hasCR && /\.(?:sh|ts|tsx|js|jsx|mjs|cjs|gd|json|md|py|rs|ya?ml|toml|css|html|svg)$/i.test(file)) {
-    lineEndingViolations.push(
-      createViolation({
-        ruleId: RULE_HYG_EOL_001,
-        file,
-        message: `代码/文档必须使用 LF 换行符，检测到 CRLF: ${file}`,
-        actual: EOL_CRLF,
-        expected: EOL_LF,
-        actionableFix: VIOLATION_TPLS.EOL_LF.actionableFix,
-      }),
-    );
-  }
-}
-
-/**
- * Validates dual-scale volume budgets (ELOC <= 900, LOC <= 1400) on staged source files.
- *
- * @param {string} file - Relative file path.
- * @param {string} content - Raw text content of the file.
- * @param {Array} volumeViolations - Collector array for VOLUME-BUDGET findings.
- */
-/**
- * Rejects UTF-8 BOM prefixes on staged text files.
- *
- * @param {Buffer} buffer - Raw staged bytes.
- * @param {string} file - Relative file path.
- * @param {Array} violations - Collector array.
- * @returns {void}
- */
-function validateFileBom(buffer, file, violations) {
-  const hasBom =
-    buffer.length >= 3 &&
-    buffer[0] === BYTE_BOM[0] &&
-    buffer[1] === BYTE_BOM[1] &&
-    buffer[2] === BYTE_BOM[2];
-  if (!hasBom) return;
-  violations.push(
-    createViolation({
-      ruleId: 'HYG-BOM-001',
-      file,
-      message: `检测到 UTF-8 BOM 前缀，必须为 NO-BOM: ${file}`,
-      actual: 'UTF-8 with BOM',
-      expected: 'UTF-8 without BOM',
-      actionableFix: '以 UTF-8 无 BOM 重新保存该文件',
-    }),
-  );
-}
-
-/**
- * Enforces a single POSIX terminal newline without trailing blank lines.
- *
- * @param {string} content - Decoded staged content.
- * @param {string} file - Relative file path.
- * @param {Array} violations - Collector array.
- * @returns {void}
- */
-function validateFileTerminalNewline(content, file, violations) {
-  const missing = !content.endsWith('\n') && !content.endsWith('\r');
-  const multiple = /\n[ \t]*\n[ \t]*$/.test(content);
-  if (!missing && !multiple) return;
-  violations.push(
-    createViolation({
-      ruleId: 'HYG-TRL-001',
-      file,
-      message: missing ? `文件末尾缺少 POSIX 换行: ${file}` : `文件末尾存在多余空行: ${file}`,
-      actual: missing ? 'missing terminal newline' : 'multiple trailing newlines',
-      expected: 'exactly one terminal newline',
-      actionableFix: '保留且仅保留一个文件末尾换行符',
-    }),
-  );
-}
-
-/**
- * Rejects tab indentation outside GDScript and Makefile.
- *
- * @param {string} file - Relative file path.
- * @param {string} content - Decoded staged content.
- * @param {Array} violations - Collector array.
- * @returns {void}
- */
-function validateFileIndent(file, content, violations) {
-  const ext = path.extname(file).toLowerCase();
-  if (ext === '.gd' || path.basename(file) === 'Makefile') return;
-  if (!content.includes('\t')) return;
-  violations.push(
-    createViolation({
-      ruleId: 'HYG-IND-001',
-      file,
-      message: `非 GDScript 文件出现 Tab 缩进: ${file}`,
-      actual: 'tab indentation',
-      expected: 'space indentation only',
-      actionableFix: '将 Tab 替换为空格（TS 4 个，其余 2 个）',
-    }),
-  );
 }
 
 /**
