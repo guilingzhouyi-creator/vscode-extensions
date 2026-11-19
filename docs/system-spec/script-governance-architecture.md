@@ -12,6 +12,7 @@ Workspace-level scripts reside under `scripts/`, decoupled from project-internal
 scripts/
 ├── README.md                              # Inventory of all controlled scripts & domain matrix
 ├── common/                                # Node.js (LF, 2-space, zero external npm dependencies)
+│   ├── lib/eloc-line-classifier.js        # Stateful multi-language ELOC/wiring/noise classifier SSOT
 │   ├── gate-fast-staged.js                # Tier 1 single-process streaming pre-commit gate (< 250ms)
 │   ├── validate-staged-slice.js           # AST slice CC/Depth/Noise guard (fail-closed)
 │   ├── validate-code-density.js           # 5D code density, POR/TSPR & dilution guard
@@ -20,13 +21,20 @@ scripts/
 │   ├── validate-destructive-ops.js        # Recursive deletion taint & read-only auto-var guard
 │   ├── validate-script-isomorphism.js     # ps1 <-> sh pairing, EOL, and directive guard
 │   ├── validate-rule-id-closure.js        # Bidirectional rule ID closure (RCFG-RULE-DRIFT)
+│   ├── run-workspace-guards.js            # Bounded-concurrency Pillar-2 guard orchestrator
+│   ├── project-registry-resolver.js       # Controlled project & VS Code extension discovery SSOT
 │   ├── sync-doc-metrics.js                # Single-source documentation metric renderer & checker
+│   ├── quality-budget-contract.json       # Static ELOC/CC/Depth/Noise/POR/tau budget SSOT
+│   ├── ten-dimensions-contract.json       # Canonical 10-dimension quality vector SSOT
+│   ├── diff-bounds-contract.json          # Weighted ELOC differential bounds & admission SSOT
 │   ├── rule-catalog.json                  # Workspace SSOT rule catalog
 │   └── gate-step-registry.json            # Single-source gate step & verdict registry
 ├── ps1/                                   # PowerShell 7+ (CRLF, StrictMode, -WorkingDirectory isolation)
+│   ├── lib/gate-runtime.ps1               # Shared step identity, Git isolation & runtime tool resolver
 │   ├── lib/linux-parity.ps1               # Single-source GNU / PowerShell command surface binding
 │   └── {audit-all,pre-commit-gate,commit-msg-gate,pre-push-gate,package,install-hooks,...}.ps1
 └── sh/                                    # Bash (LF, set -uo pipefail, subshell cwd isolation)
+    ├── lib/gate-runtime.sh                # Shared step identity, Git isolation & runtime bin resolver
     └── {audit-all,pre-commit-gate,commit-msg-gate,pre-push-gate,package,install-hooks,...}.sh
 ```
 
@@ -40,12 +48,17 @@ scripts/
 | **Bash (`.sh`)** | `LF` | `#!/usr/bin/env bash`<br/>`set -uo pipefail` (plus `set -e` where required by `validate-script-isomorphism.js`) | Subshell `(cd "<dir>" && ...)` for child pipelines; use `printf "%s\n"` instead of `echo -e` | POSIX / Bash builtins + coreutils |
 | **Node.js (`.js`)** | `LF` | 6-field JSDoc header + `'use strict';` | Pure `path.resolve`/`path.join` operations; `cwd` passed explicitly to `spawnSync` | Node.js stdlib only (`fs`, `path`, `child_process`, `crypto`) |
 
-### Sandbox Git Config Isolation
-Gate entry scripts initialize fallback environment variables when running inside restricted containers or sandboxes without `~/.gitconfig`:
+### Sandbox Git Config Isolation & Runtime Bootstrap
+Gate entry scripts delegate Git isolation and runtime tool resolution to shared helpers (`Initialize-GateGitIsolation` / `Resolve-GateRuntimeTools` in `scripts/ps1/lib/gate-runtime.ps1`, and `gate_init_git_isolation` / `gate_resolve_runtime_bins` in `scripts/sh/lib/gate-runtime.sh`), binding OS-aware null devices (`/dev/null` on POSIX vs `NUL` on Windows) without duplicating inline environment boilerplate:
 ```powershell
-if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
-if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
-if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
+. (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
+Initialize-GateGitIsolation -RepoRoot $repoRoot
+$tools = Resolve-GateRuntimeTools
+```
+```bash
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init_git_isolation "$ROOT_DIR"
+gate_resolve_runtime_bins
 ```
 
 ---
@@ -64,4 +77,4 @@ The workspace maintains <!-- METRICS:BEGIN iso-pairs -->**29 对跨平台同构�
 1. **Tier 1 Single-Process Streaming (`gate-fast-staged.js`, `< 250ms`)**: Consolidates staged file checks into a single Node.js process to avoid repeated `80~250ms` Windows process spawn overhead.
 2. **8 KB Fast-Path Short-Circuit (`validate-physical-hygiene.js`)**: Files with `stat.size > 8192` bytes bypass full-file string trimming for 0-byte/blank/trampoline checks, cutting cold-scan I/O by $> 90\%$.
 3. **$O(1)$ Precompiled Lookup**: Forbidden commit terms and SSOT rule ID closure use precompiled `Set.has()` lookups (`PRF-ALG-002`).
-4. **Two-Phase Topological Concurrency (`audit-all`)**: Runs fast repo-wide metadata/hygiene gates first (~1s), then dispatches project test suites in parallel across <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->.
+4. **Two-Phase Topological Concurrency (`audit-all`)**: Runs fast repo-wide metadata/hygiene gates first (~1s) with bounded-concurrency Pillar-2 guard execution via `run-workspace-guards.js`, then dispatches project test suites in parallel across <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count --> and aggregates verdicts via structured `--input` JSON handoff to `render-audit-all-summary.js`.

@@ -8,6 +8,8 @@
 
 全工作区将软件工程代码质量严格投影至 10 个正交维度，各维度均由底层专用静态分析器发射的确定性规则直接驱动，杜绝主观臆断：
 
+> **单源维度契约**：十维有序标识（`key`、`zhName`、`enName`、`shortDesc`）以 [`scripts/common/ten-dimensions-contract.json`](../../scripts/common/ten-dimensions-contract.json) 为单一真源。
+
 | 维度英文标识 (Key) | 维度中文名称 | 物理语义与工程核心关注点 | 关联规则族与典型检测项 | 计分模式 |
 | :--- | :--- | :--- | :--- | :--- |
 | **`architectureConsistency`** | 架构一致 | 架构分层单向流动、严禁跨层循环依赖、门面实质承载（`ARCH-FAC-001`）与单行空包跳板清零（`ARCH-ABS-001`） | `ARCH-*`, `NAM-DEC-*`, `IMP-*` | 双曲密度衰减 |
@@ -17,7 +19,7 @@
 | **`standardization`** | 标准化 | 命名规范（`NAM-*`）、驼峰/下划线词素切分、自解释长度包络、现代缩写合规与统一格式契约 | `NAM-*`, `HYG-NAM-*`, `UI-ENG-001` | 双曲密度衰减 |
 | **`modernity`** | 现代化 | TypeScript/JavaScript/GDScript 现代语法演进（`TSM-*`）、过时 API 淘汰、严格类型推断 | `TSM-*`, `GOV-STD-*`, `MOD-*` | 双曲密度衰减 |
 | **`maintainability`** | 可维护性 | 控制流圈复杂度（$\text{CC} \le 15$）、嵌套深度（$\text{Depth} \le 4$）、单行噪声比（$\text{Noise} \le 4.0$）与单文件双轨体积（$\text{ELOC} \le 900, \text{LOC} \le 1400$） | `large-file`, `CPX-BUD-*`, `PROD-HYG-*` | 双曲密度衰减 |
-| **`commentQuality`** | 注释质量 | 六字段 JSDoc 模块头部契约、算法退化边界显式声明、有效注释密度模型（$\text{ECR} \ge 0.75$）、零敏捷代号与零黑话 | `CMT-*`, `DOC-*` | 双曲密度衰减 |
+| **`commentQuality`** | 注释质量 | 六字段 JSDoc 模块头部契约、算法退化边界显式声明、有效注释密度模型（防注水下限 $\text{ECR} \ge 0.45$，`MIN_WATER_LOGGING_RATIO_CEILING`，见 `comment-density-model.ts`）、零敏捷代号与零黑话 | `CMT-*`, `DOC-*` | 双曲密度衰减 |
 | **`duplication`** | 重复率 | 魔法数字抽取、硬编码字符串解耦、常量库拓扑归一（`CONST-*`）、大常量库良性模式识别 | `CONST-*`, `duplicate-literal`, `HYG-CLN-*` | 双曲密度衰减 |
 | **`techDebtRisk`** | 技术债风险 | 系统性演进风险、Tier 1 关键阻断债务穿透、未决重构热点扩散倾向 | `DEBT-*`, Tier 1/2 债务穿透 | 双曲密度衰减 |
 

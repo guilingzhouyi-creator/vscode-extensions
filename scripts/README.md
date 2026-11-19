@@ -35,7 +35,7 @@
 | `common/` | Node.js | `validate-code-density.js` | gate / density（多维代码密度、接线率 POR<=60% 与列密度审查器） | `pre-commit-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all` |
 | `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络；`--all` 全仓扫描 + `eloc-budget-baseline.json` grow-only 棘轮；未识别参数直接 exit 2） | `pre-commit-gate`、`pre-push-gate`、CI |
-| `common/` | Node.js | `gate-differential-bounds.js` | gate / diff（暂存区五维有效代码 5D ELOC 差分双向钳制与准入更替量评估器，联动 Taxis 原生与纯 JS 差分双轨） | `pre-commit-gate` STAGED-DIFF-14、CI |
+| `common/` | Node.js | `gate-differential-bounds.js` | gate / diff（暂存区 weighted ELOC 差分双向钳制与准入更替量评估器，联动 Taxis 原生与纯 JS 差分双轨） | `pre-commit-gate` STAGED-DIFF-14、CI |
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
 | `common/` | Node.js | `generate-rule-catalog-types.js` | tooling / ssot（从 rule-catalog.json SSOT 自动生成 auto-refactor 强类型常量库与领域子模块） | 本地 CLI、CI |
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
@@ -73,7 +73,7 @@
 | `common/` | Node.js | `record-workspace-trajectory.js` | telemetry / ledger（全工作区审查轨迹账本记录与版本增量追加工具） | `audit-all` |
 | `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
 | `common/` | Node.js | `record-workspace-audit.js` | telemetry / audit（统一审查结论汇总落盘与跨项目得分聚合） | `audit-all` |
-| `common/` | Node.js | `render-audit-all-summary.js` | audit / summary（Linux Bash 统一审查 6 大支柱真实遥测聚合、零假保底裁决与十维质量看板渲染） | `audit-all.sh` |
+| `common/` | Node.js | `render-audit-all-summary.js` | audit / summary（跨平台统一审查 `audit-all.ps1` / `audit-all.sh` 的 `--input` JSON 交接、6 大支柱真实遥测聚合、零假保底裁决与 `ten-dimensions-contract.json` 十维质量看板渲染） | `audit-all` |
 | `common/` | Node.js | `run-workspace-guards.js` | audit / orchestrator（Pillar-2 治理守卫有界并发调度器：统一运行 23 项规则与文档守卫并输出顺序退出码/日志索引） | `audit-all`、CI |
 | `common/` | Node.js | `evaluate-polyglot-balance.js` | audit / balance（异构多语言均衡指数与离散度惩罚度量） | `audit-all` |
 | `common/` | Node.js | `evaluate-workspace-quant.js` | telemetry / quant（资本负债与量化风险模型：利息覆盖率、夏普比率、索提诺比率、基尼系数与自愈半衰期评估） | `audit-all`、本地 CLI |
@@ -116,7 +116,7 @@
 | `ps1/` | PowerShell | `release-tag.ps1` | release（release-tag.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `version-bump.sh` | release（全工作区版本号一致性递增工具） | 本地 CLI |
 | `ps1/` | PowerShell | `version-bump.ps1` | release（version-bump.sh 同构双实现） | 本地 CLI（Windows） |
-| `common/` | Node.js | `project-registry-resolver.js` | tooling / registry（全工作区受控项目单源动态发现与路径解析器） | 本地 CLI、CI |
+| `common/` | Node.js | `project-registry-resolver.js` | tooling / registry（全工作区受控项目单源动态发现与路径解析器，含 `--vscode-extensions` / `--json` / `--matrix-json` 单源 VS Code 扩展目录发现） | 本地 CLI、CI |
 | `common/` | Node.js | `remote-sandbox-gate.js` | tooling / gate（云端 Linux 预测试机切片调度中枢，把改动集路由到 hygiene、rust、timing、auto-refactor、webgames、impact 与 all 预演切片，支持 --sync 源码增量同步） | `remote-sandbox-test.ps1`、`remote-sandbox-test.sh`、CI |
 | `common/` | Node.js | `render-skill-catalog.js` | tooling / skills（将技能注册表渲染为面向人类的技能调用全景清单） | 本地 CLI |
 | `common/` | Node.js | `skill-registry-resolver.js` | tooling / skills（技能注册表单源读取与路径解析引擎） | `render-skill-catalog`、CI |
@@ -132,6 +132,20 @@
 
 > 职能域语义：`gate`=协作门禁（CNB 流水线触发）、`release`=发布流程、
 > `package`=本地打包、`ci`=CI 辅助校验、`validate`=脚本自测/回归用例。
+
+### 内部模块化辅助库（`scripts/common/lib/`）
+
+受控入口脚本的共享内核与拆分模块统一沉淀于 `scripts/common/lib/`（不计入上表受控入口清单）：
+
+| 模块 | 核心职责 | 主要调用方 |
+| :--- | :--- | :--- |
+| `common/lib/workspace-guard-catalog.js` | Pillar-2 治理守卫单源元数据名册与分组映射（`PILLAR2_GUARDS`、`GUARD_GROUPS`、`buildListPayload`） | `run-workspace-guards.js`、`render-audit-all-summary.js` |
+| `common/lib/eloc-language-rules.js` | 多语言注释/跳板/接线行语法规则与 `quality-budget-contract.json` 防御加载器 | `eloc-line-classifier.js` |
+| `common/lib/eloc-line-classifier.js` | 多语言状态机行级语义分类（空行/注释/文档注释/跳板/实质代码）与 ELOC/POR/噪声摘要 SSOT | `evaluate-eloc-budget.js`、`validate-code-density.js`、`fast-staged-checks.js`、`staged-slice-metrics.js` |
+| `common/lib/fast-staged-nomenclature.js` | 暂存区规则字典、Agent-Native 阻断信封构建器、命名黑话与根目录杂物校验 | `fast-staged-checks.js` |
+| `common/lib/fast-staged-checks.js` | 单遍文件物理卫生（EOL/BOM/缩进/空洞）与双轨 ELOC/LOC/POR 体积检查原语 | `gate-fast-staged.js` |
+| `common/lib/staged-slice-metrics.js` | TypeScript 编译器解析、McCabe 圈复杂度、嵌套深度与噪声稀释度量原语 | `staged-slice-analyzers.js` |
+| `common/lib/staged-slice-analyzers.js` | 函数可见性与爆炸半径分类、标识符命名校验及每函数/文件切片违规评估 | `validate-staged-slice.js` |
 
 ### 文档规模数字的渲染约定
 
