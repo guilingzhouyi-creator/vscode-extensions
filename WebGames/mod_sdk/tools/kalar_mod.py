@@ -23,11 +23,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 import argparse
-import hashlib
 import json
-import os
 import sys
-import zipfile
+
 VERSION_STRING: str = "kalar-mod v1.0.0"
 
 # 确保本工具同级目录在 sys.path 中
@@ -42,7 +40,10 @@ from check_mod import (
     validate_multi_mods,
 )
 from cook_assets import cook_assets, print_cook_report
-from play_mod import play_mod_interactive, play_mod_suite, print_transcript_text
+from kalar_mod_parser_core import register_core_subparsers
+from kalar_mod_parser_ops import register_ops_subparsers
+from play_mod import PlaySuiteContext, play_mod_suite, print_transcript_text
+from play_mod_interactive import InteractivePlayConfig, play_mod_interactive
 from preview_mod import preview_overview, simulate_mod
 from scaffold_mod import scaffold_mod
 
@@ -59,6 +60,7 @@ def _ensure_utf8_stdout() -> None:
 
 class Style:
     """终端彩色与结构化输出格式化工具。"""
+
     USE_COLOR = sys.stdout.isatty() if hasattr(sys.stdout, "isatty") else False
     RESET = "\033[0m" if USE_COLOR else ""
     BOLD = "\033[1m" if USE_COLOR else ""
@@ -109,7 +111,9 @@ def _handle_check(args: argparse.Namespace) -> int:
         if not p.is_dir():
             err_msg = f"MOD 目标目录不存在: {p}"
             if args.as_json:
-                print(json.dumps({"valid": False, "error": err_msg}, ensure_ascii=False))
+                print(
+                    json.dumps({"valid": False, "error": err_msg}, ensure_ascii=False)
+                )
             else:
                 print(f"{Style.RED}❌ 错误: {err_msg}{Style.RESET}", file=sys.stderr)
             return 2
@@ -205,14 +209,16 @@ def _handle_play(args: argparse.Namespace) -> int:
 
     if args.interactive:
         transcript, is_success = play_mod_interactive(
-            mod_paths=paths,
-            player_name=args.player_name,
-            race_id=args.race_id,
-            gender=args.gender,
-            origin_id_param=args.origin_id,
-            trait_pair_param=args.trait_pair,
-            reroll_nonce=args.reroll_nonce,
-            seed=args.seed,
+            InteractivePlayConfig(
+                mod_paths=paths,
+                player_name=args.player_name,
+                race_id=args.race_id,
+                gender=args.gender,
+                origin_id_param=args.origin_id,
+                trait_pair_param=args.trait_pair,
+                reroll_nonce=args.reroll_nonce,
+                seed=args.seed,
+            )
         )
         if args.as_json:
             print(json.dumps(transcript, ensure_ascii=False))
@@ -221,17 +227,19 @@ def _handle_play(args: argparse.Namespace) -> int:
         return 0 if is_success else 1
 
     transcript, is_success = play_mod_suite(
-        mod_paths=paths,
-        player_name=args.player_name,
-        race_id=args.race_id,
-        gender=args.gender,
-        origin_id_param=args.origin_id,
-        trait_pair_param=args.trait_pair,
-        reroll_nonce=args.reroll_nonce,
-        seed=args.seed,
-        choices_param=args.choices,
-        choice_strategy=args.choice_strategy,
-        with_hud=getattr(args, "with_hud", False),
+        PlaySuiteContext(
+            mod_paths=paths,
+            player_name=args.player_name,
+            race_id=args.race_id,
+            gender=args.gender,
+            origin_id_param=args.origin_id,
+            trait_pair_param=args.trait_pair,
+            reroll_nonce=args.reroll_nonce,
+            seed=args.seed,
+            choices_param=args.choices,
+            choice_strategy=args.choice_strategy,
+            with_hud=getattr(args, "with_hud", False),
+        )
     )
     if args.as_json:
         print(json.dumps(transcript, ensure_ascii=False, indent=2))
@@ -242,71 +250,64 @@ def _handle_play(args: argparse.Namespace) -> int:
 
 def _handle_dispatch(args: argparse.Namespace) -> int:
     """分发 dispatch 子命令：离线派发统一协议请求并执行强类型信封校验。"""
-    from kalar_protocol_client import KalarProtocolClient
+    from kalar_protocol_client import KalarProtocolClient, ProtocolRequestContext
+
     try:
         payload_dict = json.loads(args.payload) if args.payload else {}
     except Exception as exc:
         err_msg = f"无法解析 payload JSON: {exc}"
         if args.as_json:
-            print(json.dumps({"is_success": False, "error": err_msg}, ensure_ascii=False))
+            print(
+                json.dumps({"success": False, "error": err_msg}, ensure_ascii=False)
+            )
         else:
             print(f"{Style.RED}❌ 错误: {err_msg}{Style.RESET}", file=sys.stderr)
         return 2
 
     client = KalarProtocolClient()
     req = client.build_request(
-        actor_type=args.actor,
-        domain=args.domain,
-        action_type=args.action,
-        payload=payload_dict,
+        ProtocolRequestContext(
+            actor_type=args.actor,
+            domain=args.domain,
+            action_type=args.action,
+            payload=payload_dict,
+        )
     )
     resp = client.send(req)
 
     if args.as_json:
         print(json.dumps(resp, ensure_ascii=False, indent=2))
     else:
-        if resp.get("is_success"):
-            print(f"{Style.GREEN}✔ 协议派发成功{Style.RESET} [ReqID={resp.get('request_id')}]")
-            print(f"  • 响应动作   : {resp.get('payload', {}).get('action', args.action)}")
+        if resp.get("success"):
+            print(
+                f"{Style.GREEN}✔ 协议派发成功{Style.RESET} [ReqID={resp.get('request_id')}]"
+            )
+            print(
+                f"  • 响应动作   : {resp.get('data', {}).get('action', args.action)}"
+            )
             print(f"  • 服务端时间 : {resp.get('server_timestamp_ms')}ms")
-            print(f"  • 载荷摘要   : {json.dumps(resp.get('payload', {}), ensure_ascii=False)}")
+            print(
+                f"  • 载荷摘要   : {json.dumps(resp.get('data', {}), ensure_ascii=False)}"
+            )
         else:
-            print(f"{Style.RED}❌ 协议派发受阻{Style.RESET} [ReqID={resp.get('request_id')}]")
+            print(
+                f"{Style.RED}❌ 协议派发受阻{Style.RESET} [ReqID={resp.get('request_id')}]"
+            )
             print(f"  • 错误代码   : {resp.get('error_code', 'UNKNOWN')}")
-            print(f"  • 提示信息   : {resp.get('message', 'None')}")
-            if resp.get("payload"):
-                print(f"  • 详细信息   : {json.dumps(resp.get('payload', {}), ensure_ascii=False)}")
+            print(f"  • 提示信息   : {resp.get('error_message', 'None')}")
+            if resp.get("data"):
+                print(
+                    f"  • 详细信息   : {json.dumps(resp.get('data', {}), ensure_ascii=False)}"
+                )
 
-    return 0 if resp.get("is_success") else 1
+    return 0 if resp.get("success") else 1
 
 
 # ==============================================================================
-# 二、pack 子命令（校验并打包分发 ZIP 包）
+# 二、pack 子命令（校验并编译封装标准 .kmod 二进制包）
 # ==============================================================================
-EXCLUDED_PACK_NAMES: frozenset[str] = frozenset({
-    "__pycache__", ".git", ".gitignore", ".DS_Store", "Thumbs.db", ".tmp",
-})
-
-
-def _should_exclude_from_pack(rel_path: Path) -> bool:
-    """判断文件或目录是否应从模组发布包中排除。"""
-    for part in rel_path.parts:
-        if part in EXCLUDED_PACK_NAMES or part.endswith(".tmp") or part.endswith(".zip"):
-            return True
-    return False
-
-
-def _compute_file_sha256(file_path: Path) -> str:
-    """计算单个文件的 SHA-256 哈希值。"""
-    hasher = hashlib.sha256()
-    with open(file_path, "rb") as fp:
-        while chunk := fp.read(65536):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-
 def _handle_pack(args: argparse.Namespace) -> int:
-    """分发 pack 子命令：验证模组并打包为 .kmod / .zip 分发包。"""
+    """分发 pack 子命令：验证模组并打包为 .kmod 分发包。"""
     target_dir = Path(args.mod_dir).resolve()
     if not target_dir.is_dir():
         err_msg = f"MOD 目标目录不存在: {target_dir}"
@@ -321,13 +322,21 @@ def _handle_pack(args: argparse.Namespace) -> int:
         valid_mod, check_diags = validate_mod(target_dir)
         if not valid_mod:
             if args.as_json:
-                print(json.dumps({
-                    "success": False,
-                    "error": "模组静态诊断未通过，拒绝打包",
-                    "diagnostics": [d.to_dict() for d in check_diags],
-                }, ensure_ascii=False))
+                print(
+                    json.dumps(
+                        {
+                            "success": False,
+                            "error": "模组静态诊断未通过，拒绝打包",
+                            "diagnostics": [d.to_dict() for d in check_diags],
+                        },
+                        ensure_ascii=False,
+                    )
+                )
             else:
-                print(f"{Style.RED}❌ 打包中止: MOD 静态诊断存在 {len(check_diags)} 处违规错误！{Style.RESET}", file=sys.stderr)
+                print(
+                    f"{Style.RED}❌ 打包中止: MOD 静态诊断存在 {len(check_diags)} 处违规错误！{Style.RESET}",
+                    file=sys.stderr,
+                )
                 print_cli_report(valid_mod, check_diags, target_dir)
             return 1
 
@@ -337,13 +346,21 @@ def _handle_pack(args: argparse.Namespace) -> int:
             valid_assets, asset_diags, _ = cook_assets(target_dir, check_only=True)
             if not valid_assets:
                 if args.as_json:
-                    print(json.dumps({
-                        "success": False,
-                        "error": "assets/ 资产审计门禁未通过，拒绝打包",
-                        "diagnostics": [d.to_dict() for d in asset_diags],
-                    }, ensure_ascii=False))
+                    print(
+                        json.dumps(
+                            {
+                                "success": False,
+                                "error": "assets/ 资产审计门禁未通过，拒绝打包",
+                                "diagnostics": [d.to_dict() for d in asset_diags],
+                            },
+                            ensure_ascii=False,
+                        )
+                    )
                 else:
-                    print(f"{Style.RED}❌ 打包中止: assets/ 资产审计存在违规或 manifest.json 未更新！{Style.RESET}", file=sys.stderr)
+                    print(
+                        f"{Style.RED}❌ 打包中止: assets/ 资产审计存在违规或 manifest.json 未更新！{Style.RESET}",
+                        file=sys.stderr,
+                    )
                 return 1
 
     # 2. 读取 pack.json 确定默认包名
@@ -359,84 +376,16 @@ def _handle_pack(args: argparse.Namespace) -> int:
         except Exception:
             pass
 
-    target_format = getattr(args, "pack_format", "kmod")
-    if args.output and str(args.output).endswith(".zip"):
-        target_format = "zip"
-    elif args.output and str(args.output).endswith(".kmod"):
-        target_format = "kmod"
+    from kalar_workbench import handle_kmod_pack_cli
 
-    if target_format == "kmod":
-        from kalar_workbench import handle_kmod_pack_cli
-        out_p = Path(args.output).resolve() if args.output else None
-        return handle_kmod_pack_cli(target_dir, out_p, args.as_json, pack_id, version)
-
-    out_zip = Path(args.output).resolve() if args.output else target_dir.parent / f"{pack_id}_v{version}.zip"
-
-    # 3. 收集并打包所有有效文件
-    packaged_files: list[str] = []
-    total_uncompressed_bytes = 0
-
-    try:
-        out_zip.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(out_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for root, dirs, files in os.walk(target_dir):
-                root_path = Path(root)
-                rel_root = root_path.relative_to(target_dir)
-                if _should_exclude_from_pack(rel_root):
-                    dirs.clear()
-                    continue
-
-                for f in sorted(files):
-                    file_path = root_path / f
-                    rel_file = file_path.relative_to(target_dir)
-                    if _should_exclude_from_pack(rel_file):
-                        continue
-
-                    arcname = rel_file.as_posix()
-                    zf.write(file_path, arcname)
-                    packaged_files.append(arcname)
-                    total_uncompressed_bytes += file_path.stat().st_size
-    except OSError as exc:
-        err_msg = f"生成 ZIP 压缩包失败: {exc}"
-        if args.as_json:
-            print(json.dumps({"success": False, "error": err_msg}, ensure_ascii=False))
-        else:
-            print(f"{Style.RED}❌ 错误: {err_msg}{Style.RESET}", file=sys.stderr)
-        return 1
-
-    zip_size_bytes = out_zip.stat().st_size
-    zip_sha256 = _compute_file_sha256(out_zip)
-
-    if args.as_json:
-        payload = {
-            "success": True,
-            "pack_id": pack_id,
-            "version": version,
-            "output_zip": str(out_zip),
-            "file_count": len(packaged_files),
-            "uncompressed_bytes": total_uncompressed_bytes,
-            "compressed_bytes": zip_size_bytes,
-            "sha256": zip_sha256,
-            "files": packaged_files,
-        }
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return 0
-
-    print("==============================================================================")
-    print(f"{Style.GREEN}📦 MOD 打包成功: {pack_id} (v{version}){Style.RESET}")
-    print("------------------------------------------------------------------------------")
-    print(f"  • 输出路径   : {out_zip}")
-    print(f"  • 文件总数   : {len(packaged_files)} 项")
-    print(f"  • 原始大小   : {round(total_uncompressed_bytes / 1024, 2)} KB")
-    print(f"  • 压缩后大小 : {round(zip_size_bytes / 1024, 2)} KB")
-    print(f"  • SHA-256    : {zip_sha256}")
-    print("==============================================================================")
-    return 0
+    out_p = Path(args.output).resolve() if args.output else None
+    return handle_kmod_pack_cli(target_dir, out_p, args.as_json, pack_id, version)
 
 
 def _handle_workbench(args: argparse.Namespace) -> int:
     """分发 workbench 子命令：开发者集成工作台核心命令台。"""
     from kalar_workbench import handle_workbench_cli
+
     return handle_workbench_cli(args)
 
 
@@ -455,18 +404,21 @@ def _handle_bake(args: argparse.Namespace) -> int:
 def _handle_install(args: argparse.Namespace) -> int:
     """安装 .kmod 归档包或 MOD 源目录到引擎 mods 目标根目录。"""
     from kalar_dev_pipeline import handle_install_cli
+
     return handle_install_cli(args, TOOLS_DIR)
 
 
 def _handle_dev(args: argparse.Namespace) -> int:
     """分发 dev 子命令：调试(JSON) 与正式封装(.kmod/.kdat) 一体化流水线。"""
     from kalar_dev_pipeline import handle_dev_cli
+
     return handle_dev_cli(args, TOOLS_DIR)
 
 
 def _handle_inspect(args: argparse.Namespace) -> int:
     """分发 inspect 子命令：检查 .kmod 二进制段或反向导出 JSON 调试工作区。"""
     from kalar_dev_pipeline import handle_inspect_cli
+
     return handle_inspect_cli(args)
 
 
@@ -482,86 +434,58 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-v", "--version", action="version", version=VERSION_STRING)
 
-    subparsers = parser.add_subparsers(dest="subcommand", title="核心子命令", metavar="<command>")
-
-    # 1. init
-    p_init = subparsers.add_parser("init", help="初始化生成新的纯净世界引擎 MOD 项目骨架")
-    p_init.add_argument("--id", required=True, dest="pack_id", help="MOD 包唯一标识符 (如 mod_elf_story)")
-    p_init.add_argument("--name", required=True, dest="pack_name", help="MOD 人类可读名称")
-    p_init.add_argument("--race", default="HUMAN", dest="race_id", help="默认绑定的角色种族 (默认: HUMAN)")
-    p_init.add_argument("--output-dir", default=None, dest="output_dir", help="生成的目标目录路径 (默认: 当前目录下 <id>)")
-    p_init.add_argument(
-        "--tier",
-        type=int,
-        choices=[1, 2, 3],
-        default=2,
-        dest="tier",
-        help="模组复杂度层级 (1=极简纯剧情, 2=命途扩展, 3=全量富媒体与大魔改, 默认: 2)",
+    subparsers = parser.add_subparsers(
+        dest="subcommand", title="核心子命令", metavar="<command>"
     )
-    p_init.add_argument(
-        "--with-destiny",
-        action="store_true",
-        dest="with_destiny",
-        default=True,
-        help="生成命途扩展配置文件 destinies.json (默认开启)",
-    )
-    p_init.add_argument(
-        "--no-destiny",
-        action="store_false",
-        dest="with_destiny",
-        help="跳过生成 destinies.json",
-    )
-    p_init.add_argument(
-        "--inline-text",
-        action="store_true",
-        dest="inline_text",
-        default=False,
-        help="在因果图元中直接内联文本，免除外部多语言字典强依赖",
-    )
-
-    # 2. check
-    p_check = subparsers.add_parser("check", help="纯静态轻量自愈诊断 MOD 清单、DAG 因果图元与资产引用")
-    p_check.add_argument("mod_dir", nargs="?", default=".", help="待诊断的 MOD 根目录路径 (默认: 当前目录)")
-    p_check.add_argument(
-        "--check-multi",
-        nargs="+",
-        dest="multi_dirs",
-        default=None,
-        help="多包联合冲突预检的附加或完整 MOD 目录列表",
-    )
-    p_check.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 诊断信息")
-
-    # 3. cook
-    p_cook = subparsers.add_parser("cook", help="扫描、审计与预编译 assets/ 资源清单 (manifest.json)")
-    p_cook.add_argument("mod_dir", nargs="?", default=".", help="待审计/预编译的 MOD 根目录路径 (默认: 当前目录)")
-    p_cook.add_argument(
-        "--check",
-        action="store_true",
-        dest="check_only",
-        help="以只读门禁模式运行：校验格式白名单、体积预算与 manifest.json 是否最新",
-    )
-    p_cook.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 报告")
-
-    # 4. preview
-    p_prev = subparsers.add_parser("preview", help="无头演习推演 MOD 剧情流转与四级路由分支")
-    p_prev.add_argument("mod_dir", nargs="?", default=".", help="待演习的 MOD 根目录路径 (默认: 当前目录)")
-    p_prev.add_argument("--simulate", action="store_true", dest="simulate", help="启动全分支剧情推演与文本占位符填充")
-    p_prev.add_argument("--race", default="HUMAN", dest="race_id", help="模拟角色的种族 (默认: HUMAN)")
-    p_prev.add_argument("--name", default="阿尔温", dest="player_name", help="模拟角色的名称 (默认: 阿尔温)")
-    p_prev.add_argument("--origin", default=None, dest="origin_id", help="指定演习选定的创角身世 ID")
-    p_prev.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 演习报告")
+    register_core_subparsers(subparsers)
 
     # 5. play
-    p_play = subparsers.add_parser("play", help="全自动端到端试玩推演与结构化战报发生器")
-    p_play.add_argument("mod_dirs", nargs="+", help="参与试玩演习的一个或多个 MOD 根目录路径")
-    p_play.add_argument("--name", default="阿尔温", dest="player_name", help="模拟角色自定义名称 (默认: 阿尔温)")
-    p_play.add_argument("--race", default="HUMAN", dest="race_id", help="模拟角色种族 (默认: HUMAN)")
-    p_play.add_argument("--gender", default="FEMALE", dest="gender", help="模拟角色性别 (默认: FEMALE)")
-    p_play.add_argument("--origin", default=None, dest="origin_id", help="指定演习创角身世 ID")
-    p_play.add_argument("--trait-pair", default=None, dest="trait_pair", help="指定演习因果天赋配对预设 ID")
-    p_play.add_argument("--reroll-nonce", type=int, default=0, dest="reroll_nonce", help="六维属性重掷随机数 (默认: 0)")
-    p_play.add_argument("--seed", default="PURE_WORLD_SEED_DEFAULT", dest="seed", help="确定性创角与推演种子 (默认: PURE_WORLD_SEED_DEFAULT)")
-    p_play.add_argument("--choices", default=None, dest="choices", help="交互分支决策序列 (逗号分隔，如 0,1 或 NODE_ID)")
+    p_play = subparsers.add_parser(
+        "play", help="全自动端到端试玩推演与结构化战报发生器"
+    )
+    p_play.add_argument(
+        "mod_dirs", nargs="+", help="参与试玩演习的一个或多个 MOD 根目录路径"
+    )
+    p_play.add_argument(
+        "--name",
+        default="阿尔温",
+        dest="player_name",
+        help="模拟角色自定义名称 (默认: 阿尔温)",
+    )
+    p_play.add_argument(
+        "--race", default="HUMAN", dest="race_id", help="模拟角色种族 (默认: HUMAN)"
+    )
+    p_play.add_argument(
+        "--gender", default="FEMALE", dest="gender", help="模拟角色性别 (默认: FEMALE)"
+    )
+    p_play.add_argument(
+        "--origin", default=None, dest="origin_id", help="指定演习创角身世 ID"
+    )
+    p_play.add_argument(
+        "--trait-pair",
+        default=None,
+        dest="trait_pair",
+        help="指定演习因果天赋配对预设 ID",
+    )
+    p_play.add_argument(
+        "--reroll-nonce",
+        type=int,
+        default=0,
+        dest="reroll_nonce",
+        help="六维属性重掷随机数 (默认: 0)",
+    )
+    p_play.add_argument(
+        "--seed",
+        default="PURE_WORLD_SEED_DEFAULT",
+        dest="seed",
+        help="确定性创角与推演种子 (默认: PURE_WORLD_SEED_DEFAULT)",
+    )
+    p_play.add_argument(
+        "--choices",
+        default=None,
+        dest="choices",
+        help="交互分支决策序列 (逗号分隔，如 0,1 或 NODE_ID)",
+    )
     p_play.add_argument(
         "--choice-strategy",
         choices=["first", "random", "all-branches"],
@@ -569,84 +493,26 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="choice_strategy",
         help="交互分支遍历决策策略 (默认: first)",
     )
-    p_play.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 战报")
+    p_play.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="输出机器可读的结构化 JSON 战报",
+    )
     p_play.add_argument(
         "--interactive",
         action="store_true",
         dest="interactive",
         help="启动长程交互式单步推演会话 (Agent stdio 流式推演)",
     )
-    p_play.add_argument("--simulate", action="store_true", dest="simulate", help="启动推演模式（兼容参数）")
-    p_play.add_argument("--with-hud", action="store_true", dest="with_hud", help="在推演战报中附带初始主页 HUD 快照切片")
-
-    # 6. pack
-    p_pack = subparsers.add_parser("pack", help="验证并打包 MOD 为 .kmod / .zip 分发包")
-    p_pack.add_argument("mod_dir", help="待打包的 MOD 根目录路径")
-    p_pack.add_argument("-o", "--output", default=None, dest="output", help="生成的目标分发包路径 (可选，默认 .kmod)")
-    p_pack.add_argument(
-        "--format",
-        choices=["kmod", "zip"],
-        default="kmod",
-        dest="pack_format",
-        help="打包格式 (kmod 或 zip，默认: kmod)",
-    )
-    p_pack.add_argument(
-        "--no-check",
+    p_play.add_argument(
+        "--with-hud",
         action="store_true",
-        dest="no_check",
-        help="跳过打包前的静态自愈诊断与资产审计门禁",
+        dest="with_hud",
+        help="在推演战报中附带初始主页 HUD 快照切片",
     )
-    p_pack.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 打包结果")
 
-    # 7. dispatch
-    p_disp = subparsers.add_parser("dispatch", help="离线派发全域统一协议请求并执行请求信封校验")
-    p_disp.add_argument("--actor", choices=["HUMAN_UI", "AGENT"], default="HUMAN_UI", help="操作发起方主体类型 (默认: HUMAN_UI)")
-    p_disp.add_argument("--domain", default="ESC_MENU", help="目标业务领域名称 (默认: ESC_MENU)")
-    p_disp.add_argument("--action", default="ESC_QUERY_READINESS", help="具体指令动作类型 (默认: ESC_QUERY_READINESS)")
-    p_disp.add_argument("--payload", default="{}", help="业务载荷 JSON 字符串 (默认: {})")
-    p_disp.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化响应 JSON 信封")
-
-    # 8. workbench
-    p_wb = subparsers.add_parser("workbench", help="纯净世界引擎 MOD 开发者集成工作台统一命令台")
-    p_wb.add_argument("workbench_args", nargs="*", help="传递给工作台的子命令或参数")
-    p_wb.add_argument("--self-test", action="store_true", dest="self_test", help="执行工作台内部集成自测试")
-    p_wb.add_argument("--verify", dest="verify_target", default=None, help="校验指定 .kmod 归档包完整性与指纹")
-    p_wb.add_argument("--inspect", dest="inspect_target", default=None, help="检查指定 .kmod 二进制归档包头与段摘要")
-    p_wb.add_argument("--export-json", dest="export_json", default=None, help="与 --inspect 联用，将 .kmod 反编译还原为 JSON 调试目录")
-    p_wb.add_argument("-p", "--pack", dest="pack_target", default=None, help="打包指定 MOD 物理目录为 .kmod")
-    p_wb.add_argument("-o", "--output", dest="output", default=None, help="输出目标路径")
-
-    # 9. bake
-    p_bake = subparsers.add_parser("bake", help="将 JSON 配置表或目录编译为高纯度紧凑二进制流 (.kdat)")
-    p_bake.add_argument("input_path", help="输入源 JSON 文件或配置目录")
-    p_bake.add_argument("-o", "--output", dest="output", default=None, help="输出 .kdat 文件路径或目标目录")
-    p_bake.add_argument("--monolithic", action="store_true", help="全目录编译为单一融合包 config.kdat")
-    p_bake.add_argument("--no-compress", action="store_true", help="禁用数据压缩")
-
-    # 10. install
-    p_install = subparsers.add_parser("install", help="验证并安装 .kmod 归档包或 MOD 源目录到引擎 mods/ 目录")
-    p_install.add_argument("source", help=".kmod 归档文件或 MOD 源目录路径")
-    p_install.add_argument("--mods-dir", dest="mods_dir", default=None, help="目标 mods/ 安装根目录 (默认: 引擎根目录 mods/)")
-    p_install.add_argument("--force", action="store_true", help="若目标已存在则强制覆盖安装")
-    p_install.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON 结果")
-
-    # 11. dev (调试 JSON <-> 正式二进制 .kmod 一体化流水线)
-    p_dev = subparsers.add_parser("dev", help="调试(JSON)与正式封装(.kmod/.kdat)一体化开发流水线")
-    p_dev.add_argument("mod_dir", nargs="?", default=".", help="待调试/封装的 MOD JSON 根目录 (默认: 当前目录)")
-    p_dev.add_argument("--simulate", action="store_true", help="附加运行无头 DAG 剧情仿真推演")
-    p_dev.add_argument("--pack", action="store_true", help="在校验通过后编译封装为正式二进制 .kmod")
-    p_dev.add_argument("-o", "--output", default=None, dest="output", help="指定正式 .kmod 输出路径 (自动启用 --pack)")
-    p_dev.add_argument("--install", action="store_true", help="打包后直接安装到目标 mods/ 目录 (自动启用 --pack)")
-    p_dev.add_argument("--mods-dir", dest="mods_dir", default=None, help="目标 mods/ 安装根目录")
-    p_dev.add_argument("--force", action="store_true", help="覆盖安装已存在的目标 .kmod")
-    p_dev.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON 报告")
-
-    # 12. inspect (检查 .kmod 二进制流 / 反编译还原 JSON 调试目录)
-    p_inspect = subparsers.add_parser("inspect", help="检查 .kmod 二进制归档段信息或反向还原 JSON 调试工作区")
-    p_inspect.add_argument("kmod_file", help="待检查的 .kmod 二进制归档包路径")
-    p_inspect.add_argument("--export-json", dest="export_json", default=None, help="反向反编译导出为可编辑 JSON 调试目录")
-    p_inspect.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读 JSON 结果")
-
+    register_ops_subparsers(subparsers)
     return parser
 
 
