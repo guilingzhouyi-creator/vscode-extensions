@@ -31,8 +31,8 @@ static func test_single_player_third_party_mods_allowed() -> Dictionary:
 	if not had_overlay:
 		TestCase.mount_official_kalar_for_test()
 	var mods: Array = [
-		{"pack_id": "custom_expansion_story", "is_vanilla": false, "version": "1.0.0"},
-		{"pack_id": "overpowered_relics", "is_vanilla": false, "version": "2.0.0"}
+		{"pack_id": "custom_expansion_story", "is_official": false, "version": "1.0.0"},
+		{"pack_id": "overpowered_relics", "is_official": false, "version": "2.0.0"}
 	]
 
 	# 1. 直接通过安全守卫裁定单机放行
@@ -67,7 +67,7 @@ static func test_single_player_third_party_mods_allowed() -> Dictionary:
 ## TC-MSS-02: 联机模式加载第三方 MOD 坚决拦截 (SECURITY_ERR_MULTIPLAYER_MOD_POISONING)
 static func test_multiplayer_third_party_mods_blocked() -> Dictionary:
 	var poison_mods: Array = [
-		{"pack_id": "hacked_stats_booster", "is_vanilla": false}
+		{"pack_id": "hacked_stats_booster", "is_official": false}
 	]
 
 	# 1. 守卫直接拦截判定
@@ -111,7 +111,7 @@ static func test_slot_mode_poisoning_blocked() -> Dictionary:
 	var direct_res := AntiBridgeGuard.validate_slot_mode_affinity(
 		WorldGatewayModel.GameMode.SINGLE_PLAYER,
 		WorldGatewayModel.GameMode.MULTIPLAYER,
-		[{"pack_id": "mod_sp_story"}]
+		[ {"pack_id": "mod_sp_story"}]
 	)
 	var direct_blocked: bool = not bool(direct_res.get("allowed", true)) \
 		and str(direct_res.get("error_code", "")) == AntiBridgeGuard.SECURITY_ERR_SLOT_MODE_POISONING
@@ -146,7 +146,7 @@ static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 
 	var mixed_mods: Array = [
 		{"pack_id": OFFICIAL_BASE_PACK_ID, "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"},
-		{"pack_id": "third_party_addon", "is_vanilla": false},
+		{"pack_id": "third_party_addon", "is_official": false},
 		"official_core_content",
 		{"pack_id": "official_core_expansion", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"}
 	]
@@ -233,7 +233,7 @@ static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
 	var kalar_mount := TestCase.mount_official_kalar_for_test()
 	var fsm := WorldGatewayFSM.new("ACC_MSS_EXIT_01")
 	fsm.enter_gateway()
-	fsm.set_active_mods([kalar_mount.get("package", {}), {"pack_id": "temp_mod", "is_vanilla": false}])
+	fsm.set_active_mods([kalar_mount.get("package", {}), {"pack_id": "temp_mod", "is_official": false}])
 
 	# 选择单机模式并模拟状态填充
 	fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
@@ -276,13 +276,13 @@ static func test_switch_clean_purge_and_realm_fail_rollback() -> Dictionary:
 	var fsm := WorldGatewayFSM.new("MP_TESTER_01")
 	fsm.enter_gateway()
 	fsm.set_mod_selection(["official_kalar", "sp_story_addon"])
-	fsm.set_active_mods([kalar_mount.get("package", {}), {"pack_id": "sp_story_addon", "is_vanilla": false}])
+	fsm.set_active_mods([kalar_mount.get("package", {}), {"pack_id": "sp_story_addon", "is_official": false}])
 	fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
 
 	# 1. 显式传入非官方 custom_mods 切联机仍必须拦截
 	var poison_switch := fsm.switch_gateway_mode(
 		WorldGatewayModel.GameMode.MULTIPLAYER, {}, [], "", "",
-		[{"pack_id": "cheat_mp_addon", "is_official": false}]
+		[ {"pack_id": "cheat_mp_addon", "is_official": false}]
 	)
 	var poison_blocked: bool = not bool(poison_switch.get("success", true)) \
 		and str(poison_switch.get("error_code", "")) == AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING

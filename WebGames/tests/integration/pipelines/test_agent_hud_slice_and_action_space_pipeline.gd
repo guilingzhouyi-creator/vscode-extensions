@@ -133,7 +133,8 @@ static func test_potential_allocation_action_space_pruning() -> Dictionary:
 	var ctx := _create_base_context()
 	ctx["unallocated_potential_points"] = 5
 	var snap1 := AuthoritativeHudSyncService.get_authoritative_snapshot(ctx)
-	var actions1 := HomeActionSpaceSolver.resolve_action_space(snap1, false)
+	var actions1: Array[AgentActionDirectiveDTO] = []
+	HomeActionSpaceSolver.resolve_action_space_into(snap1, actions1, false)
 
 	var alloc_act1: AgentActionDirectiveDTO = null
 	for a in actions1:
@@ -148,7 +149,8 @@ static func test_potential_allocation_action_space_pruning() -> Dictionary:
 
 	ctx["unallocated_potential_points"] = 0
 	var snap2 := AuthoritativeHudSyncService.get_authoritative_snapshot(ctx)
-	var actions2 := HomeActionSpaceSolver.resolve_action_space(snap2, false)
+	var actions2: Array[AgentActionDirectiveDTO] = []
+	HomeActionSpaceSolver.resolve_action_space_into(snap2, actions2, false)
 
 	var alloc_act2: AgentActionDirectiveDTO = null
 	for a in actions2:
@@ -170,7 +172,8 @@ static func test_ap_and_rest_action_space_pruning() -> Dictionary:
 	var ctx := _create_base_context()
 	ctx["ap_current"] = 5.0
 	var snap1 := AuthoritativeHudSyncService.get_authoritative_snapshot(ctx)
-	var actions1 := HomeActionSpaceSolver.resolve_action_space(snap1, false)
+	var actions1: Array[AgentActionDirectiveDTO] = []
+	HomeActionSpaceSolver.resolve_action_space_into(snap1, actions1, false)
 
 	var rest_act1: AgentActionDirectiveDTO = null
 	for a in actions1:
@@ -185,7 +188,8 @@ static func test_ap_and_rest_action_space_pruning() -> Dictionary:
 
 	ctx["ap_current"] = 1.0
 	var snap2 := AuthoritativeHudSyncService.get_authoritative_snapshot(ctx)
-	var actions2 := HomeActionSpaceSolver.resolve_action_space(snap2, false)
+	var actions2: Array[AgentActionDirectiveDTO] = []
+	HomeActionSpaceSolver.resolve_action_space_into(snap2, actions2, false)
 
 	var rest_act2: AgentActionDirectiveDTO = null
 	for a in actions2:
@@ -240,8 +244,9 @@ static func test_causal_deltas_precise_tracking() -> Dictionary:
 	next_slice.wallet_gold = 150
 	next_slice.day_phase_key = "NOON"
 
-	var deltas := HudCausalDeltaSolver.compute_deltas(
-		prev_slice, next_slice, "REST_ACTION", "AGENT_ACTION_CHANNEL", "HEALED_AT_INN"
+	var deltas: Array[HudCausalDeltaDTO] = []
+	HudCausalDeltaSolver.compute_deltas_into(
+		prev_slice, next_slice, deltas, "REST_ACTION", "AGENT_ACTION_CHANNEL", "HEALED_AT_INN"
 	)
 
 	if deltas.size() != 3:
@@ -360,8 +365,8 @@ static func test_ui_notices_structural_slicing_and_actions() -> Dictionary:
 	test_notice.notice_id = "notice_rest_recommendation_001"
 	test_notice.category = "RECOMMENDATION"
 	test_notice.priority = 2
-	test_notice.message_text = "AP 体能偏低，建议返回宿屋休息恢复。"
-	test_notice.actions = ["REST_AND_ADVANCE_TIME", "DISMISS_UI_NOTICE"]
+	test_notice.body_text = "AP 体能偏低，建议返回宿屋休息恢复。"
+	test_notice.action_directive_ids = ["REST_AND_ADVANCE_TIME", "DISMISS_UI_NOTICE"]
 
 	bridge.inject_ui_notice(test_notice)
 	var packet: AgentHudTelemetryPacketDTO = bridge.step_and_publish("TEST_INJECT_NOTICE")
@@ -379,13 +384,13 @@ static func test_ui_notices_structural_slicing_and_actions() -> Dictionary:
 			"error": "捕获的 notice_id 不匹配: %s" % first_notice.notice_id
 		})
 
-	if first_notice.message_text.contains("<color>") or first_notice.message_text.contains("<b>"):
+	if first_notice.body_text.contains("<color>") or first_notice.body_text.contains("<b>"):
 		_teardown_environment(env)
 		return TestCase.make_result("test_ui_notices_structural_slicing_and_actions", false, {
 			"error": "UI 通知包含表现层富文本标记"
 		})
 
-	if first_notice.actions.size() != 2 or not first_notice.actions.has("REST_AND_ADVANCE_TIME"):
+	if first_notice.action_directive_ids.size() != 2 or not first_notice.action_directive_ids.has("REST_AND_ADVANCE_TIME"):
 		_teardown_environment(env)
 		return TestCase.make_result("test_ui_notices_structural_slicing_and_actions", false, {
 			"error": "actions 指令集未完整保留"

@@ -69,8 +69,8 @@ static func write_binary_kmod_package(
 	var full_manifest := manifest_dict.duplicate(true)
 	var p_id := str(full_manifest.get("pack_id", "test_mod"))
 	full_manifest["archive_format_version"] = 2
-	full_manifest["bundle_id"] = str(full_manifest.get("bundle_id", p_id))
-	full_manifest["bundle_name"] = str(full_manifest.get("bundle_name", full_manifest.get("pack_name", p_id)))
+	full_manifest["pack_id"] = p_id
+	full_manifest["pack_name"] = str(full_manifest.get("pack_name", p_id))
 	full_manifest["content_sha256"] = sha_hasher.finish().hex_encode()
 	full_manifest["files_manifest"] = files_manifest
 	var manifest_kdat := BinaryConfigWriter.encode_kdat_buffer(full_manifest, true, KDataHeaderDTO.PAYLOAD_MOD_PACKAGE)
@@ -108,7 +108,7 @@ static func write_custom_realm_kmod(kmod_path: String, wav_bytes: PackedByteArra
 			"cutscenes": {"cs_custom_entry": {"duration_sec": 3.0, "is_placeholder": true}}
 		},
 		"cutscenes/cutscene_hooks.json": {
-			"hooks": [{
+			"hooks": [ {
 				"hook_id": "hook_custom_entry",
 				"trigger_type": "NARRATIVE_NODE_PRE",
 				"target_filter": {"dag_id": "DAG_CUSTOM_REALM", "node_id": "NODE_ENTRY"},

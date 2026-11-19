@@ -355,6 +355,22 @@ static func _test_frontend_compatibility_retirement() -> Dictionary:
 	var skeleton_ok := TestCase.assert_eq(skeleton_hits, 0, "frontend/ 全域零 skeleton_mock/MOCK_PATH 引用")
 	var fill_ok := TestCase.assert_eq(fill_params_hits, 0, "frontend/ 全域零 _fill_params 死委托引用")
 
+	var view_mock_hits := 0
+	for view_path in _view_files():
+		var view_code := TestArchitectureGuardDomain._strip_comments(FileAccess.get_file_as_string(view_path))
+		if view_code.contains("_mock_"):
+			view_mock_hits += 1
+	var view_mock_ok := TestCase.assert_eq(view_mock_hits, 0, "frontend/views 全域零 _mock_ 内联字段或残留方法")
+
+	var boundary_files: Array[String] = []
+	_collect("res://frontend/domain_boundary", boundary_files, [".gd"])
+	var boundary_drift_hits := 0
+	for boundary_path in boundary_files:
+		var boundary_code := TestArchitectureGuardDomain._strip_comments(FileAccess.get_file_as_string(boundary_path))
+		if boundary_code.contains("\"installed_packs\""):
+			boundary_drift_hits += 1
+	var boundary_drift_ok := TestCase.assert_eq(boundary_drift_hits, 0, "frontend/domain_boundary 禁止残留 installed_packs 协议键漂移")
+
 	# 3. 断言 MockDataCatalog 包含完整 character 与 economy 扩展字段
 	var char_data: Dictionary = MockDataCatalog.get_domain_data("character")
 	var char_ok := TestCase.assert_true(char_data.has("attributes"), "MockDataCatalog 必须包含 character.attributes")
@@ -362,7 +378,7 @@ static func _test_frontend_compatibility_retirement() -> Dictionary:
 	var eco_wallet_ok := TestCase.assert_true(eco_data.has("wallet"), "MockDataCatalog 必须包含 economy.wallet")
 	var eco_trend_ok := TestCase.assert_true(eco_data.has("price_trend"), "MockDataCatalog 必须包含 economy.price_trend")
 
-	var all_ok: bool = dir_ok and skeleton_ok and fill_ok and char_ok and eco_wallet_ok and eco_trend_ok
+	var all_ok: bool = dir_ok and skeleton_ok and fill_ok and view_mock_ok and boundary_drift_ok and char_ok and eco_wallet_ok and eco_trend_ok
 	return TestCase.make_result("frontend_compatibility_retirement", all_ok)
 
 ## 14. 视图业务交互按钮防抖纪律断言 (GDM-DEB-001)

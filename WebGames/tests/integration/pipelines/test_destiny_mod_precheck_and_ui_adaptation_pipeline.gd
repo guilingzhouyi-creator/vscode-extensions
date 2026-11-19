@@ -106,7 +106,7 @@ static func _make_compliant_mod_a() -> Dictionary:
                 "birth_region": "SILVER_MOON_SPIRE",
                 "weight": 35,
                 "initial_gold": 120,
-                "attribute_bonus": {"INT": 2, "SPR": 1, "STR": -1},
+                "attribute_bonus": {"INT": 2, "SPR": 1, "STR": - 1},
                 "starter_kit_id": "KIT_ASTRO_SCHOLAR",
                 "prologue_dag_id": "DAG_PROLOGUE_ASTRO_01"
             }
@@ -121,7 +121,7 @@ static func _make_compliant_mod_a() -> Dictionary:
             "NIGHT_BLINDNESS": {
                 "name": "幽暗眩光",
                 "type": "NEGATIVE",
-                "cost": -3,
+                "cost": - 3,
                 "desc": "受星辉反噬在深渊暗处视野受限"
             }
         },
@@ -144,7 +144,7 @@ static func _make_compliant_mod_a() -> Dictionary:
         },
         "custom_routing_rules": [
             {
-                "match_condition": {"origin_id": "ASTRO_SCHOLAR"},
+                "origin_id": "ASTRO_SCHOLAR",
                 "target_dag_id": "DAG_PROLOGUE_ASTRO_01"
             }
         ],
@@ -157,7 +157,7 @@ static func _make_compliant_mod_a() -> Dictionary:
                     "NODE_ASTRO_START": {"node_type": "START_ENTRY", "narrative_key": "narrative.prologue.awakening"},
                     "NODE_ASTRO_END": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.prologue.completed", "required_prerequisites": ["NODE_ASTRO_START"]}
                 },
-                "edges": [{"from_node_id": "NODE_ASTRO_START", "to_node_id": "NODE_ASTRO_END"}]
+                "edges": [ {"from_node_id": "NODE_ASTRO_START", "to_node_id": "NODE_ASTRO_END"}]
             }
         }
     }
@@ -184,7 +184,7 @@ static func _make_compliant_mod_b() -> Dictionary:
                 "birth_region": "IRON_FORGE_CITADEL",
                 "weight": 30,
                 "initial_gold": 150,
-                "attribute_bonus": {"STR": 2, "CON": 2, "AGI": -1},
+                "attribute_bonus": {"STR": 2, "CON": 2, "AGI": - 1},
                 "starter_kit_id": "KIT_RUNE_FORGER",
                 "prologue_dag_id": "DAG_PROLOGUE_RUNE_01"
             }
@@ -199,7 +199,7 @@ static func _make_compliant_mod_b() -> Dictionary:
             "MANA_OVERLOAD": {
                 "name": "魔力淤塞",
                 "type": "NEGATIVE",
-                "cost": -2,
+                "cost": - 2,
                 "desc": "体内魔力运转滞重"
             }
         },
@@ -228,7 +228,7 @@ static func _make_compliant_mod_b() -> Dictionary:
                     "NODE_RUNE_START": {"node_type": "START_ENTRY", "narrative_key": "narrative.prologue.awakening"},
                     "NODE_RUNE_END": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.prologue.completed", "required_prerequisites": ["NODE_RUNE_START"]}
                 },
-                "edges": [{"from_node_id": "NODE_RUNE_START", "to_node_id": "NODE_RUNE_END"}]
+                "edges": [ {"from_node_id": "NODE_RUNE_START", "to_node_id": "NODE_RUNE_END"}]
             }
         }
     }
@@ -261,7 +261,7 @@ static func test_single_mod_compliance_precheck_and_interception() -> Dictionary
     mod_imbalance_trait["pack_id"] = "mod_cheat_trait"
     mod_imbalance_trait["custom_traits"] = {
         "CHEAT_BLESSING": {"name": "无代价神赐", "type": "POSITIVE", "cost": 5},
-        "TINY_FLAW": {"name": "微瑕", "type": "NEGATIVE", "cost": -1}
+        "TINY_FLAW": {"name": "微瑕", "type": "NEGATIVE", "cost": - 1}
     }
     mod_imbalance_trait["paired_presets"] = [
         {"positive": "CHEAT_BLESSING", "negative": "TINY_FLAW", "weight": 50}
@@ -303,7 +303,7 @@ static func test_multi_mod_collaborative_list_merging() -> Dictionary:
     var has_mod_a_origin: bool = origins_cat.has("ASTRO_SCHOLAR")
     var has_mod_b_origin: bool = origins_cat.has("RUNE_FORGER")
 
-    var kits: Dictionary = manifest.get("starter_kits", {})
+    var kits: Dictionary = manifest.get("custom_starter_kits", {})
     var has_both_kits: bool = kits.has("KIT_ASTRO_SCHOLAR") and kits.has("KIT_RUNE_FORGER")
 
     var ui_snap: Dictionary = gw.get_creation_ui_snapshot()

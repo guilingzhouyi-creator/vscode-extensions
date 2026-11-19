@@ -58,7 +58,7 @@ static func create_tier3_merge_package(pack_directory: String) -> Dictionary:
 	}
 	write_json_file(pack_directory.path_join("pack.json"), manifest)
 	write_json_file(pack_directory.path_join("content/items/weapons.json"), {
-		"override_mode": "APPEND_MERGE",
+		"override_mode": "MERGE",
 		"weapons": [
 			{"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD", "base_market_value": 777},
 			{
@@ -72,14 +72,14 @@ static func create_tier3_merge_package(pack_directory: String) -> Dictionary:
 	})
 	write_json_file(pack_directory.path_join("content/skills/skills.json"), {
 		"override_mode": "MERGE",
-		"verbs": {"PIERCE": {"name": "穿", "k_mom": 1.3, "k_edge": 2.1, "base_ap": -2}}
+		"verbs": {"PIERCE": {"name": "穿", "k_mom": 1.3, "k_edge": 2.1, "base_ap": - 2}}
 	})
 	write_json_file(pack_directory.path_join("content/rules/rules.json"), {
 		"override_mode": "MERGE", "combat_constants": {"kinetic": {"energy_coef": 0.75}}
 	})
 	write_json_file(pack_directory.path_join("content/world/world_map.json"), {
 		"override_mode": "MERGE", "terrain_impedance": {"SWAMP": 4.2},
-		"map_id": "WORLD_MOD_TEST", "nodes": [{"node_id": "NODE_MOD_CITADEL"}]
+		"map_id": "WORLD_MOD_TEST", "nodes": [ {"node_id": "NODE_MOD_CITADEL"}]
 	})
 	return manifest
 
@@ -91,7 +91,7 @@ static func run_tc_t3mod_04_replace_entry() -> Dictionary:
 	write_json_file(pack_directory.path_join("pack.json"), manifest)
 	write_json_file(pack_directory.path_join("content/skills/skills.json"), {
 		"override_mode": "REPLACE_ENTRY",
-		"verbs": {"SLASH": {"name": "重劈", "k_mom": 2.4, "k_edge": 1.0, "base_ap": -4}}
+		"verbs": {"SLASH": {"name": "重劈", "k_mom": 2.4, "k_edge": 1.0, "base_ap": - 4}}
 	})
 	write_json_file(pack_directory.path_join("content/rules/rules.json"), {
 		"override_mode": "REPLACE_ENTRY",
@@ -114,7 +114,7 @@ static func run_tc_t3mod_04_replace_entry() -> Dictionary:
 		"kinetic_replaced": kinetic_replaced
 	})
 
-## TC-T3MOD-05: TOTAL_PURGE (及 REPLACE_EXISTING 别名) 全量替换指定集合并维持安全默认键
+## TC-T3MOD-05: TOTAL_PURGE 全量替换指定集合并维持安全默认键
 static func run_tc_t3mod_05_total_purge() -> Dictionary:
 	reset_mod_runtime_state()
 	var catalog: ItemRegistryCatalog = ItemLoaderPipeline.build_catalog_from_config()
@@ -123,7 +123,7 @@ static func run_tc_t3mod_05_total_purge() -> Dictionary:
 	write_json_file(pack_directory.path_join("pack.json"), manifest)
 	write_json_file(pack_directory.path_join("content/items/items.json"), {
 		"override_mode": "TOTAL_PURGE",
-		"items": [{
+		"items": [ {
 			"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:SOLO_BLADE",
 			"english_name": "solo_blade", "loc_name_key": "item.solo_blade.name",
 			"category_major": "EQUIPMENT", "category_minor": "WEAPON_BLADE",
@@ -131,8 +131,8 @@ static func run_tc_t3mod_05_total_purge() -> Dictionary:
 		}]
 	})
 	write_json_file(pack_directory.path_join("content/skills/skills.json"), {
-		"override_mode": "REPLACE_EXISTING",
-		"verbs": {"ARCANE_STRIKE": {"name": "灵击", "k_mom": 1.6, "k_edge": 1.6, "base_ap": -2}}
+		"override_mode": "TOTAL_PURGE",
+		"verbs": {"ARCANE_STRIKE": {"name": "灵击", "k_mom": 1.6, "k_edge": 1.6, "base_ap": - 2}}
 	})
 
 	var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")

@@ -177,7 +177,7 @@ static func _test_config_hotfix_reload_without_restart() -> Dictionary:
 	var initial_version := GameConfig.config_reload_version()
 
 	# 触发热重载
-	var reload_res := GameConfig.reload_all_configurations()
+	var reload_res := GameConfig.reload_config()
 	if not reload_res.get("success", false):
 		return {"test": tname, "name": tname, "passed": false, "message": "配置全表热重载执行失败"}
 	if GameConfig.config_reload_version() <= initial_version:

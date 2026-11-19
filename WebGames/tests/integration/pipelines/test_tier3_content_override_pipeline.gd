@@ -52,7 +52,7 @@ static func test_tc_t3mod_01_structured_validator_diagnostics() -> Dictionary:
 			"TRAIT_BAD_SIGN": {
 				"name": "极性冲突特质",
 				"type": "POSITIVE",
-				"cost": -2
+				"cost": - 2
 			}
 		}
 	}
@@ -122,7 +122,7 @@ static func test_tc_t3mod_02_unified_mods_discovery_priority() -> Dictionary:
 		"override_ok": override_ok
 	})
 
-## TC-T3MOD-03: Tier 3 MERGE/APPEND_MERGE 差分叠加向 GameConfig、ItemLoaderPipeline 与 PhysicalVerbRegistry 传播
+## TC-T3MOD-03: Tier 3 MERGE 差分叠加向 GameConfig、ItemLoaderPipeline 与 PhysicalVerbRegistry 传播
 static func test_tc_t3mod_03_tier3_merge_and_template_aliases() -> Dictionary:
 	Helper.reset_mod_runtime_state()
 	var catalog: ItemRegistryCatalog = ItemLoaderPipeline.build_catalog_from_config()

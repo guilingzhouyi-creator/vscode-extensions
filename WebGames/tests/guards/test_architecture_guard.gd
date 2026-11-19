@@ -426,6 +426,15 @@ const RETIRED_COMPAT_SYMBOLS: Array[String] = [
 	"item_template_id",
 	"mod_tier",
 	"_normalize_items",
+	"_mock_town_facilities",
+	"_mock_town_npcs",
+	"_mock_territories",
+	"_mock_sovereignty",
+	"\"ALLOCATE_POTENTIAL\"",
+	"\"REST_INN\"",
+	"func exit_world(",
+	"func init_gm_sandbox(",
+	"\"is_safe\"",
 ]
 
 static func test_compatibility_retirement_backend_clean() -> Dictionary:
@@ -464,6 +473,12 @@ static func test_compatibility_retirement_backend_clean() -> Dictionary:
 	var band_resolver := _strip_comments(FileAccess.get_file_as_string("res://backend/domains/item_namespace_registry/magic_rank_band_resolver.gd"))
 	if band_resolver.contains("rank_to_band(rank: int, registry: MagicTierRegistry = null)"):
 		violations.append("magic_rank_band_resolver.gd: rank_to_band 必须移除 = null")
+
+	# 6. 断言统一响应信封 DTO 零 is_success / "payload" 兼容别名残留
+	var envelope_code := _strip_comments(FileAccess.get_file_as_string("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd"))
+	for retired_field in ["is_success", "\"payload\""]:
+		if envelope_code.contains(retired_field):
+			violations.append("unified_response_envelope_dto.gd: 严禁残留已退役响应信封别名 %s" % retired_field)
 
 	return _result("TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零）", violations)
 

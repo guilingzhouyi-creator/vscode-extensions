@@ -228,7 +228,7 @@ static func _test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx:
 	var entry: AccountEntryViewScript = nav.get_current_screen() as AccountEntryViewScript
 	var signals_ok := false
 	if entry != null:
-		entry.set_character_slots_snapshot([{"slot_id": "SLOT_01", "name": "SignalHero"}])
+		entry.apply_snapshot({"character_slots": [ {"slot_id": "SLOT_01", "name": "SignalHero"}]})
 		entry._on_char_slot_0_pressed()
 		var slot_picked := entry.selected_character_slot == "SLOT_01"
 		entry._on_char_slot_1_pressed()

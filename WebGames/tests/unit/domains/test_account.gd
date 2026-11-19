@@ -200,17 +200,18 @@ static func test_salt_single_track_authentication() -> Dictionary:
 	acc.salt_version = 1
 	acc.password_hash_sha256 = AuthService.hash_password(pass_plain)
 
-	# 1. 标准凭证通过鉴权，rehashed 恒为 false
+	# 1. 标准凭证通过鉴权且不存在重铸兼容性字段
 	var r1 := AuthService.authenticate_local("StandardUser", pass_plain, acc)
-	var standard_ok: bool = r1.get("success", false) and r1.get("rehashed", true) == false and acc.salt_version == 1
+	var standard_ok: bool = r1.get("success", false) and not r1.has("rehashed") and acc.salt_version == 1
 
 	# 2. 错误口令严格拒绝
 	var wrong_pass_rejected: bool = not AuthService.authenticate_local("StandardUser", "WrongPass", acc).get("success", true)
 
-	# 3. 历史未加盐裸哈希账户在单轨加盐体系下严格拦截拒绝
+	# 3. 无盐或低于 salt_version=1 的凭据在单轨加盐体系下严格拦截拒绝
 	var raw_hash_acc := AccountProfile.new()
 	raw_hash_acc.account_id = "ACC_RAW_HASH"
 	raw_hash_acc.username = "RawUser"
+	raw_hash_acc.salt_version = 0
 	raw_hash_acc.password_hash_sha256 = pass_plain.sha256_text()
 	var raw_rejected: bool = not AuthService.authenticate_local("RawUser", pass_plain, raw_hash_acc).get("success", true)
 

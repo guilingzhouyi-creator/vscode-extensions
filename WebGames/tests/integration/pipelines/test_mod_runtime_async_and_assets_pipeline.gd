@@ -54,11 +54,11 @@ class DelayedAsyncWorldService extends "res://frontend/domain_boundary/interface
 	func list_worlds_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 		_enqueue("list_worlds", result_callback, {
 			"success": true,
-			"worlds": [{"world_id": "WORLD_MOD_ASYNC", "mode": 1, "active_mod_pack_ids": ["mod_async_base"]}]
+			"worlds": [ {"world_id": "WORLD_MOD_ASYNC", "mode": 1, "active_mod_pack_ids": ["mod_async_base"]}]
 		})
 
 	func list_remote_realms_async(_account_id: String, _token: String, result_callback: Callable) -> void:
-		_enqueue("list_remote_realms", result_callback, {"success": true, "realms": []})
+		_enqueue("list_remote_realms", result_callback, {"success": true, "data": {"realms": []}})
 
 	func get_world_mod_diagnostics_async(_account_id: String, _token: String, world_id: String, result_callback: Callable) -> void:
 		_enqueue("get_world_mod_diagnostics", result_callback, {
@@ -66,7 +66,7 @@ class DelayedAsyncWorldService extends "res://frontend/domain_boundary/interface
 			"data": {
 				"world_id": world_id,
 				"status": "MATCHED",
-				"locked_mods": [{"pack_id": "mod_async_base", "version": "1.0.0"}],
+				"locked_mods": [ {"pack_id": "mod_async_base", "version": "1.0.0"}],
 				"missing_mods": [],
 				"digest_mismatches": []
 			}
@@ -76,7 +76,7 @@ class DelayedAsyncWorldService extends "res://frontend/domain_boundary/interface
 		_enqueue("list_installed_mods", result_callback, {
 			"success": true,
 			"data": {
-				"installed_packs": [{
+				"packages": [ {
 					"pack_id": "mod_async_base",
 					"display_name": "Async Base Pack",
 					"version": "1.0.0",
@@ -144,7 +144,7 @@ class DelayedAsyncPrologueService extends "res://frontend/domain_boundary/interf
 				"step_index": 1,
 				"is_completed": false,
 				"narrative_text": "Delayed prologue loaded",
-				"choices": [{"choice_id": "NEXT", "label": "Next"}]
+				"choices": [ {"choice_id": "NEXT", "label": "Next"}]
 			}
 		})
 
@@ -360,7 +360,7 @@ static func test_tc_mraa_05_kmod_png_image_texture_and_anti_traversal() -> Dicti
 
 static func _build_custom_routing_mod_package() -> Dictionary:
 	var route_dir := SANDBOX_ROOT.path_join("mod_sample_route")
-	var rules := [{"rule_id": "R_MOD_HIGH", "priority": 999, "origin_id": "BORDER_CITIZEN", "dag_id": "DAG_MOD_ALT"}]
+	var rules := [ {"rule_id": "R_MOD_HIGH", "priority": 999, "origin_id": "BORDER_CITIZEN", "target_dag_id": "DAG_MOD_ALT"}]
 	TestTier3ContentOverrideHelper.write_json_file(route_dir.path_join("pack.json"), {
 		"pack_id": "mod_sample_route", "pack_name": "Sample Route", "version": "1.0.0",
 		"pack_profile": "CONTENT_ADDON", "priority": 350, "is_active": true,
@@ -375,7 +375,7 @@ static func _build_custom_routing_mod_package() -> Dictionary:
 			"N_ALT_0": {"node_type": "START_ENTRY", "narrative_key": "narrative.sample_mod.alt0"},
 			"N_ALT_1": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.sample_mod.alt1", "required_prerequisites": ["N_ALT_0"]}
 		},
-		"edges": [{"from_node_id": "N_ALT_0", "to_node_id": "N_ALT_1"}]
+		"edges": [ {"from_node_id": "N_ALT_0", "to_node_id": "N_ALT_1"}]
 	})
 	return ModPackageDiscoverySolver.load_full_mod_package_from_dir(route_dir)
 
@@ -388,7 +388,7 @@ static func _write_domain_tables_kmod(kmod_path: String) -> String:
 	var source_entries := {
 		"content/items/sample_items.json": {
 			"override_mode": "MERGE",
-			"items": [{
+			"items": [ {
 				"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:SAMPLE_STAR_ORB", "english_name": "sample_star_orb",
 				"loc_name_key": "item.sample_star_orb.name", "category_major": "EQUIPMENT",
 				"category_minor": "WEAPON_BLADE", "tier_rank": 3, "default_mass_kg": 1.0,
@@ -397,8 +397,8 @@ static func _write_domain_tables_kmod(kmod_path: String) -> String:
 		},
 		"content/skills/sample_skills.json": {
 			"override_mode": "MERGE",
-			"verbs": {"LUNGE": {"name": "突刺", "k_mom": 1.2, "k_edge": 1.1, "base_ap": -2}},
-			"skill_cards": [{"card_id": "CARD_MOD_ASTRAL", "verb_type": "LUNGE", "name": "星芒突刺", "ap_cost": -1, "base_potency": 42.0}]
+			"verbs": {"LUNGE": {"name": "突刺", "k_mom": 1.2, "k_edge": 1.1, "base_ap": - 2}},
+			"skill_cards": [ {"card_id": "CARD_MOD_ASTRAL", "verb_type": "LUNGE", "name": "星芒突刺", "ap_cost": - 1, "base_potency": 42.0}]
 		},
 		"content/rules/sample_rules.json": {
 			"override_mode": "MERGE",
@@ -406,9 +406,9 @@ static func _write_domain_tables_kmod(kmod_path: String) -> String:
 		},
 		"content/world/sample_world.json": {
 			"override_mode": "MERGE", "map_id": "MAP_MOD_SAMPLE", "map_name": "星辉裂隙", "default_entry_node": "NODE_GATE",
-			"nodes": [{"node_id": "NODE_GATE", "name": "星门", "terrain_type": "PLAINS", "x": 0.0, "y": 0.0}],
-			"edges": [{"from": "NODE_GATE", "to": "LM_SANCTUM", "distance": 6.5, "bidirectional": true}],
-			"landmarks": [{"id": "LM_SANCTUM", "name": "苍穹圣所", "terrain_type": "PLAINS", "x": 10.0, "y": 0.0}]
+			"nodes": [ {"node_id": "NODE_GATE", "name": "星门", "terrain_type": "PLAINS", "x": 0.0, "y": 0.0}],
+			"edges": [ {"from": "NODE_GATE", "to": "LM_SANCTUM", "distance": 6.5, "bidirectional": true}],
+			"landmarks": [ {"id": "LM_SANCTUM", "name": "苍穹圣所", "terrain_type": "PLAINS", "x": 10.0, "y": 0.0}]
 		},
 	}
 	TestKmodMediaFixtureHelper.write_binary_kmod_package(kmod_path, manifest, source_entries)

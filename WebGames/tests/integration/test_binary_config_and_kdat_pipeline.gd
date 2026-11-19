@@ -354,7 +354,7 @@ static func test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolati
 static func test_tc_kdat_10_binary_writer_roundtrip_and_kmod_binary_envelope() -> Dictionary:
 	var sample := {
 		"flag_ok": true,
-		"small_int": -42,
+		"small_int": - 42,
 		"big_int": 9000000000,
 		"ratio": 1.625,
 		"title": "星界编译构筑",
@@ -387,7 +387,7 @@ static func test_tc_kdat_10_binary_writer_roundtrip_and_kmod_binary_envelope() -
 		"pack_id": "mod_compile_debug", "pack_name": "Compile Debug Mod", "version": "1.0.0", "is_active": true
 	})
 	WorldModPackageOpsHelper.write_json_file(src_dir.path_join("routing_rules.json"), {
-		"prologue_routing_rules": [{"rule_id": "R_CMPL", "priority": 500, "origin_id": "INITIATE", "dag_id": "DAG_CMPL"}]
+		"prologue_routing_rules": [ {"rule_id": "R_CMPL", "priority": 500, "origin_id": "INITIATE", "target_dag_id": "DAG_CMPL"}]
 	})
 	WorldModPackageOpsHelper.write_json_file(src_dir.path_join("dag_graphs/DAG_CMPL.json"), {
 		"dag_id": "DAG_CMPL", "entry_node_id": "N0", "nodes": {"N0": {"node_type": "START_ENTRY", "narrative_key": "cmpl.n0"}}, "edges": []
@@ -452,7 +452,7 @@ static func test_tc_kdat_11_release_config_bundle_and_direct_reader_fallbacks() 
 	var sample_tables := {
 		"domains.combat.mechanics": {"crit_cap": 0.75, "tag": "kdat_release_smoke"},
 		"infrastructure.resource_catalog": {"critical_boot_tables": ["domains.combat.mechanics"], "custom_entries": []},
-		"infrastructure.domains": {"domains": [{"id": "combat", "config": "domains.combat.mechanics"}]},
+		"infrastructure.domains": {"domains": [ {"id": "combat", "config": "domains.combat.mechanics"}]},
 		"infrastructure.contracts": {"$schema_version": 1, "infra_domains": [], "entries": []},
 		"i18n.zh_CN": {"test.bundle.hello": "来自单包"},
 		"i18n.en_US": {"test.bundle.hello": "From Bundle"},

@@ -229,28 +229,28 @@ static func test_tc_arp_05_legacy_salt_rehash_atomic_persistence() -> Dictionary
 
 	var save_res: Dictionary = repo.save_account(legacy_acc)
 	if not bool(save_res.get("success", false)):
-		return TestCase.make_result("TC-ARP-05: 历史空盐重铸在持久化仓储中的原子更新", false, {"reason": "legacy account save failed"})
+		return TestCase.make_result("TC-ARP-05: 单轨加盐体系对未加盐旧凭据Fail-Closed拦截", false, {"reason": "account save failed"})
 
 	var auth_res: Dictionary = AuthService.authenticate_local(legacy_uname, legacy_pass, legacy_acc)
-	if not bool(auth_res.get("success", false)) or not bool(auth_res.get("rehashed", false)):
-		return TestCase.make_result("TC-ARP-05: 历史空盐重铸在持久化仓储中的原子更新", false, {"reason": "rehash authenticate failed"})
+	if bool(auth_res.get("success", true)):
+		return TestCase.make_result("TC-ARP-05: 单轨加盐体系对未加盐旧凭据Fail-Closed拦截", false, {"reason": "unsalted account must be rejected"})
 
-	if legacy_acc.salt_version != 1 or legacy_acc.password_hash_sha256 != AuthService.hash_password(legacy_pass):
-		return TestCase.make_result("TC-ARP-05: 历史空盐重铸在持久化仓储中的原子更新", false, {"reason": "in-memory salt version not upgraded"})
+	if legacy_acc.salt_version != 0:
+		return TestCase.make_result("TC-ARP-05: 单轨加盐体系对未加盐旧凭据Fail-Closed拦截", false, {"reason": "rejected account must not mutate salt_version"})
 
-	# 冷启动验证磁盘数据已被原子同步更新
+	# 冷启动验证磁盘数据未被隐式迁移或篡改
 	AccountRepository.reset_for_tests()
 	var fresh_repo := AccountRepository.get_instance()
 	fresh_repo.load_all()
 
 	var disk_acc := fresh_repo.find_by_id(legacy_id)
 	if disk_acc == null:
-		return TestCase.make_result("TC-ARP-05: 历史空盐重铸在持久化仓储中的原子更新", false, {"reason": "legacy account missing after cold boot"})
+		return TestCase.make_result("TC-ARP-05: 单轨加盐体系对未加盐旧凭据Fail-Closed拦截", false, {"reason": "account missing after cold boot"})
 
-	if disk_acc.salt_version != 1 or disk_acc.password_hash_sha256 != AuthService.hash_password(legacy_pass):
-		return TestCase.make_result("TC-ARP-05: 历史空盐重铸在持久化仓储中的原子更新", false, {"reason": "disk salt version not upgraded"})
+	if disk_acc.salt_version != 0 or disk_acc.password_hash_sha256 != legacy_pass.sha256_text():
+		return TestCase.make_result("TC-ARP-05: 单轨加盐体系对未加盐旧凭据Fail-Closed拦截", false, {"reason": "disk credential unexpectedly mutated"})
 
-	return TestCase.make_result("TC-ARP-05: 历史空盐重铸在持久化仓储中的原子更新", true)
+	return TestCase.make_result("TC-ARP-05: 单轨加盐体系对未加盐旧凭据Fail-Closed拦截", true)
 
 ## TC-ARP-06: 账号删除与索引清理
 static func test_tc_arp_06_account_deletion_and_index_cleanup() -> Dictionary:
