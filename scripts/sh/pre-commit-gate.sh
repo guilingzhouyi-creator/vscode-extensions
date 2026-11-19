@@ -302,51 +302,25 @@ if echo "$STAGED_FILES" | grep -qE '^workspace-timing/(CHANGELOG\.md|README\.md|
 fi
 
 if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
-    if [[ "$AGENT_MODE" -eq 0 ]]; then
-        write_step_banner "ENGINE-COMPILE-07"
-    fi
+    write_step_banner "ENGINE-COMPILE-07"
     if [[ -n "$TOUCHED_AR_CRATES" ]]; then
-        # Crate sources: check the Rust workspace, since `tsc` cannot see them at all.
-        if [[ "$AGENT_MODE" -eq 1 ]]; then
-            if ! (cd auto-refactor/crates && cargo check --workspace --all-targets) >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "ENGINE-COMPILE-07" \
-                    "L0-COMPILE" \
-                    "Rust crate compilation failed in auto-refactor." \
-                    "Run 'cargo check --workspace --all-targets' in auto-refactor/crates and resolve errors." \
-                    "cargo check --workspace --all-targets" \
-                    "auto-refactor/crates"
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-                exit 1
-            fi
+        if (cd auto-refactor/crates && cargo check --workspace --all-targets) >"$STEP_LOG" 2>&1; then
             write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor Rust 增量编译通过"
         else
-            if ! (cd auto-refactor/crates && cargo check --workspace --all-targets) >"$STEP_LOG" 2>&1; then
-                write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor Rust 编译失败"
-                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-                FAILED=1
-            else
-                write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor Rust 增量编译通过"
-            fi
+            fail_pre_commit_step "ENGINE-COMPILE-07" "L0-COMPILE" \
+                "Rust crate compilation failed in auto-refactor." \
+                "Run 'cargo check --workspace --all-targets' in auto-refactor/crates and resolve errors." \
+                "cargo check --workspace --all-targets" "auto-refactor/crates" || true
+            write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor Rust 编译失败"
         fi
-    elif [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "ENGINE-COMPILE-07" \
-                "L0-COMPILE" \
-                "TypeScript compilation failed in auto-refactor." \
-                "Run 'npm run build' in auto-refactor and resolve compiler errors." \
-                "npm --prefix auto-refactor run build" \
-                "auto-refactor/src"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+    elif run_pre_commit_check "ENGINE-COMPILE-07" "L0-COMPILE" "$ROOT_DIR/auto-refactor" \
+        "TypeScript compilation failed in auto-refactor." \
+        "Run 'npm run build' in auto-refactor and resolve compiler errors." \
+        "npm --prefix auto-refactor run build" "auto-refactor/src" \
+        "$NPM_BIN" run build; then
+        write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor 增量编译通过"
     else
-        if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
-            write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor 编译失败"
-            tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-            FAILED=1
-        else
-            write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor 增量编译通过"
-        fi
+        write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor 编译失败"
     fi
 
     if [[ "$FAILED" -eq 0 ]]; then
@@ -354,26 +328,15 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
         if [[ -n "$AR_STAGED_TS" ]]; then
             AR_REL_FILES=$(echo "$AR_STAGED_TS" | sed 's|^auto-refactor/||' | tr '\n' ' ')
             read -r -a AR_REL_ARGS <<< "$AR_REL_FILES"
-            if [[ "$AGENT_MODE" -eq 1 ]]; then
-                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run --passWithNoTests=false) >"$STEP_LOG" 2>&1; then
-                    record_pre_commit_failure "ENGINE-TESTS-08" \
-                        "GUARD-SYS-001" \
-                        "Impacted unit tests failed in auto-refactor." \
-                        "Run 'npx vitest related ... --run --passWithNoTests=false' in auto-refactor." \
-                        "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run --passWithNoTests=false" \
-                        "auto-refactor/src"
-                    cat "$ROOT_DIR/.audit-logs/last-failure.json"
-                    exit 1
-                fi
+            write_step_banner "ENGINE-TESTS-08"
+            if run_pre_commit_check "ENGINE-TESTS-08" "GUARD-SYS-001" "$ROOT_DIR/auto-refactor" \
+                "Impacted unit tests failed in auto-refactor." \
+                "Run 'npx vitest related ... --run --passWithNoTests=false' in auto-refactor." \
+                "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run --passWithNoTests=false" "auto-refactor/src" \
+                npx vitest related "${AR_REL_ARGS[@]}" --run --passWithNoTests=false; then
+                write_step_verdict "ENGINE-TESTS-08" PASS "增量影响单测通过"
             else
-                write_step_banner "ENGINE-TESTS-08"
-                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run --passWithNoTests=false) >"$STEP_LOG" 2>&1; then
-                    write_step_verdict "ENGINE-TESTS-08" BLOCK "auto-refactor 增量影响单测未通过"
-                    tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-                    FAILED=1
-                else
-                    write_step_verdict "ENGINE-TESTS-08" PASS "增量影响单测通过"
-                fi
+                write_step_verdict "ENGINE-TESTS-08" BLOCK "auto-refactor 增量影响单测未通过"
             fi
         fi
     fi
@@ -382,62 +345,36 @@ elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^auto-refactor
 fi
 
 if [[ -n "$TOUCHED_WG_AUDIT" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "DOMAIN-CONFIG-09" \
-                "ADV-CFG-001" \
-                "WebGames configuration architecture review failed." \
-                "Run 'python WebGames/scripts/py/audit_config.py --strict' to inspect config issues." \
-                "python WebGames/scripts/py/audit_config.py --strict" \
-                "WebGames/config"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
+    write_step_banner "DOMAIN-CONFIG-09"
+    if run_pre_commit_check "DOMAIN-CONFIG-09" "ADV-CFG-001" "$ROOT_DIR" \
+        "WebGames configuration architecture review failed." \
+        "Run 'python WebGames/scripts/py/audit_config.py --strict' to inspect config issues." \
+        "python WebGames/scripts/py/audit_config.py --strict" "WebGames/config" \
+        "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict; then
+        write_step_verdict "DOMAIN-CONFIG-09" PASS "WebGames 配置架构审查通过"
     else
-        write_step_banner "DOMAIN-CONFIG-09"
-        if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >"$STEP_LOG" 2>&1; then
-            write_step_verdict "DOMAIN-CONFIG-09" BLOCK "WebGames 配置架构审查未通过"
-            tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-            FAILED=1
-        else
-            write_step_verdict "DOMAIN-CONFIG-09" PASS "WebGames 配置架构审查通过"
-        fi
+        write_step_verdict "DOMAIN-CONFIG-09" BLOCK "WebGames 配置架构审查未通过"
     fi
 fi
 
 if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
-    if [[ "$AGENT_MODE" -eq 0 ]]; then
-        write_step_banner "RUST-COMPILE-10"
-    fi
+    write_step_banner "RUST-COMPILE-10"
     if [[ -n "$CARGO_BIN" ]]; then
-        if [[ "$AGENT_MODE" -eq 1 ]]; then
-            if ! "$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "RUST-COMPILE-10" \
-                    "L0-COMPILE" \
-                    "Cargo check compilation failed in fractal-git." \
-                    "Run 'cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." \
-                    "cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets" \
-                    "fractal-git/Cargo.toml"
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-                exit 1
-            fi
+        if run_pre_commit_check "RUST-COMPILE-10" "L0-COMPILE" "$ROOT_DIR" \
+            "Cargo check compilation failed in fractal-git." \
+            "Run 'cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." \
+            "cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets" "fractal-git/Cargo.toml" \
+            "$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets; then
+            write_step_verdict "RUST-COMPILE-10" PASS "增量编译与语法校验通过"
         else
-            if ! "$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
-                write_step_verdict "RUST-COMPILE-10" BLOCK "fractal-git 增量编译未通过"
-                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
-                FAILED=1
-            else
-                write_step_verdict "RUST-COMPILE-10" PASS "增量编译与语法校验通过"
-            fi
+            write_step_verdict "RUST-COMPILE-10" BLOCK "fractal-git 增量编译未通过"
         fi
     else
         if [[ "$AGENT_MODE" -eq 1 ]]; then
-            record_pre_commit_failure "RUST-COMPILE-10" \
-                "L0-COMPILE" \
+            record_pre_commit_failure "RUST-COMPILE-10" "L0-COMPILE" \
                 "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行。" \
                 "安装 Rust 工具链并确保 cargo 在 PATH 中，然后重新执行 bash scripts/sh/pre-commit-gate.sh --agent。" \
-                "cargo --version" \
-                "fractal-git/Cargo.toml" \
+                "cargo --version" "fractal-git/Cargo.toml" \
                 "Agent 模式下 cargo 缺失属于空门禁，与 push 阶段 RUST-TAXIS-19 一致 fail-closed。"
             cat "$ROOT_DIR/.audit-logs/last-failure.json"
             exit 1
