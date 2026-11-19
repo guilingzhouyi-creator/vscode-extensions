@@ -32,6 +32,7 @@ const { scan } = require('../dist/api');
 const { GoAdapter } = require('../dist/core/ast/go-adapter');
 const { NodeKind } = require('../dist/core/ast/multilang');
 const { adapterFor, hasAdapterFor } = require('../dist/core/ast/adapters');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 // ────────────────────────────────────────────────────────────────────────────
 // Fixtures
@@ -242,7 +243,7 @@ async function scanFixture(files, analyzers) {
     });
     return report.issues;
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

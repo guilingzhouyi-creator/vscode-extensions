@@ -22,6 +22,7 @@ const os = require('os');
 const path = require('path');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const ROOT = path.join(__dirname, '..');
 const RUNNER = path.join(ROOT, 'templates', 'consumer', 'run.mjs');
@@ -138,7 +139,7 @@ async function testBlockingAndReportOnly() {
     );
     console.log('  ✔ --report-only and --engine-arg behave as documented');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -169,7 +170,7 @@ async function testBaselineFreezeAndRatchet() {
     assert.strictEqual(regression.status, 1, 'a new violation must fail the ratchet');
     console.log('  ✔ a new violation breaks the ratchet');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -234,7 +235,7 @@ async function testConfigurationAndDegradation() {
     assert.strictEqual(noConfig.status, 2, 'missing config must exit 2');
     console.log('  ✔ missing config fails loudly');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

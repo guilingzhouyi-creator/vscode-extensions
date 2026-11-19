@@ -24,6 +24,7 @@ const path = require('path');
 const { scan } = require('../dist/api');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const LONG_BODY = Array.from({ length: 65 }, (_, i) => `    const value${i} = ${i};`);
 const MEDIUM_BODY = Array.from({ length: 45 }, (_, i) => `    const value${i} = ${i};`);
@@ -526,7 +527,7 @@ async function run() {
     );
     console.log('  ✔ maxFunctionLines threshold is honoured from config');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

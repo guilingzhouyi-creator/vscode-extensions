@@ -18,6 +18,7 @@ const path = require('path');
 const { scan } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 async function testRoleAwareDeduplication() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-role-dedup-'));
@@ -98,7 +99,7 @@ async function testRoleAwareDeduplication() {
     console.log('  ✔ Config schema property tokens are exempt from duplicate literal warnings');
     console.log('\nALL ROLE-AWARE DEDUPLICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

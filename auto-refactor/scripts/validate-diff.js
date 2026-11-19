@@ -27,6 +27,7 @@ const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
 const { computeEditRanges } = require('../dist/core/diff/edit-diff');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.diff-corpus');
@@ -181,7 +182,7 @@ function normalize(scanReport) {
  */
 function removeDirectoryWithRetry(targetPath) {
   try {
-    fs.rmSync(targetPath, { recursive: true, force: true });
+    rmSyncWithRetry(targetPath, { recursive: true, force: true });
   } catch {
     // best-effort: attempt fallback rename if deletion fails due to transient Windows lock
     try {

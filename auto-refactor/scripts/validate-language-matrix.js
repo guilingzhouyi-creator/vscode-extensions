@@ -33,6 +33,7 @@ const { unsupportedLanguageDiagnostic } = require('../dist/core/ast/language-sup
 const { DEFAULT_EXT } = require('../dist/core/file-discovery');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /**
  * Language-agnostic probe: a marker every content-oriented analyzer can see, whatever
@@ -132,7 +133,7 @@ const MATRIX = [
  * @returns Report from the public scanning entry point.
  */
 async function scanRow(root, row, declarePack) {
-  fs.rmSync(root, { recursive: true, force: true });
+  rmSyncWithRetry(root, { recursive: true, force: true });
   fs.mkdirSync(root, { recursive: true });
   const absolute = path.join(root, row.file);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
@@ -228,7 +229,7 @@ async function main() {
     console.log('\n  Language coverage matrix:');
     for (const line of summary) console.log(`    ${line}`);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

@@ -37,6 +37,7 @@ const {
 const { evaluateAntiGamingConjunction } = require('../dist/core/scoring/antiGaming');
 const { evaluateProjectAutonomy } = require('../dist/core/scoring/autonomy-scorer');
 const { ALL_QUALITY_DIMENSIONS } = require('../dist/core/scoring/scoringTypes');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** Build a deduction record where only the named dimension carries points. */
 function deductionsOf(points) {
@@ -300,7 +301,7 @@ function testOriginalityDensityScaling() {
 
     console.log('   ✓ Density-based originality and literal decoupling verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -361,7 +362,7 @@ function testAggregationNonCompensatory() {
     );
     console.log('   ✓ Non-compensatory aggregation verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 

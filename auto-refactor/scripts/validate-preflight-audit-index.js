@@ -42,6 +42,7 @@ const {
   executePreflightPlan,
   finalizeAuditSession,
 } = require('../dist/core/preflight');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 function createIsolatedWorkspace(prefix) {
   const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -50,7 +51,7 @@ function createIsolatedWorkspace(prefix) {
 
 function removeDir(dirPath) {
   try {
-    fs.rmSync(dirPath, { recursive: true, force: true });
+    rmSyncWithRetry(dirPath, { recursive: true, force: true });
   } catch {
     // ignore
   }

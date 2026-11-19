@@ -17,6 +17,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { runValidationSuite, reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 function assertProbeOutput(seen, probe) {
   assert.strictEqual(
@@ -75,7 +76,7 @@ function verifyExitProbes() {
       ].join('\n'),
     );
     const outcome = spawnSync(process.execPath, [probePath], { encoding: 'utf8' });
-    fs.rmSync(probePath, { force: true });
+    rmSyncWithRetry(probePath, { recursive: false, force: true });
     assert.strictEqual(outcome.status, 1, `${probe.name} must exit 1 on failure`);
     const seen = `${outcome.stdout}${outcome.stderr}`;
     assertProbeOutput(seen, probe);

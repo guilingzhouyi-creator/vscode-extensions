@@ -26,6 +26,7 @@ const os = require('os');
 
 const { scan } = require('../dist/api');
 const { GovernanceAnalyzer } = require('../dist/analyzers/governance');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 console.log('=== [1/3] Testing Compression Bounds Fixtures (100% Hit Rate) ===');
 
@@ -351,6 +352,6 @@ const NEGATIVE_FIXTURES = {
 
     console.log('\nALL COMPRESSION BOUNDS & UNCERTAINTY MODEL CHECKS PASSED.');
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    rmSyncWithRetry(tempRoot, { recursive: true, force: true });
   }
 })();

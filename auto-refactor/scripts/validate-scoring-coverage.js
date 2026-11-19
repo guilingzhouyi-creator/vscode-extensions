@@ -30,6 +30,7 @@ const {
 const { dimensionDeductionSources } = require('../dist/core/scoring/dimensionDeductions.js');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** All built-in analyzers, so the control scan leaves no dimension unmeasured. */
 const ALL_ANALYZERS = {
@@ -451,9 +452,9 @@ function checkCoverageModel() {
     await checkDeductionTable(rootC);
     checkCoverageModel();
   } finally {
-    fs.rmSync(rootA, { recursive: true, force: true });
-    fs.rmSync(rootB, { recursive: true, force: true });
-    fs.rmSync(rootC, { recursive: true, force: true });
+    rmSyncWithRetry(rootA, { recursive: true, force: true });
+    rmSyncWithRetry(rootB, { recursive: true, force: true });
+    rmSyncWithRetry(rootC, { recursive: true, force: true });
   }
 
   console.log('\n ALL SCORING COVERAGE CHECKS PASSED SUCCESSFULLY!\n');

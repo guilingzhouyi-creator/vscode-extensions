@@ -29,6 +29,7 @@ const {
   generateGateScaffold,
 } = require('../dist/core/governance');
 const { GateArchitectureAnalyzer } = require('../dist/analyzers/gate-architecture');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `gate-test-${prefix}-`));
@@ -36,7 +37,7 @@ function createTempDir(prefix) {
 
 function cleanTempDir(targetDir) {
   try {
-    fs.rmSync(targetDir, { recursive: true, force: true });
+    rmSyncWithRetry(targetDir, { recursive: true, force: true });
   } catch {
     // best-effort: test fixture cleanup
   }

@@ -26,6 +26,7 @@ const path = require('path');
 const { scan, scanAndRender } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** Config shared by both fixtures; only the suppression list differs between them. */
 const BASE_CONFIG = {
@@ -136,8 +137,8 @@ async function main() {
     );
     console.log('  ✔ the control tree still fails, so the suppression is what decides it');
   } finally {
-    fs.rmSync(suppressRoot, { recursive: true, force: true });
-    fs.rmSync(controlRoot, { recursive: true, force: true });
+    rmSyncWithRetry(suppressRoot, { recursive: true, force: true });
+    rmSyncWithRetry(controlRoot, { recursive: true, force: true });
   }
 }
 

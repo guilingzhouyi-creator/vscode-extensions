@@ -29,6 +29,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.corpus');
@@ -349,7 +350,7 @@ function normalizeReport(report) {
 
 function removeDirectoryWithRetry(targetPath) {
   try {
-    fs.rmSync(targetPath, { recursive: true, force: true });
+    rmSyncWithRetry(targetPath, { recursive: true, force: true });
   } catch {
     try {
       fs.renameSync(

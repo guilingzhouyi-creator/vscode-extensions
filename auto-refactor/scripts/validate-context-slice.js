@@ -28,6 +28,7 @@ const { buildContextSlice } = require('../dist/core/intelligence/contextSlice.js
 const { queryContextSlice } = require('../dist/api.js');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** Fixture: entry -> alpha -> beta -> gamma, one cross-file hop each. */
 const FIXTURE = {
@@ -166,7 +167,7 @@ async function scanAndSlice(root) {
       `  ✔ real scan slice: ${real.regions.length} regions, ${real.dependencies.length} dependencies, ${real.impacts.length} impacts`,
     );
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 
   console.log('\n ALL CONTEXT SLICE CHECKS PASSED SUCCESSFULLY!\n');

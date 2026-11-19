@@ -33,6 +33,7 @@ const { EXTENSION_ADAPTER_IDS } = require('../dist/core/ast/adapters');
 const { DataAdapter } = require('../dist/core/ast/data-adapter');
 const { NodeKind } = require('../dist/core/ast/multilang');
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const RULE_UNSUPPORTED = 'LANG-UNSUPPORTED';
 
@@ -126,7 +127,7 @@ async function checkDiscoveryWithoutFailOpen() {
     );
     console.log('  ✔ a YAML file is discovered and carries no unsupported-language diagnostic');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -150,7 +151,7 @@ async function checkTextRulesStillReadIt() {
     );
     console.log('  ✔ text-oriented rules still read the raw YAML lines');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -168,8 +169,8 @@ async function checkBothExtensionsBehaveIdentically() {
     );
     console.log('  ✔ .yml and .yaml produce identical results');
   } finally {
-    fs.rmSync(ymlRoot, { recursive: true, force: true });
-    fs.rmSync(yamlRoot, { recursive: true, force: true });
+    rmSyncWithRetry(ymlRoot, { recursive: true, force: true });
+    rmSyncWithRetry(yamlRoot, { recursive: true, force: true });
   }
 }
 

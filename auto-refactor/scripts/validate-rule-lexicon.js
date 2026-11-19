@@ -30,6 +30,7 @@ const path = require('path');
 
 const { findUnregisteredRuleDrift } = require('../dist/core/governance/rule-catalog-ssot');
 const { resetRuleLexiconCache, loadRuleLexicon } = require('../dist/core/governance/rule-lexicon');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const LEXICON_FILE = path.resolve(__dirname, '../../scripts/common/rule-lexicon.json');
 
@@ -249,7 +250,7 @@ function checkDegradationWhenLexiconAbsent() {
   } finally {
     if (previous === undefined) delete process.env.AUTO_REFACTOR_RULE_LEXICON;
     else process.env.AUTO_REFACTOR_RULE_LEXICON = previous;
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
     resetRuleLexiconCache();
   }
 }
@@ -277,7 +278,7 @@ function checkMalformedLexiconDegrades() {
   } finally {
     if (previous === undefined) delete process.env.AUTO_REFACTOR_RULE_LEXICON;
     else process.env.AUTO_REFACTOR_RULE_LEXICON = previous;
-    fs.rmSync(incomplete, { recursive: true, force: true });
+    rmSyncWithRetry(incomplete, { recursive: true, force: true });
     resetRuleLexiconCache();
   }
 }

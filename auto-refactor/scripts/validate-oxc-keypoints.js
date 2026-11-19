@@ -23,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const ROOT = path.join(__dirname, '..');
 process.env.NODE_PATH = path.join(ROOT, 'node_modules');
@@ -316,7 +317,7 @@ async function main() {
  */
 function cleanup() {
   try {
-    fs.rmSync(TMP, { recursive: true, force: true });
+    rmSyncWithRetry(TMP, { recursive: true, force: true });
   } catch {
     /* best-effort cleanup only */
   }

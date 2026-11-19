@@ -20,6 +20,7 @@ const path = require('path');
 const { scan } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 // Shield keyword to prevent comment analyzer from misinterpreting fixture code as public API
 const EXP = 'export';
@@ -215,7 +216,7 @@ ${EXP} let mutableGlobalOrders: any[] = []; // ARCH-GLB-001 (mutable global stat
     console.log('======================================================\n');
   } finally {
     try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      rmSyncWithRetry(tmpDir, { recursive: true, force: true });
     } catch (_cleanupErr) {
       // best-effort cleanup of test fixture directory
     }

@@ -25,6 +25,7 @@ const { toStructuredAgentDirectives } = require('../dist/core/reporters/agent-re
 const { formatCompactAgentPrompt } = require('../dist/core/guidance/agentConstraintGenerator');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 async function run() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-std-clarify-'));
@@ -216,7 +217,7 @@ async function run() {
 
     console.log('\n🎉 ALL NAMING STANDARDIZATION & CLARIFICATION DIRECTIVES TESTS PASSED!');
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    rmSyncWithRetry(tmpDir, { recursive: true, force: true });
   }
 }
 

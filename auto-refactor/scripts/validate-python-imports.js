@@ -27,6 +27,7 @@ const { scanAndRender } = require('../dist/api');
 const { ModuleDependencyGraph, runCyclePass } = require('../dist/core/dependency-graph');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /**
  * Write a set of fixture files into a directory tree.
@@ -196,7 +197,7 @@ async function main() {
     );
     console.log('  ✔ unused-export detection remains TS/JS-only (documented boundary)');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

@@ -29,6 +29,7 @@ const { runEntry } = require('./common/test-runner-harness');
 const { StdlibAnalyzer } = require('../dist/analyzers/stdlib');
 const { detectProjectProfile } = require('../dist/core/profiler/projectProfiler');
 const { evaluateProjectAutonomy } = require('../dist/core/scoring/autonomy-scorer');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 async function testStdlibArchetypeProfiling() {
   console.log('1. Testing stdlib & systems_runtime archetype profiling...');
@@ -55,7 +56,7 @@ async function testStdlibArchetypeProfiling() {
 
     console.log(`   ✓ Archetype correctly detected as: ${profile.archetype}`);
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -244,7 +245,7 @@ async function testStdlibAutonomyQuantification() {
       `   ✓ Stdlib autonomy quantified: ${result.compositeAutonomyIndex}% (${result.grade})`,
     );
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 

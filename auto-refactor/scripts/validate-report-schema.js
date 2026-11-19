@@ -25,6 +25,7 @@ const path = require('path');
 const Ajv = require('ajv');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const ROOT = path.join(__dirname, '..');
 const SCHEMA_PATH = path.join(ROOT, 'report.schema.json');
@@ -136,7 +137,7 @@ async function run() {
     };
     assertValid(validate, unmeasured, 'unmeasured quality score');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    rmSyncWithRetry(dir, { recursive: true, force: true });
   }
 
   console.log('\nALL REPORT SCHEMA CHECKS PASSED SUCCESSFULLY!');

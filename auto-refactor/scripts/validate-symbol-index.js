@@ -25,6 +25,7 @@ const path = require('path');
 const { scan, querySymbols } = require('../dist/api');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** TypeScript fixture: `helper.ts` defines, `main.ts` calls it across the file boundary. */
 const TS_FILES = {
@@ -192,7 +193,7 @@ async function main() {
         `  ✔ default (projection) path feeds the index (${projectedIndex.definitions} defs)`,
       );
     } finally {
-      fs.rmSync(projectionRoot, { recursive: true, force: true });
+      rmSyncWithRetry(projectionRoot, { recursive: true, force: true });
     }
 
     // ── 3c. B2b lock: top-level call sites outside functions must be collected in projection
@@ -218,7 +219,7 @@ async function main() {
       );
       console.log('  ✔ projection path collects top-level call references (B2b lock)');
     } finally {
-      fs.rmSync(topLevelCallRoot, { recursive: true, force: true });
+      rmSyncWithRetry(topLevelCallRoot, { recursive: true, force: true });
     }
 
     const oxcReport = await scanFixture(tsRoot, TS_FILES, { parser: 'oxc' });
@@ -264,8 +265,8 @@ async function main() {
     );
     console.log('  ✔ published index counters describe the scanned fixture');
   } finally {
-    fs.rmSync(tsRoot, { recursive: true, force: true });
-    fs.rmSync(pyRoot, { recursive: true, force: true });
+    rmSyncWithRetry(tsRoot, { recursive: true, force: true });
+    rmSyncWithRetry(pyRoot, { recursive: true, force: true });
   }
 }
 

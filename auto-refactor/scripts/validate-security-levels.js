@@ -35,12 +35,13 @@ const { resolveConfig } = require('../dist/core/config/config');
 const { QualityScorer } = require('../dist/core/scoring/qualityScorer');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const TEST_DIR = path.join(__dirname, '../.test_security_workspace');
 
 function setupWorkspace() {
   if (fs.existsSync(TEST_DIR)) {
-    fs.rmSync(TEST_DIR, { recursive: true, force: true });
+    rmSyncWithRetry(TEST_DIR, { recursive: true, force: true });
   }
   fs.mkdirSync(TEST_DIR, { recursive: true });
 
@@ -153,7 +154,7 @@ export class GameDice {
 
 function cleanupWorkspace() {
   if (fs.existsSync(TEST_DIR)) {
-    fs.rmSync(TEST_DIR, { recursive: true, force: true });
+    rmSyncWithRetry(TEST_DIR, { recursive: true, force: true });
   }
 }
 

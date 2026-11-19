@@ -26,6 +26,7 @@ const { CallGraph } = require('../dist/core/intelligence/callGraph.js');
 const { scan } = require('../dist/api.js');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js');
 
@@ -201,8 +202,8 @@ const SYNTHETIC = {
         `${materializedStats.crossFileEdges} cross-file)`,
     );
   } finally {
-    fs.rmSync(materializedRoot, { recursive: true, force: true });
-    fs.rmSync(projectedRoot, { recursive: true, force: true });
+    rmSyncWithRetry(materializedRoot, { recursive: true, force: true });
+    rmSyncWithRetry(projectedRoot, { recursive: true, force: true });
   }
 
   console.log('\n ALL CALL GRAPH CHECKS PASSED SUCCESSFULLY!\n');

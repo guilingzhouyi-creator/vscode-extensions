@@ -22,6 +22,7 @@ const { runSelfAudit, BASELINE_OUTPUT, BASELINE_AAS_OUTPUT } = require('./run-se
 const { evaluateElasticDebtBudget } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const EXPECTED_PILLARS = [
   'architecture',
@@ -409,7 +410,7 @@ async function main() {
     console.log('================================================================');
   } finally {
     if (tempDir && tempDir.includes('self-audit-test-')) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      rmSyncWithRetry(tempDir, { recursive: true, force: true });
     }
   }
 }

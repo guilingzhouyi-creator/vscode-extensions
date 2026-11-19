@@ -28,6 +28,7 @@ const { scan } = require('../dist/api');
 const { classifyLiteral } = require('../dist/core/governance/semanticLiterals');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /**
  * Fixture source: two literals repeated three times each inside a function body, which is the
@@ -194,7 +195,7 @@ async function main() {
     );
     console.log('  ✔ escape spellings and docstring fences classify as benign delimiters');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

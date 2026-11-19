@@ -31,6 +31,7 @@ const {
 } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 async function main() {
   console.log('=== [1/5] Testing PersistentReviewFactStore 72h Sliding Window & Pruning ===');
@@ -93,7 +94,7 @@ async function main() {
 
   // Cleanup temp dir
   try {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   } catch {
     // Ignore cleanup error
   }

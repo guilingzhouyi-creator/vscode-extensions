@@ -24,6 +24,7 @@ const path = require('path');
 const { scan } = require('../dist/api');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -404,7 +405,7 @@ async function run() {
       console.log('  ✔ severity=warning, message format includes outer line reference');
     }
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

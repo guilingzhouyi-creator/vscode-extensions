@@ -36,6 +36,7 @@ const { DataAdapter } = require('../dist/core/ast/data-adapter');
 const { ShellAdapter } = require('../dist/core/ast/shell-adapter');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const RULE = 'LANG-UNSUPPORTED';
 
@@ -329,7 +330,7 @@ async function run() {
     );
     console.log('  ✔ disabled analyzers are reported, never silently skipped');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

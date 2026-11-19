@@ -16,12 +16,13 @@ const path = require('path');
 const { TrajectoryAccumulator, readLifetimeSummary, readRecentRecords } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const TEST_LEDGER_DIR = path.join(__dirname, '..', 'tmp', 'test-trajectory-accumulator');
 
 async function cleanTestDir() {
   if (fs.existsSync(TEST_LEDGER_DIR)) {
-    fs.rmSync(TEST_LEDGER_DIR, { recursive: true, force: true });
+    rmSyncWithRetry(TEST_LEDGER_DIR, { recursive: true, force: true });
   }
 }
 

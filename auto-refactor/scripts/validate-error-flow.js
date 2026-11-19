@@ -24,6 +24,7 @@ const path = require('path');
 const { scan } = require('../dist/api.js');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js');
 
@@ -133,8 +134,8 @@ function errorFindings(report) {
     assert.strictEqual(offFindings.length, 0, 'the pass must stay opt-in');
     console.log('  ✔ the error-propagation pass stays opt-in');
   } finally {
-    fs.rmSync(enabledRoot, { recursive: true, force: true });
-    fs.rmSync(disabledRoot, { recursive: true, force: true });
+    rmSyncWithRetry(enabledRoot, { recursive: true, force: true });
+    rmSyncWithRetry(disabledRoot, { recursive: true, force: true });
   }
 
   console.log('\n ALL ERROR FLOW CHECKS PASSED SUCCESSFULLY!\n');

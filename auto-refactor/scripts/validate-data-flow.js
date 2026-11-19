@@ -34,6 +34,7 @@ const {
   computeIncrementalMetrics,
   countDuplicateLines,
 } = require('../dist/api');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** Test 1: Full 7-stage DataFlowGraph lifecycle construction and pipeline traversal. */
 function testDataFlowGraphLifecycle() {
@@ -460,7 +461,7 @@ function testConsumerRunnerCouplingGate() {
 
     console.log('  ✔ Consumer runner --coupling-gate CLI contract verified');
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    rmSyncWithRetry(tmpDir, { recursive: true, force: true });
   }
 }
 

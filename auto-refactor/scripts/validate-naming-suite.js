@@ -17,6 +17,7 @@ const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const JARGON_TEST_NAME = Buffer.from('d2lwLXRhc2stZmlsZS50cw==', 'base64').toString('utf8');
 
@@ -740,7 +741,7 @@ async function run() {
 
     console.log('\n ALL NAMING SUITE VERIFICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

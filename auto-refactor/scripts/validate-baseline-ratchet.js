@@ -33,6 +33,7 @@ const {
   normalizeGroupsForRename,
   RULE_GOV_RTC_002,
 } = require('../dist/core/reporting/baseline-ratchet');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /** Issue id the constants analyzer emits for the first magic number of the fixture line. */
 const MAGIC_ID = 'constants:magic-number:src/a.ts:1';
@@ -349,8 +350,8 @@ async function main() {
     checkRenamePathShiftNormalization();
     console.log('  ✔ ratchet credits cover multiplicity, escalation and legacy payloads');
   } finally {
-    fs.rmSync(smallRoot, { recursive: true, force: true });
-    fs.rmSync(bigRoot, { recursive: true, force: true });
+    rmSyncWithRetry(smallRoot, { recursive: true, force: true });
+    rmSyncWithRetry(bigRoot, { recursive: true, force: true });
   }
 }
 

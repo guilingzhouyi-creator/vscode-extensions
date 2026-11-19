@@ -22,6 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const ROOT = path.resolve(__dirname, '..');
 const HOOK = path.join(__dirname, 'lib', 'read-audit-hook.cjs');
@@ -70,7 +71,7 @@ function runAuditedScan() {
   }
   assert.ok(fs.existsSync(auditOut), 'read hook did not produce an audit file');
   const rows = JSON.parse(fs.readFileSync(auditOut, 'utf8'));
-  fs.rmSync(tempDir, { recursive: true, force: true });
+  rmSyncWithRetry(tempDir, { recursive: true, force: true });
   return rows;
 }
 

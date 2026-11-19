@@ -48,6 +48,7 @@ const {
 } = require('../dist/core/preflight/scope-normalizer');
 const { BUILTIN_FACTORIES } = require('../dist/core/analyzer-registry');
 const { evaluateCompositeGate } = require('../dist/core/praxis/composite-quality-gate');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `gate-enhancement-${prefix}-`));
@@ -55,7 +56,7 @@ function createTempDir(prefix) {
 
 function cleanTempDir(dir) {
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    rmSyncWithRetry(dir, { recursive: true, force: true });
   } catch {
     // best-effort cleanup
   }

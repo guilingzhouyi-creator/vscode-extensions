@@ -46,6 +46,7 @@ const {
 } = require('../dist/api');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 console.log('🧪 Running Comprehensive Review Memory & Quality System Validation...');
 
@@ -556,7 +557,7 @@ test('Review-memory discovery walks up to the scanned root cache', () => {
     assert.strictEqual(resolveReviewMemoryDir(root), expected);
     assert.strictEqual(resolveReviewMemoryDir(path.join(root, 'app')), expected);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root);
   }
 });
 
@@ -582,7 +583,7 @@ test('Review memory compacts its JSONL log instead of growing without bound', ()
     assert(lines <= 400, `log must stay inside its compaction budget, got ${lines} lines`);
     assert(manager.size() === 200, 'the in-memory store keeps one record per file');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    rmSyncWithRetry(dir);
   }
 });
 
@@ -609,7 +610,7 @@ test('Reloading a log keeps one record per file and the newest audit', () => {
       'the newest audit of a file must survive the reload',
     );
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    rmSyncWithRetry(dir);
   }
 });
 
@@ -643,7 +644,7 @@ test('The in-memory cap still evicts after reloading a log with duplicate audits
     assert(manager.size() === 1, 'the in-memory cap must hold after reload');
     assert(manager.get('src/c.ts'), 'the newest audit stays resident');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    rmSyncWithRetry(dir);
   }
 });
 
@@ -697,8 +698,8 @@ async function cacheDisabledLeavesNoLog() {
       'a default scan must still persist review memory',
     );
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-    fs.rmSync(childRoot, { recursive: true, force: true });
+    rmSyncWithRetry(root);
+    rmSyncWithRetry(childRoot);
   }
   total += 1;
   passed += 1;

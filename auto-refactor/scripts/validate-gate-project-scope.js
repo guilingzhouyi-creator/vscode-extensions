@@ -27,6 +27,7 @@ const path = require('path');
 const { detectRepoTopology } = require('../dist/core/governance/repo-archetype');
 const { auditGateArchitecture } = require('../dist/core/governance/gate-governance');
 const { ShellLintAnalyzer } = require('../dist/analyzers/shell-lint');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `gate-scope-${prefix}-`));
@@ -34,7 +35,7 @@ function createTempDir(prefix) {
 
 function cleanTempDir(dir) {
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    rmSyncWithRetry(dir, { recursive: true, force: true });
   } catch {
     // best-effort cleanup
   }

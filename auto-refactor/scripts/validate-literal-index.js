@@ -30,6 +30,7 @@ const {
 const { scan } = require('../dist/api.js');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js');
 
@@ -243,8 +244,8 @@ async function scanFixture(root, files, config) {
       `  ✔ clusters consumed into a review finding (${findings[0].detail.meanings.length} meanings, opt-in)`,
     );
   } finally {
-    fs.rmSync(materializedRoot, { recursive: true, force: true });
-    fs.rmSync(projectedRoot, { recursive: true, force: true });
+    rmSyncWithRetry(materializedRoot, { recursive: true, force: true });
+    rmSyncWithRetry(projectedRoot, { recursive: true, force: true });
   }
 
   console.log('\n ALL LITERAL INDEX CHECKS PASSED SUCCESSFULLY!\n');

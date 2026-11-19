@@ -23,6 +23,7 @@ const path = require('path');
 const { scan } = require('../dist/api');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /* =========================================================================
  * Shell fixtures
@@ -681,7 +682,7 @@ async function run() {
     console.log(`\n  Total test cases: ${testCases.length} (>= 15 required)`);
     assert.ok(testCases.length >= 15, 'At least 15 test cases must be covered');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

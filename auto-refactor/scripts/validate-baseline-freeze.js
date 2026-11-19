@@ -33,6 +33,7 @@ const {
 } = require('../dist/api');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /**
  * Policy floor for registered rules.
@@ -166,7 +167,7 @@ async function main() {
     );
     console.log('✔ Isolated freeze-and-reload roundtrip verified in temporary sandbox');
   } finally {
-    fs.rmSync(tempTestPath, { force: true });
+    rmSyncWithRetry(tempTestPath, { recursive: false, force: true });
   }
 
   // 6. Test tampered snapshot detection

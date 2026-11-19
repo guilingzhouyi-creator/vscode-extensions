@@ -11,7 +11,6 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const {
@@ -26,6 +25,7 @@ const {
 const { getIsoWeekId, compactLedger } = require('../dist/core/trajectory/trajectory-compactor');
 
 const { runEntry } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 async function runTests() {
   console.log('🧪 Running Compact Ledger & Trajectory Compaction Validation Suite...');
@@ -174,7 +174,7 @@ async function runTests() {
     console.log('\n🎉 ALL Phase 3 Compact Ledger & Compaction Tests PASSED!\n');
   } finally {
     try {
-      fs.rmSync(tempLedgerDir, { recursive: true, force: true });
+      rmSyncWithRetry(tempLedgerDir, { recursive: true, force: true });
     } catch {
       // Ignore
     }

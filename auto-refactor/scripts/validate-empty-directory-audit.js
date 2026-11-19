@@ -39,6 +39,7 @@ const {
   isEmptyDirectoryExempt,
   toIgnoredDirectoryName,
 } = require('../dist/core/intelligence/empty-directory-audit');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /**
  * Create a fresh temporary directory.
@@ -104,7 +105,7 @@ function verifyAuditDetectsEmptyDirectory() {
     assert.strictEqual(issues[0].location.file, 'src/abandoned', 'the path must be repo-relative');
     console.log('  ✔ a directory with no live entries is reported as HYG-DIR-001');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -131,7 +132,7 @@ function verifyIgnoredTreesStaySilent() {
     );
     console.log('  ✔ ignored trees are never reported, even when they hold no files');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -175,7 +176,7 @@ function verifyExemptionsAndTranslator() {
     );
     console.log('  ✔ exemptions hold and only bare directory names widen the ignore set');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -192,7 +193,7 @@ function verifyPopulatedTreeStaysSilent() {
     assert.deepStrictEqual(reportedPaths(root), [], 'a populated tree must stay silent');
     console.log('  ✔ a populated tree emits nothing from this rule');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -259,7 +260,7 @@ async function verifyPostScanChannel() {
     );
     console.log('  ✔ the rule is driven by the analyzer switch, not by the include globs');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 
@@ -313,7 +314,7 @@ async function verifyDisabledAnalyzerSkipsPass() {
     );
     console.log('  ✔ disabling the hygiene analyzer removes both the rule and the pass');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

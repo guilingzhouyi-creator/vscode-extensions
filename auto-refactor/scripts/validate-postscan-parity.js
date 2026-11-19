@@ -25,6 +25,7 @@ const path = require('path');
 const { scan, scanAndRender } = require('../dist/api');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 /**
  * Write a set of fixture files into a directory tree.
@@ -216,10 +217,10 @@ async function main() {
       );
       console.log('  ✔ matchFile accepts globs and stays scoped to the matched directory');
     } finally {
-      fs.rmSync(globRoot, { recursive: true, force: true });
+      rmSyncWithRetry(globRoot, { recursive: true, force: true });
     }
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    rmSyncWithRetry(root, { recursive: true, force: true });
   }
 }
 

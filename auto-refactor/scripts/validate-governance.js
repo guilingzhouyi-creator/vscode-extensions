@@ -27,6 +27,7 @@ const path = require('path');
 const os = require('os');
 
 const { reportFailure } = require('./common/test-runner-harness');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 const TMP_DIR = path.join(os.tmpdir(), `ar-gov-validate-${Date.now()}`);
 fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -504,7 +505,7 @@ function verifyAutoFixability(issues) {
  */
 function cleanupAndExit() {
   try {
-    fs.rmSync(TMP_DIR, { recursive: true, force: true });
+    rmSyncWithRetry(TMP_DIR, { recursive: true, force: true });
   } catch (_e) {
     /* Best-effort: a failed temp-dir cleanup must never mask the verification verdict. */
   }
@@ -618,7 +619,7 @@ function verifyModernGovernanceEnhancements(govIssues) {
 run()
   .finally(() => {
     try {
-      fs.rmSync(TMP_DIR, { recursive: true, force: true });
+      rmSyncWithRetry(TMP_DIR, { recursive: true, force: true });
     } catch {
       // best-effort cleanup
     }

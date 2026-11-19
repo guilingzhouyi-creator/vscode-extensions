@@ -37,6 +37,7 @@ const {
   calculatePolyglotGeneralizationIndex,
 } = require('../dist/core/scoring/modernization-formulas');
 const { scan } = require('../dist/api');
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 async function testProvenanceManifestDetection() {
   console.log('1. Testing dependency provenance manifest detection...');
@@ -99,7 +100,7 @@ async function testProvenanceManifestDetection() {
 
     console.log('   ✓ Manifest detection and classification verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -182,7 +183,7 @@ async function testAutonomyMathematicalModel() {
 
     console.log('   ✓ Six-dimensional mathematical evaluation verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -238,7 +239,7 @@ async function testSupplyChainAndCredibleIntervals() {
 
     console.log('   ✓ Supply chain penetration and Bayesian confidence verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -300,7 +301,7 @@ async function testFiveTierBoundaryHold() {
 
     console.log('   ✓ Tier classification grades verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -360,7 +361,7 @@ async function testEndToEndScanIntegration() {
 
     console.log('   ✓ End-to-end scan integration verified.');
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSyncWithRetry(tempDir, { recursive: true, force: true });
   }
 }
 
