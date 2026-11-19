@@ -9,25 +9,39 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   bash scripts/sh/commit-msg-gate.sh <commit-msg-file>
+#   bash scripts/sh/commit-msg-gate.sh <commit-msg-file> --json
+#   bash scripts/sh/commit-msg-gate.sh --help
 # ==============================================================================
 set -euo pipefail
 
-NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+# 步骤身份、环境隔离与工具探测由共享运行时库提供，禁止在各门禁内复制实现。
 GATE_ROOT_DIR="$ROOT_DIR"
-GATE_NODE_BIN="${NODE_BIN:-node}"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init_git_isolation "$ROOT_DIR"
+gate_resolve_runtime_bins
 
 IS_AGENT=0
+VIEW_LOG=0
 MSG_FILE=""
 
 for arg in "$@"; do
     case "$arg" in
-        --view-log|-v)
-            exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
+        --help|-h|-Help)
+            echo "用法: bash scripts/sh/commit-msg-gate.sh <commit-msg-file> [--agent] [--json] [--view-log] [--help]"
+            echo "选项:"
+            echo "  --agent, -a, -Agent      以 Agent-Native JSON 信封格式输出校验结果"
+            echo "  --json, -j, -Json        以 JSON 格式输出校验结果 (与 --agent 等价)"
+            echo "  --view-log, -v, -ViewLog 查看最近一次失败日志"
+            echo "  --help, -h, -Help        显示此帮助信息"
+            exit 0
             ;;
-        --agent|-a)
+        --view-log|-v|-ViewLog)
+            VIEW_LOG=1
+            ;;
+        --agent|-a|-Agent|--json|-j|-Json)
             IS_AGENT=1
             ;;
         *)
@@ -38,9 +52,33 @@ for arg in "$@"; do
     esac
 done
 
+if [[ -z "$NODE_BIN" ]]; then
+    if [[ "$IS_AGENT" -eq 1 ]]; then
+        cat <<EOF
+{
+  "protocolVersion": "1.0.0",
+  "status": "BLOCK",
+  "gate": "commit-msg",
+  "summary": "未检测到 Node.js 运行时，提交信息门禁无法执行。",
+  "violations": [{
+    "ruleId": "GUARD-SYS-001",
+    "severity": "BLOCK",
+    "message": "未检测到 Node.js 运行时",
+    "actionableFix": "安装 Node.js 20+ 并确保 node 在 PATH 中"
+  }]
+}
+EOF
+    else
+        echo "✖ BLOCK  未检测到 Node.js 运行时，提交信息门禁无法执行。" >&2
+    fi
+    exit 1
+fi
+
+if [[ "$VIEW_LOG" -eq 1 ]]; then
+    exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
+fi
+
 GATE_SUPPRESS="$IS_AGENT"
-# shellcheck source=scripts/sh/lib/gate-runtime.sh
-. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
 gate_init commit-msg
 
 if [[ -z "$MSG_FILE" ]]; then

@@ -102,7 +102,7 @@ gate_init() {
     return 0
 }
 
-# 输出 "序号<TAB>步骤标识<TAB>规则标识<TAB>标题"；未登记标识返回非零。
+# 输出 "序号<TAB>步骤标识<TAB>规则标识<TAB>标题<TAB>超时秒数"；未登记标识返回非零。
 get_step_meta() {
     local step_id="$1"
     gate_init || return 1
@@ -113,6 +113,19 @@ get_step_meta() {
         return 1
     fi
     printf '%s' "${row}"
+}
+
+get_step_timeout() {
+    local step_id="$1"
+    local default_sec="${2:-60}"
+    local row raw_timeout
+    row=$(get_step_meta "${step_id}") || return 1
+    raw_timeout=$(printf '%s\n' "${row}" | cut -f5)
+    if [[ "${raw_timeout}" =~ ^[0-9]+$ ]] && (( 10#${raw_timeout} > 0 )); then
+        printf '%s\n' "${raw_timeout}"
+    else
+        printf '%s\n' "${default_sec}"
+    fi
 }
 
 write_step_banner() {
@@ -271,4 +284,8 @@ wait_with_timeout() {
     done
     wait "${pid}" 2>/dev/null || return $?
     return 0
+}
+
+gate_write_failure_envelope() {
+    "${GATE_NODE_BIN}" "${GATE_ROOT_DIR}/scripts/common/gate-failure-contract.js" --write-envelope "$@"
 }

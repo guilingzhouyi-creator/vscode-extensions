@@ -11,26 +11,26 @@
 #   bash scripts/sh/audit-all.sh
 #   bash scripts/sh/audit-all.sh --fast
 #   bash scripts/sh/audit-all.sh --json
+#   bash scripts/sh/audit-all.sh --view-log
+#   bash scripts/sh/audit-all.sh --help
 # ==============================================================================
 set -euo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT_DIR" || exit 1
 
-export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-NUL}"
-export GIT_CONFIG_SYSTEM="${GIT_CONFIG_SYSTEM:-NUL}"
-export GIT_CONFIG_NOSYSTEM="${GIT_CONFIG_NOSYSTEM:-1}"
-export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
-
-NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
-NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
-PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
-CARGO_BIN=$(command -v cargo 2>/dev/null || command -v cargo.exe 2>/dev/null || echo "")
+# 步骤身份、环境隔离与工具探测由共享运行时库提供，禁止在本 Runner 内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init_git_isolation "$ROOT_DIR"
+gate_resolve_runtime_bins
 
 FAST_MODE=0
 JSON_MODE=0
 AGENT_MODE=0
 COMMIT_LEDGER=0
+VIEW_LOG=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -38,18 +38,34 @@ for arg in "$@"; do
         --json|-j|-Json) JSON_MODE=1 ;;
         --agent|-a|-Agent) AGENT_MODE=1 ;;
         --commit-ledger|-CommitLedger) COMMIT_LEDGER=1 ;;
+        --view-log|-v|-ViewLog) VIEW_LOG=1 ;;
         --help|-h|-Help)
             echo "用法: bash scripts/sh/audit-all.sh [选项]"
             echo "选项:"
-            echo "  --fast, -f, -Fast    快速审查模式 (跳过耗时深层自审)"
-            echo "  --json, -j, -Json    以 JSON 格式输出审查摘要"
-            echo "  --agent, -a, -Agent  以 Agent-Native JSON 信封格式输出审查结果"
-            echo "  --commit-ledger      将本次审查写入受控轨迹账本 (默认写入运行期目录)"
-            echo "  --help, -h, -Help    显示此帮助信息"
+            echo "  --fast, -f, -Fast          快速审查模式 (跳过耗时深层自审)"
+            echo "  --json, -j, -Json          以 JSON 格式输出审查摘要"
+            echo "  --agent, -a, -Agent        以 Agent-Native JSON 信封格式输出审查结果"
+            echo "  --commit-ledger            将本次审查写入受控轨迹账本 (默认写入运行期目录)"
+            echo "  --view-log, -v, -ViewLog   查看最近一次失败审查日志"
+            echo "  --help, -h, -Help          显示此帮助信息"
             exit 0
             ;;
     esac
 done
+
+if [[ -z "$NODE_BIN" ]]; then
+    echo "✖ BLOCK  未检测到 Node.js 运行时，全工作区审查无法执行。" >&2
+    exit 1
+fi
+
+if [[ "$VIEW_LOG" -eq 1 ]]; then
+    exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
+fi
+
+if [[ -z "$NPM_BIN" ]]; then
+    echo "✖ BLOCK  未检测到 npm 包管理器，全工作区审查无法执行。" >&2
+    exit 1
+fi
 
 if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then
     echo "================================================================="
@@ -60,12 +76,7 @@ fi
 FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
-# 步骤身份与四态判定由共享运行时库提供，禁止在本 Runner 内复制实现。
-GATE_ROOT_DIR="$ROOT_DIR"
-GATE_NODE_BIN="$NODE_BIN"
 GATE_SUPPRESS=$([[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]] && echo 1 || echo 0)
-# shellcheck source=scripts/sh/lib/gate-runtime.sh
-. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
 gate_init audit-all
 
 # 1. 物理卫生八维刚性公理与全域巡检

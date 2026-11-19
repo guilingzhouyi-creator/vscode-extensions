@@ -8,13 +8,17 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   pwsh -File scripts/ps1/commit-msg-gate.ps1 .git/COMMIT_EDITMSG
+#   pwsh -File scripts/ps1/commit-msg-gate.ps1 .git/COMMIT_EDITMSG -Json
+#   pwsh -File scripts/ps1/commit-msg-gate.ps1 -Help
 # ==============================================================================
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false, Position = 0)]
     [string]$MsgFile,
     [switch]$ViewLog,
-    [switch]$Agent
+    [switch]$Agent,
+    [switch]$Json,
+    [switch]$Help
 )
 Set-StrictMode -Version Latest
 
@@ -27,14 +31,47 @@ $PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+if ($Help) {
+    Write-Output "用法: pwsh -File scripts/ps1/commit-msg-gate.ps1 <commit-msg-file> [-Agent] [-Json] [-ViewLog] [-Help]"
+    Write-Output "选项:"
+    Write-Output "  -Agent    以 Agent-Native JSON 信封格式输出校验结果"
+    Write-Output "  -Json     以 JSON 格式输出校验结果 (与 -Agent 等价)"
+    Write-Output "  -ViewLog  查看最近一次失败日志"
+    Write-Output "  -Help     显示此帮助信息"
+    exit 0
+}
 
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$isMachineMode = [bool]($Agent -or $Json)
+
+# 步骤身份、环境隔离、工具探测与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
 $script:GateRepoRoot = $repoRoot
 $script:GateEntryId = 'commit-msg'
-$script:GateSuppressOutput = [bool]$Agent
+$script:GateSuppressOutput = $isMachineMode
 . (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
+Initialize-GateGitIsolation -RepoRoot $repoRoot
+
+$tools = Resolve-GateRuntimeTools
+$nodeCmd = $tools.Node
+if (-not $nodeCmd) {
+    if ($isMachineMode) {
+        Write-Output (@{
+            protocolVersion = "1.0.0"
+            status = "BLOCK"
+            gate = "commit-msg"
+            summary = "未检测到 Node.js 运行时，提交信息门禁无法执行。"
+            violations = @(@{
+                ruleId = "GUARD-SYS-001"
+                severity = "BLOCK"
+                message = "未检测到 Node.js 运行时"
+                actionableFix = "安装 Node.js 20+ 并确保 node 在 PATH 中"
+            })
+        } | ConvertTo-Json -Depth 5)
+    } else {
+        Write-Host "✖ BLOCK  未检测到 Node.js 运行时，提交信息门禁无法执行。" -ForegroundColor Red
+    }
+    exit 1
+}
 
 if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
@@ -42,7 +79,7 @@ if ($ViewLog) {
 }
 
 if (-not $MsgFile -or -not (Test-Path $MsgFile -PathType Leaf)) {
-    if ($Agent) {
+    if ($isMachineMode) {
         Write-Output (@{
             protocolVersion = "1.0.0"
             status = "BLOCK"
@@ -91,7 +128,7 @@ function Show-CommitTemplateGuide {
     Write-Host "-----------------------------------------------------------------" -ForegroundColor Gray
 }
 
-if (-not $Agent) {
+if (-not $isMachineMode) {
     Write-Host "=================================================================" -ForegroundColor Cyan
     Write-Host "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁 (PowerShell 版)" -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
@@ -116,7 +153,7 @@ if (Test-Path $mergeHeadPath -PathType Leaf) {
 }
 if ($isMergeCommit) {
     Write-StepVerdict -StepId "MERGE-STRUCTURE-10" -Status "PASS" -Detail "合并提交采用 Git 生成的结构性标题，文本契约由合并来源提交保证"
-    if ($Agent) {
+    if ($isMachineMode) {
         Write-Output (@{
             protocolVersion = "1.0.0"
             status = "PASS"
@@ -134,12 +171,10 @@ if ($isMergeCommit) {
 # --- 结构契约校验（单一实现：scripts/common/commit-structure-contract.js）---
 # 七项结构判定原先在本文件与 Bash 版本各写一份，任何修正都要写两遍、验两遍，而 Bash 那份已经漂移。
 # 现在只在这里调度一次 Node，两个平台看到的是同一套规则与同一个步骤归属。
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $resolvedMsgFile = (Resolve-Path $MsgFile).Path
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $structureScript = Join-Path $repoRoot "scripts/common/validate-commit-msg.js"
 
-if (-not $Agent) {
+if (-not $isMachineMode) {
     $previewLines = @(Get-Content $resolvedMsgFile -Encoding utf8 | Where-Object { $_ -notmatch '^\s*#' })
     if ($previewLines.Count -gt 0) {
         Write-Host "提交标题: $($previewLines[0].Trim())" -ForegroundColor Gray
@@ -163,17 +198,14 @@ if ($structureExit -ne 0) {
     } else {
         Write-Host $structureText -ForegroundColor Red
     }
-    if (-not $Agent) {
+    if (-not $isMachineMode) {
         Show-CommitTemplateGuide
     }
     exit $structureExit
 }
 
 # --- 规则标识反虚构与文本求真联合审查 ---
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$resolvedMsgFile = (Resolve-Path $MsgFile).Path
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-if ($Agent) {
+if ($isMachineMode) {
     $savedNativePref = $PSNativeCommandUseErrorActionPreference
     $PSNativeCommandUseErrorActionPreference = $false
     $outNode = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-commit-msg.js") $resolvedMsgFile --agent 2>&1

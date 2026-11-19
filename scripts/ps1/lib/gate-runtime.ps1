@@ -285,7 +285,15 @@ function Initialize-StepRegistry {
     $ordinal = 0
     foreach ($step in $entry.steps) {
         $ordinal++
-        $index[$step.id] = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title }
+        $timeoutProp = $step.PSObject.Properties['timeoutSeconds']
+        $timeoutVal = $null
+        if ($null -ne $timeoutProp -and $null -ne $timeoutProp.Value) {
+            $parsedTimeout = 0
+            if ([int]::TryParse([string]$timeoutProp.Value, [ref]$parsedTimeout) -and $parsedTimeout -gt 0) {
+                $timeoutVal = [int]$parsedTimeout
+            }
+        }
+        $index[$step.id] = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title; TimeoutSeconds = $timeoutVal }
     }
     $script:GateStepIndex[$EntryId] = $index
     $script:GateStepTotal[$EntryId] = $ordinal
@@ -311,6 +319,20 @@ function Get-StepTotal {
     param([string]$EntryId = $script:GateEntryId)
     Initialize-StepRegistry -EntryId $EntryId
     return $script:GateStepTotal[$EntryId]
+}
+
+function Get-GateStepTimeout {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [string]$EntryId = $script:GateEntryId,
+        [int]$DefaultSeconds = 60
+    )
+    $meta = Resolve-StepMeta -EntryId $EntryId -StepId $StepId
+    if ($null -ne $meta.TimeoutSeconds -and [int]$meta.TimeoutSeconds -gt 0) {
+        return [int]$meta.TimeoutSeconds
+    }
+    return [int]$DefaultSeconds
 }
 
 function Write-StepBanner {
@@ -565,5 +587,149 @@ function Complete-GateTelemetry {
         }
     } catch {
         # 遥测记录软失败，不阻断门禁主流程
+    }
+}
+
+<#
+.SYNOPSIS
+    Writes a standardized single-step Agent-Native failure envelope via gate-failure-contract.js.
+.DESCRIPTION
+    Delegates to `node scripts/common/gate-failure-contract.js --write-envelope` with native
+    error-action preference temporarily disabled so failure reporting never aborts the gate.
+    Falls back to minimal safe JSON serialization only when Node.js is unavailable or fails.
+#>
+function Write-GateFailureEnvelope {
+    [CmdletBinding()]
+    param(
+        [string]$Gate = $script:GateEntryId,
+        [string]$StepId = "",
+        [string]$StepTitle = "",
+        [string]$RuleId = "",
+        [int]$ExitCode = 1,
+        [string]$RunId = "",
+        [string]$Command = "",
+        [string]$Summary = "",
+        [string]$ActionableFix = "",
+        [string]$VerifyCmd = "",
+        [string]$FastRecheck = "",
+        [string[]]$TargetFiles = @(),
+        [string]$LogFile = "",
+        [string]$OutFile = "",
+        [switch]$PassThru
+    )
+
+    $isWin = $IsWindows -or ($env:OS -match "Windows")
+    $nodeTrustedRoots = if ($isWin) {
+        @(
+            $env:NODE_HOME,
+            $(if ($env:ProgramFiles) { Join-Path $env:ProgramFiles 'nodejs' }),
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'nodejs' }),
+            $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Programs\nodejs' })
+        ) | Where-Object { $_ }
+    } else {
+        @($env:NODE_HOME, '/usr/local/bin', '/usr/bin') | Where-Object { $_ }
+    }
+    $nodeCmd = Resolve-GateTrustedExecutable -Name 'node' -TrustedRoots $nodeTrustedRoots
+    $contractScript = if ($script:GateRepoRoot) {
+        Join-Path $script:GateRepoRoot "scripts/common/gate-failure-contract.js"
+    } else {
+        ""
+    }
+
+    if ($nodeCmd -and $contractScript -and (Test-Path -LiteralPath $contractScript -PathType Leaf)) {
+        $cliArgs = [System.Collections.Generic.List[string]]::new()
+        $cliArgs.Add($contractScript)
+        $cliArgs.Add('--write-envelope')
+        if ($Gate) { $cliArgs.Add('--gate'); $cliArgs.Add($Gate) }
+        if ($StepId) { $cliArgs.Add('--step-id'); $cliArgs.Add($StepId) }
+        if ($StepTitle) { $cliArgs.Add('--step-title'); $cliArgs.Add($StepTitle) }
+        if ($RuleId) { $cliArgs.Add('--rule-id'); $cliArgs.Add($RuleId) }
+        $cliArgs.Add('--exit-code'); $cliArgs.Add([string]$ExitCode)
+        if ($RunId) { $cliArgs.Add('--run-id'); $cliArgs.Add($RunId) }
+        if ($Command) { $cliArgs.Add('--command'); $cliArgs.Add($Command) }
+        if ($Summary) { $cliArgs.Add('--summary'); $cliArgs.Add($Summary) }
+        if ($ActionableFix) { $cliArgs.Add('--actionable-fix'); $cliArgs.Add($ActionableFix) }
+        if ($VerifyCmd) { $cliArgs.Add('--verify-cmd'); $cliArgs.Add($VerifyCmd) }
+        if ($FastRecheck) { $cliArgs.Add('--fast-recheck'); $cliArgs.Add($FastRecheck) }
+        foreach ($tf in @($TargetFiles)) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$tf)) {
+                $cliArgs.Add('--target-file')
+                $cliArgs.Add([string]$tf)
+            }
+        }
+        if ($LogFile) { $cliArgs.Add('--log-file'); $cliArgs.Add($LogFile) }
+        if ($OutFile) { $cliArgs.Add('--out'); $cliArgs.Add($OutFile) }
+        if ($PassThru) { $cliArgs.Add('--print') }
+
+        $savedNativePref = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+        try {
+            $rawOut = & $nodeCmd @cliArgs 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                if ($PassThru) {
+                    $rendered = ($rawOut -join "`n").Trim()
+                    if ($rendered) { return $rendered }
+                } else {
+                    return
+                }
+            }
+        } catch {
+            # Fall back to minimal JSON envelope below so failure reporting never aborts the gate.
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $savedNativePref
+        }
+    }
+
+    $resolvedSummary = if ($Summary) { $Summary } else { "Step $StepId failed with exit code $ExitCode" }
+    $resolvedRule = if ($RuleId) { $RuleId } else { "GUARD-SYS-001" }
+    $fallbackPayload = [ordered]@{
+        protocolVersion = "1.0.0"
+        runId = $RunId
+        recordedAt = [DateTimeOffset]::UtcNow.ToString("o")
+        status = "BLOCK"
+        gate = $Gate
+        step = $StepId
+        stepTitle = $StepTitle
+        stepId = $StepId
+        failedCommand = $Command
+        exitCode = $ExitCode
+        summary = $resolvedSummary
+        logFile = $LogFile
+        violations = @([ordered]@{
+            ruleId = $resolvedRule
+            severity = "BLOCK"
+            step = $StepId
+            message = $resolvedSummary
+            actionableFix = $ActionableFix
+        })
+        agentDirectives = [ordered]@{
+            targetFiles = @($TargetFiles)
+            remediationPriority = @($resolvedRule)
+            verificationCommand = $VerifyCmd
+            fastRecheckCommand = $FastRecheck
+        }
+    }
+    $fallbackJson = ($fallbackPayload | ConvertTo-Json -Depth 5)
+    $resolvedOutFile = if ($OutFile) {
+        $OutFile
+    } elseif ($script:GateRepoRoot) {
+        Join-Path $script:GateRepoRoot ".audit-logs/last-failure.json"
+    } else {
+        ""
+    }
+    if ($resolvedOutFile) {
+        try {
+            $outDir = Split-Path -Parent $resolvedOutFile
+            if ($outDir -and -not (Test-Path -LiteralPath $outDir)) {
+                [void](New-Item -ItemType Directory -Path $outDir -Force)
+            }
+            $normalizedJson = $fallbackJson.Replace("`r`n", "`n").TrimEnd("`n") + "`n"
+            [System.IO.File]::WriteAllText($resolvedOutFile, $normalizedJson, [System.Text.UTF8Encoding]::new($false))
+        } catch {
+            # Best-effort fallback persistence; never abort the caller gate.
+        }
+    }
+    if ($PassThru) {
+        return $fallbackJson
     }
 }

@@ -11,13 +11,17 @@
 #   pwsh -File scripts/ps1/audit-all.ps1 -Fast
 #   pwsh -File scripts/ps1/audit-all.ps1 -Json
 #   pwsh -File scripts/ps1/audit-all.ps1 -Agent
+#   pwsh -File scripts/ps1/audit-all.ps1 -ViewLog
+#   pwsh -File scripts/ps1/audit-all.ps1 -Help
 # ==============================================================================
 [CmdletBinding()]
 param(
     [switch]$Fast,
     [switch]$Json,
     [switch]$Agent,
-    [switch]$CommitLedger
+    [switch]$CommitLedger,
+    [switch]$ViewLog,
+    [switch]$Help
 )
 Set-StrictMode -Version Latest
 
@@ -30,23 +34,47 @@ $PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
+if ($Help) {
+    Write-Output "用法: pwsh -File scripts/ps1/audit-all.ps1 [-Fast] [-Json] [-Agent] [-CommitLedger] [-ViewLog] [-Help]"
+    Write-Output "选项:"
+    Write-Output "  -Fast          快速审查模式 (跳过耗时深层自审)"
+    Write-Output "  -Json          以 JSON 格式输出审查摘要"
+    Write-Output "  -Agent         以 Agent-Native JSON 信封格式输出审查结果"
+    Write-Output "  -CommitLedger  将本次审查写入受控轨迹账本 (默认写入运行期目录)"
+    Write-Output "  -ViewLog       查看最近一次失败审查日志"
+    Write-Output "  -Help          显示此帮助信息"
+    exit 0
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+# 步骤身份、环境隔离、工具探测与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
 $script:GateRepoRoot = $repoRoot
 $script:GateEntryId = 'audit-all'
 $script:GateSuppressOutput = ([bool]$Json -or [bool]$Agent)
 . (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
+Initialize-GateGitIsolation -RepoRoot $repoRoot
 
-if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
-if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
-if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
-if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
+$tools = Resolve-GateRuntimeTools
+$nodeCmd = $tools.Node
+$npmCmd = $tools.Npm
+$pythonCmd = $tools.Python
+$cargoCmd = $tools.Cargo
 
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
-$pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
-$cargoCmd = Resolve-GateCargoCommand
+if (-not $nodeCmd) {
+    Write-GateHost "✖ BLOCK  未检测到 Node.js 运行时，全工作区审查无法执行。" -ForegroundColor Red
+    exit 1
+}
+
+if ($ViewLog) {
+    & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
+    exit $LASTEXITCODE
+}
+
+if (-not $npmCmd) {
+    Write-GateHost "✖ BLOCK  未检测到 npm 包管理器，全工作区审查无法执行。" -ForegroundColor Red
+    exit 1
+}
 
 if (-not $Json -and -not $Agent) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
