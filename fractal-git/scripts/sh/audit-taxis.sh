@@ -47,6 +47,14 @@ GATE_SUPPRESS="${JSON_MODE}"
 . "${GATE_ROOT_DIR}/scripts/sh/lib/gate-runtime.sh"
 gate_init audit-taxis
 
+AUDIT_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/taxis-audit-XXXXXX")"
+PROMO_ROOT=""
+cleanup_audit_tmp() {
+    rm -rf "${AUDIT_TMP_DIR:-}" "${PROMO_ROOT:-}"
+}
+trap cleanup_audit_tmp EXIT
+CARGO_SUMMARY_JSON=""
+
 gate_log "=========================================================================="
 gate_log "  Taxis (Fractal Git) Industrial Audit & Auto-Refactor Quality Gate (Bash)"
 gate_log "=========================================================================="
@@ -148,12 +156,48 @@ if [[ "${TS_STATUS}" -ne 0 ]]; then
     exit 1
 fi
 
-RUST_PASSED="$(printf '%s\n' "${TEST_OUTPUT}" | sed -nE 's/^test result: (ok|FAILED)\. ([0-9]+) passed.*/\2/p' | awk '{s+=$1} END {print s+0}')"
+read -r RUST_PASSED RUST_FAILED RUST_IGNORED RUST_SUITES <<< "$(printf '%s' "${TEST_OUTPUT}" | node -e '
+    const fs = require("fs");
+    const raw = fs.readFileSync(0, "utf8").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
+    const re = /test result:\s+(?:ok|FAILED)\.\s+(\d+)\s+passed;\s+(\d+)\s+failed;\s+(\d+)\s+ignored;/g;
+    let passed = 0, failed = 0, ignored = 0, suites = 0, m;
+    while ((m = re.exec(raw)) !== null) {
+        passed += Number(m[1]);
+        failed += Number(m[2]);
+        ignored += Number(m[3]);
+        suites += 1;
+    }
+    console.log([passed, failed, ignored, suites].join(" "));
+')"
+if [[ "${RUST_FAILED}" -gt 0 ]]; then
+    write_step_verdict "CRATE-REGRESSION-02" BLOCK "cargo 回归套件报告 ${RUST_FAILED} 项测试失败"
+    exit 1
+fi
+
 PASSED_TOTAL=$((RUST_PASSED + TS_PASSED))
-if [[ "${PASSED_TOTAL}" -gt 0 && "${TS_PASSED}" -gt 0 ]]; then
-    write_step_verdict "CRATE-REGRESSION-02" PASS "${PASSED_TOTAL} 项测试通过 (含 TS ${TS_PASSED} 项)"
-elif [[ "${PASSED_TOTAL}" -gt 0 ]]; then
-    write_step_verdict "CRATE-REGRESSION-02" WARN "Rust ${PASSED_TOTAL} 项通过，但 node --test 未报告通过计数"
+if [[ "${RUST_PASSED}" -gt 0 && "${RUST_FAILED}" -eq 0 && "${RUST_SUITES}" -gt 0 ]]; then
+    CARGO_SUMMARY_JSON="${AUDIT_TMP_DIR}/cargo-test-summary.json"
+    node -e '
+        const fs = require("fs");
+        const payload = {
+            passed: Number(process.argv[2]),
+            failed: Number(process.argv[3]),
+            ignored: Number(process.argv[4]),
+            suites: Number(process.argv[5]),
+            source: "audit-taxis-step-2",
+        };
+        fs.writeFileSync(process.argv[1], JSON.stringify(payload) + "\n", "utf8");
+    ' "${CARGO_SUMMARY_JSON}" "${RUST_PASSED}" "${RUST_FAILED}" "${RUST_IGNORED}" "${RUST_SUITES}"
+fi
+
+REGRESSION_STATUS="WARN"
+if [[ "${RUST_PASSED}" -gt 0 && "${TS_PASSED}" -gt 0 ]]; then
+    REGRESSION_STATUS="PASS"
+    write_step_verdict "CRATE-REGRESSION-02" PASS "${PASSED_TOTAL} 项测试通过 (Rust ${RUST_PASSED} + TS ${TS_PASSED})"
+elif [[ "${RUST_PASSED}" -gt 0 ]]; then
+    write_step_verdict "CRATE-REGRESSION-02" WARN "Rust ${RUST_PASSED} 项通过，但 node --test 未报告通过计数"
+elif [[ "${TS_PASSED}" -gt 0 ]]; then
+    write_step_verdict "CRATE-REGRESSION-02" WARN "TS ${TS_PASSED} 项通过，但 cargo test 未报告通过计数"
 else
     # A green exit status carrying no reported count means the harness executed nothing, or the
     # output shape changed underneath this parser. Both conditions must surface: calling this PASS
@@ -201,6 +245,8 @@ CI_LOWER=""
 if command -v node &>/dev/null && [[ -f "${AUDIT_SCRIPT}" ]]; then
     REPORT_ARGS=()
     [[ "${FAST_MODE}" -eq 1 ]] && REPORT_ARGS+=("--fast")
+    [[ -n "${CARGO_SUMMARY_JSON}" && -f "${CARGO_SUMMARY_JSON}" ]] && REPORT_ARGS+=("--cargo-test-summary" "${CARGO_SUMMARY_JSON}")
+    [[ "${BENCH_STATUS}" -eq 0 ]] && REPORT_ARGS+=("--perf-preverified")
     REPORT_STATUS=0
     if [[ "${JSON_MODE}" -eq 1 ]]; then
         node "${AUDIT_SCRIPT}" ${REPORT_ARGS[@]+"${REPORT_ARGS[@]}"} >/dev/null 2>&1 || REPORT_STATUS=$?
@@ -249,7 +295,6 @@ else
     # implementations stay byte-equivalent in intent.
     PROMO_ROOT="${TMPDIR:-/tmp}/taxis-promotion-ledger-$$"
     mkdir -p "${PROMO_ROOT}"
-    trap 'rm -rf "${PROMO_ROOT:-}"' EXIT
     PROMO_TAXIS_BIN=""
     for target_root in "${CARGO_TARGET_DIR:-}" "${PROJECT_ROOT}/target"; do
         [[ -n "${target_root}" ]] || continue
@@ -322,6 +367,7 @@ if [[ "${JSON_MODE}" -eq 1 ]]; then
         const cai = process.argv[4] ? Number(process.argv[4]) : null;
         const ci = process.argv[5] ? Number(process.argv[5]) : null;
         const promo = process.argv[6] || "SKIP";
+        const regStatus = process.argv[7] || "WARN";
         const qualityStatus = comp !== null && cai !== null && ci !== null ? "PASS" : "SKIP";
         console.log(JSON.stringify({
             protocolVersion: "1.0.0",
@@ -330,7 +376,7 @@ if [[ "${JSON_MODE}" -eq 1 ]]; then
             fastMode: fast,
             steps: {
                 "CRATE-TOPOLOGY-01": "PASS",
-                "CRATE-REGRESSION-02": passed > 0 ? "PASS" : "WARN",
+                "CRATE-REGRESSION-02": regStatus,
                 "CRATE-BENCHMARK-03": "PASS",
                 "QUALITY-ENVELOPE-04": qualityStatus,
                 "PROMOTION-BRIDGE-05": promo,
@@ -339,7 +385,7 @@ if [[ "${JSON_MODE}" -eq 1 ]]; then
             qualityEnvelope: { compositeScore: comp, caiScore: cai, credibleIntervalLower: ci },
             failedSteps: [],
         }, null, 2));
-    ' "${FAST_MODE}" "${PASSED_TOTAL}" "${COMPOSITE_SCORE}" "${CAI_SCORE}" "${CI_LOWER}" "${PROMO_STATUS_LABEL}"
+    ' "${FAST_MODE}" "${PASSED_TOTAL}" "${COMPOSITE_SCORE}" "${CAI_SCORE}" "${CI_LOWER}" "${PROMO_STATUS_LABEL}" "${REGRESSION_STATUS}"
     exit 0
 fi
 

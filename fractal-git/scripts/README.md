@@ -10,13 +10,14 @@
 | 脚本路径 | 平台/Shell | 换行契约 | 核心职责 | 调用示例 |
 | :--- | :--- | :---: | :--- | :--- |
 | **`ps1/build.ps1`** | Windows (pwsh 7+) | **CRLF** | 执行内核子系统拓扑、Plumbing 等价性、TS 门面与 Rust 完整构建 | `pwsh -File scripts/ps1/build.ps1` |
-| **`ps1/audit-taxis.ps1`** | Windows (pwsh 7+) | **CRLF** | Taxis 五级质量与性能门禁总督（拓扑、911项回归、基准棘轮、综合分、晋级账本） | `pwsh -File scripts/ps1/audit-taxis.ps1 -Fast` |
+| **`ps1/audit-taxis.ps1`** | Windows (pwsh 7+) | **CRLF** | Taxis 五级质量与性能门禁总督（拓扑、全量回归、基准棘轮、综合分、晋级账本） | `pwsh -File scripts/ps1/audit-taxis.ps1 -Fast` |
 | **`ps1/gate-rust.ps1`** | Windows (pwsh 7+) | **CRLF** | Rust 规范质量门禁（rustfmt, clippy -D warnings, 零堆分配, 单测） | `pwsh -File scripts/ps1/gate-rust.ps1` |
 | **`sh/build.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux 完整构建与测试流水线 | `bash scripts/sh/build.sh` |
 | **`sh/audit-taxis.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux 五级质量门禁运行器 | `bash scripts/sh/audit-taxis.sh` |
 | **`sh/gate-rust.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux Rust 规范门禁验证 | `bash scripts/sh/gate-rust.sh` |
 | **`common/validate-crate-topology.js`** | 跨平台 (Node.js) | **LF** | 校验 10 大内核子系统单向无环依赖 DAG 与层级隔离 (`FGT-DEP-001`) | `node scripts/common/validate-crate-topology.js` |
 | **`common/validate-git-parity.js`** | 跨平台 (Node.js) | **LF** | 校验 Git Plumbing 编解码与目录尾斜杠排序的 字节严格等价性 (`FGT-OBJ-001`) | `node scripts/common/validate-git-parity.js` |
+| **`common/lib/git-parity-vectors.js`** | 跨平台 (Node.js) | **LF** | 承载 Git 对等校验的静态对象向量数据集与夹具构造器，供 `validate-git-parity.js` 消费 | 被 `validate-git-parity.js` 引用 |
 | **`common/validate-gate-bridge.js`** | 跨平台 (Node.js) | **LF** | 校验提交预审区门禁桥的规则 SSOT 闭包与延迟预算 (`FGT-BRG-001`) | `node scripts/common/validate-gate-bridge.js` |
 | **`common/check-zero-alloc-boundary.js`** | 跨平台 (Node.js) | **LF** | 静态扫描 Rust 生产代码循环内的瞬态堆分配与裸 unwrap (`FGT-PRF-001`) | `node scripts/common/check-zero-alloc-boundary.js` |
 | **`common/resolve-cargo.js`** | 跨平台 (Node.js) | **LF** | 工具链单一真源解析：按 显式覆盖 → rustup shim → rustup toolchain 根（稳定版优先）→ PATH 的顺序定位 cargo，解析到裸 toolchain 二进制时同步钉住 `RUSTC`；与 `scripts/ps1/lib/gate-runtime.ps1` 的 `Resolve-GateCargoCommand` 逐条对应，避免两个运行时对「有没有工具链」给出不同答案 | `node scripts/common/resolve-cargo.js`、`validate-perf-baseline`、`run-audit-report` |

@@ -322,23 +322,117 @@ function computeGateScore(isOverallPass, finalCompositeScore, passChecks, totalC
 }
 
 /**
+ * Parses CLI flags for fast mode, pre-verified benchmark handoff, and Cargo test summary handoff.
+ *
+ * @param {string[]} argv - CLI argument vector (excluding node and script path).
+ * @returns {{ isFast: boolean, perfPreverified: boolean, cargoSummaryPath: string|null }} Parsed options.
+ */
+function parseCliOptions(argv) {
+  let isFast = false;
+  let perfPreverified = false;
+  let cargoSummaryPath = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--fast') {
+      isFast = true;
+    } else if (arg === '--perf-preverified') {
+      perfPreverified = true;
+    } else if (arg === '--cargo-test-summary') {
+      cargoSummaryPath = i + 1 < argv.length ? argv[i + 1] : '';
+      i += 1;
+    } else if (arg.startsWith('--cargo-test-summary=')) {
+      cargoSummaryPath = arg.slice('--cargo-test-summary='.length);
+    }
+  }
+  return { isFast, perfPreverified, cargoSummaryPath };
+}
+
+/**
+ * Loads and strictly validates a precomputed Cargo test summary produced by audit-taxis [2/5].
+ *
+ * Returns null (fail-closed fallback to full `cargo test`) if the path is omitted, missing,
+ * malformed, or fails any integer/status invariant.
+ *
+ * @param {string|null} summaryPath - Candidate JSON path from `--cargo-test-summary`.
+ * @returns {object|null} Validated test result object or null when fallback is required.
+ */
+function loadPrecomputedCargoSummary(summaryPath) {
+  if (summaryPath === null) return null;
+  if (!summaryPath || !fs.existsSync(summaryPath)) {
+    process.stderr.write(
+      `[fractal-git audit] --cargo-test-summary missing (${String(summaryPath)}); falling back to cargo test.\n`,
+    );
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+    const valid =
+      parsed &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      Number.isInteger(parsed.passed) &&
+      parsed.passed > 0 &&
+      Number.isInteger(parsed.failed) &&
+      parsed.failed === 0 &&
+      Number.isInteger(parsed.ignored) &&
+      parsed.ignored >= 0 &&
+      Number.isInteger(parsed.suites) &&
+      parsed.suites > 0 &&
+      typeof parsed.source === 'string' &&
+      parsed.source.trim().length > 0;
+    if (!valid) {
+      process.stderr.write(
+        `[fractal-git audit] --cargo-test-summary failed strict schema validation (${summaryPath}); falling back to cargo test.\n`,
+      );
+      return null;
+    }
+    return {
+      totalTests: parsed.passed + parsed.failed,
+      passedTests: parsed.passed,
+      failedTests: parsed.failed,
+      ignoredTests: parsed.ignored,
+      suites: parsed.suites,
+      isClean: true,
+      precomputedSource: parsed.source.trim(),
+      output: '',
+    };
+  } catch (err) {
+    process.stderr.write(
+      `[fractal-git audit] Failed to parse --cargo-test-summary (${err.message}); falling back to cargo test.\n`,
+    );
+    return null;
+  }
+}
+
+/**
  * Main execution orchestrator.
  */
 async function main() {
-  const isFast = process.argv.includes('--fast');
+  const opts = parseCliOptions(process.argv.slice(2));
+  const isFast = opts.isFast;
+  const skipPerfCheck = isFast || opts.perfPreverified;
   const staticCheckers = [
     'scripts/common/validate-crate-topology.js',
     'scripts/common/check-zero-alloc-boundary.js',
     { script: 'scripts/common/validate-git-parity.js', args: ['--require-git'] },
     'scripts/common/validate-gate-bridge.js',
-    ...(isFast ? [] : ['scripts/common/validate-perf-baseline.js']),
+    ...(skipPerfCheck ? [] : ['scripts/common/validate-perf-baseline.js']),
   ];
 
   const violations = [];
   const warnings = [];
+  if (opts.perfPreverified && !isFast) {
+    console.log('[fractal-git audit] Consumed --perf-preverified; skipping duplicate validate-perf-baseline run.');
+  }
   const staticPassCount = runStaticCheckers(staticCheckers, violations);
 
-  const testResult = runCargoTests(isFast);
+  const precomputedTests = loadPrecomputedCargoSummary(opts.cargoSummaryPath);
+  if (precomputedTests) {
+    console.log(
+      `[fractal-git audit] Consumed --cargo-test-summary (${precomputedTests.passedTests} passed, ${precomputedTests.suites} suites, source=${precomputedTests.precomputedSource}); skipping duplicate cargo test.`,
+    );
+  }
+  const testResult = precomputedTests || runCargoTests(isFast);
   evaluateCargoTestResult(testResult, violations);
 
   // Invoke genuine deep AST analysis via auto-refactor (Fail-Closed when unavailable)

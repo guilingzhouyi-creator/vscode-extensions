@@ -53,6 +53,7 @@ $script:GateSuppressOutput = [bool]$Json
 . (Join-Path $RepoRoot "scripts/ps1/lib/gate-runtime.ps1")
 
 $script:childLogIndex = 0
+$script:childLogMap = @{}
 
 <#
 .SYNOPSIS
@@ -86,6 +87,7 @@ function Invoke-AuditChild {
     $safe = $Label -replace "[^A-Za-z0-9_-]", "-"
     $outLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).out.log"
     $errLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).err.log"
+    $script:childLogMap[$Label] = [pscustomobject]@{ OutLog = $outLog; ErrLog = $errLog }
     $commandShell = $env:ComSpec
     if ([string]::IsNullOrWhiteSpace($commandShell)) {
         throw "ComSpec is required to redirect child output to log files."
@@ -114,7 +116,7 @@ function Invoke-AuditChild {
             if (Test-Path $logFile) { Get-Content -Path $logFile -Encoding utf8 | Out-Host }
         }
     }
-    return [pscustomobject]@{ ExitCode = $exitCode }
+    return [pscustomobject]@{ ExitCode = $exitCode; OutLog = $outLog; ErrLog = $errLog }
 }
 
 <#
@@ -122,14 +124,31 @@ function Invoke-AuditChild {
     读取子进程日志文本，供测试计数等解析使用。
 .PARAMETER Label
     与 Invoke-AuditChild 相同的标签；返回最近一次同名输出日志的内容。
+.PARAMETER IncludeStderr
+    同时附加标准错误日志文本。
 #>
 function Read-AuditChildOutput {
     [CmdletBinding()]
-    param([Parameter(Mandatory = $true)][string]$Label)
-    $safe = $Label -replace "[^A-Za-z0-9_-]", "-"
-    $outLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).out.log"
-    if (Test-Path $outLog) { return Get-Content -Path $outLog -Raw -Encoding utf8 }
-    return ""
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [switch]$IncludeStderr
+    )
+    $entry = if ($script:childLogMap.ContainsKey($Label)) { $script:childLogMap[$Label] } else { $null }
+    if (-not $entry) {
+        $safe = $Label -replace "[^A-Za-z0-9_-]", "-"
+        $entry = [pscustomobject]@{
+            OutLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).out.log"
+            ErrLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).err.log"
+        }
+    }
+    $chunks = [System.Collections.Generic.List[string]]::new()
+    if (Test-Path -LiteralPath $entry.OutLog) {
+        $chunks.Add((Get-Content -LiteralPath $entry.OutLog -Raw -Encoding utf8))
+    }
+    if ($IncludeStderr -and (Test-Path -LiteralPath $entry.ErrLog)) {
+        $chunks.Add((Get-Content -LiteralPath $entry.ErrLog -Raw -Encoding utf8))
+    }
+    return ($chunks -join "`n")
 }
 
 $cargoCmd = Resolve-GateCargoCommand
@@ -142,6 +161,7 @@ $statusBenchmark = "SKIP"
 $statusQuality = "SKIP"
 $statusPromotion = "SKIP"
 $passedTotal = 0
+$cargoSummaryPath = $null
 $compositeScore = $null
 $caiScore = $null
 $ciLower = $null
@@ -257,23 +277,51 @@ if (-not $cargoCmd) {
         Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "BLOCK" -Detail $reason
         $failures.Add("CRATE-REGRESSION-02")
     } else {
-        $testOutput = Read-AuditChildOutput -Label "cargo-test"
-        foreach ($m in [regex]::Matches($testOutput, 'test result: (?:ok|FAILED)\.\s+(\d+)\s+passed')) {
-            $passedTotal += [int]$m.Groups[1].Value
+        $testOutput = Read-AuditChildOutput -Label "cargo-test" -IncludeStderr
+        $cleanTestOutput = [regex]::Replace($testOutput, '\x1b\[[0-9;]*[A-Za-z]', '')
+        $rustPassed = 0
+        $rustFailed = 0
+        $rustIgnored = 0
+        $rustSuites = 0
+        foreach ($m in [regex]::Matches($cleanTestOutput, 'test result:\s+(?:ok|FAILED)\.\s+(\d+)\s+passed;\s+(\d+)\s+failed;\s+(\d+)\s+ignored;')) {
+            $rustPassed += [int]$m.Groups[1].Value
+            $rustFailed += [int]$m.Groups[2].Value
+            $rustIgnored += [int]$m.Groups[3].Value
+            $rustSuites += 1
         }
-        $passedTotal += $tsPassed
-        if ($passedTotal -gt 0 -and $tsPassed -gt 0) {
-            $statusRegression = "PASS"
-            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "PASS" -Detail "$passedTotal 项测试通过 (含 TS $tsPassed 项)"
-        } elseif ($passedTotal -gt 0) {
-            $statusRegression = "WARN"
-            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "Rust $passedTotal 项通过，但 node --test 未报告通过计数"
+        if ($rustFailed -gt 0) {
+            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "BLOCK" -Detail "cargo 回归套件报告 $rustFailed 项测试失败"
+            $failures.Add("CRATE-REGRESSION-02")
         } else {
-            # A green exit code carrying no reported count means the harness executed nothing, or
-            # the output shape changed underneath this parser. Both conditions must surface: calling
-            # this PASS made an empty suite indistinguishable from one that actually asserted.
-            $statusRegression = "WARN"
-            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "未报告任何测试计数，回归覆盖不可证实"
+            $passedTotal = $rustPassed + $tsPassed
+            if ($rustPassed -gt 0 -and $rustFailed -eq 0 -and $rustSuites -gt 0) {
+                $cargoSummaryPath = Join-Path $TempLogDir "cargo-test-summary.json"
+                $summaryObj = [ordered]@{
+                    passed = $rustPassed
+                    failed = $rustFailed
+                    ignored = $rustIgnored
+                    suites = $rustSuites
+                    source = "audit-taxis-step-2"
+                }
+                $summaryJson = $summaryObj | ConvertTo-Json -Compress
+                [System.IO.File]::WriteAllText($cargoSummaryPath, $summaryJson + "`n", [System.Text.UTF8Encoding]::new($false))
+            }
+            if ($rustPassed -gt 0 -and $tsPassed -gt 0) {
+                $statusRegression = "PASS"
+                Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "PASS" -Detail "$passedTotal 项测试通过 (Rust $rustPassed + TS $tsPassed)"
+            } elseif ($rustPassed -gt 0) {
+                $statusRegression = "WARN"
+                Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "Rust $rustPassed 项通过，但 node --test 未报告通过计数"
+            } elseif ($tsPassed -gt 0) {
+                $statusRegression = "WARN"
+                Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "TS $tsPassed 项通过，但 cargo test 未报告通过计数"
+            } else {
+                # A green exit code carrying no reported count means the harness executed nothing, or
+                # the output shape changed underneath this parser. Both conditions must surface: calling
+                # this PASS made an empty suite indistinguishable from one that actually asserted.
+                $statusRegression = "WARN"
+                Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "未报告任何测试计数，回归覆盖不可证实"
+            }
         }
     }
 }
@@ -312,6 +360,12 @@ $auditReportPath = Join-Path $ProjectRoot "reports/audit-latest.json"
 if ($nodeCmd -and (Test-Path $auditReportScript)) {
     $reportArgs = @($auditReportScript)
     if ($Fast) { $reportArgs += "--fast" }
+    if ($cargoSummaryPath -and (Test-Path -LiteralPath $cargoSummaryPath)) {
+        $reportArgs += @("--cargo-test-summary", $cargoSummaryPath)
+    }
+    if ($statusBenchmark -eq "PASS") {
+        $reportArgs += "--perf-preverified"
+    }
     $procReport = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList $reportArgs -Label "audit-report"
     if ($procReport.ExitCode -eq 0 -and (Test-Path $auditReportPath)) {
         try {
