@@ -12,6 +12,7 @@
 #   python scripts/py/audit_config_unused.py --json
 # ==============================================================================
 """审查 config/ 中未被 backend 代码引用的配置表（提示级）。"""
+
 from pathlib import Path
 from typing import Any
 import argparse
@@ -20,6 +21,7 @@ import re
 import sys
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
+
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -42,12 +44,16 @@ RESERVED_NARRATIVES: set[str] = {
 }
 
 GETTER_RE = re.compile(
-    r'GameConfig\.(?:get_int|get_float|get_string|get_bool|get_dict|get_array|get_table|get_value)'
+    r"GameConfig\.(?:get_int|get_float|get_string|get_bool|get_dict|get_array|get_table|get_value)"
     r'\(\s*"([a-zA-Z0-9_.]+)"'
 )
 MSG_RE = re.compile(r'GameConfig\.msg\(\s*"([a-z0-9_]+)"')
-NARRATIVE_RE = re.compile(r'(?:render_narrative|emit_narrative_by_key)\(\s*"([a-z0-9_]+)/')
-FULLNAME_RE = re.compile(r'"(infrastructure|domains|frontend|narratives|items|i18n|copywriting)(?:\.[a-zA-Z0-9_]+)+"')
+NARRATIVE_RE = re.compile(
+    r'(?:render_narrative|emit_narrative_by_key)\(\s*"([a-z0-9_]+)/'
+)
+FULLNAME_RE = re.compile(
+    r'"(infrastructure|domains|frontend|narratives|items|i18n|copywriting)(?:\.[a-zA-Z0-9_]+)+"'
+)
 RES_CONFIG_RE = re.compile(r'"res://config/([A-Za-z0-9_/]+)\.json"')
 # 契约对齐：配置驱动频道引用识别——<domain_id>.<event_name> 形态（如 account.registered）
 # 首段必须是 domains.json 已登记领域 id，解析为对 narratives.<首段> 的动态叙事引用。
@@ -57,8 +63,12 @@ CHANNEL_RE = re.compile(r"^([a-z][a-z0-9_]*)\.([a-z0-9_]+(?:\.[a-z0-9_]+)*)$")
 def collect_domain_ids() -> set[str]:
     """从 domains.json 收集已登记领域 id（频道首段合法性判定依据）。"""
     try:
-        data = json.loads((CONFIG_DIR / "infrastructure" / "domains.json").read_text(encoding="utf-8"))
-        return {str(e.get("id", "")) for e in data.get("domains", []) if isinstance(e, dict)}
+        data = json.loads(
+            (CONFIG_DIR / "infrastructure" / "domains.json").read_text(encoding="utf-8")
+        )
+        return {
+            str(e.get("id", "")) for e in data.get("domains", []) if isinstance(e, dict)
+        }
     except Exception:
         return set()
 
@@ -117,11 +127,7 @@ def collect_channel_narrative_refs() -> set[str]:
     refs: set[str] = set()
 
     account_path = CONFIG_DIR / "domains" / "account" / "core.json"
-    if not account_path.exists():
-        account_path = CONFIG_DIR / "domains" / "account.json"
     world_state_path = CONFIG_DIR / "domains" / "world_state" / "core.json"
-    if not world_state_path.exists():
-        world_state_path = CONFIG_DIR / "domains" / "world_state.json"
     channel_sources: list[tuple[Path, str | None]] = [
         (account_path, "auth/channels"),
         (world_state_path, "hud/channels"),
@@ -172,7 +178,9 @@ def _collect_gd_references() -> tuple[set[str], set[str], set[str]]:
     return referenced, dynamic_narratives, weak
 
 
-def _collect_sub_tables_from_manifest(manifest_path: Path, referenced: set[str]) -> list[str]:
+def _collect_sub_tables_from_manifest(
+    manifest_path: Path, referenced: set[str]
+) -> list[str]:
     """读取清单并提取匹配领域的 sub_tables。"""
     if not manifest_path.is_file():
         return []
@@ -221,7 +229,11 @@ def _print_unused_report(
     )
     for name, rel in tables:
         if name in unused:
-            mark = "⚠ 疑似死配置" if not name.startswith("frontend.") else "⚠ frontend 层（可能被前端消费）"
+            mark = (
+                "⚠ 疑似死配置"
+                if not name.startswith("frontend.")
+                else "⚠ frontend 层（可能被前端消费）"
+            )
             print(f"  · {rel}（{name}）{mark}")
     if reserved_hit:
         for name in reserved_hit:
@@ -245,10 +257,16 @@ def main() -> int:
 
     _expand_manifest_references(referenced, all_names)
 
-    unused = [t for t in sorted(all_names) if t not in referenced and t not in RESERVED_NARRATIVES]
+    unused = [
+        t
+        for t in sorted(all_names)
+        if t not in referenced and t not in RESERVED_NARRATIVES
+    ]
     reserved_hit = sorted(t for t in RESERVED_NARRATIVES if t not in referenced)
 
-    _print_unused_report(all_names, referenced, dynamic_narratives, weak, unused, reserved_hit, tables)
+    _print_unused_report(
+        all_names, referenced, dynamic_narratives, weak, unused, reserved_hit, tables
+    )
 
     if args.strict and unused:
         print("【审查结论】--strict 模式未通过")

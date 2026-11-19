@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import sys
+
 CHARSET_UTF8 = "utf-8"
 ERR_IGNORE = "ignore"
 ERR_REPLACE = "replace"
@@ -82,36 +83,6 @@ class Finding:
     severity: str = SEVERITY_DEFAULT
     category: str = CATEGORY_DEFAULT
     context: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def rule_id(self) -> str:
-        """获取规则唯一标识符。"""
-        return self.rule
-
-    @rule_id.setter
-    def rule_id(self, val: str) -> None:
-        """设置规则唯一标识符。"""
-        self.rule = val
-
-    @property
-    def file_path(self) -> str:
-        """获取违规文件路径。"""
-        return self.file
-
-    @file_path.setter
-    def file_path(self, val: str) -> None:
-        """设置违规文件路径。"""
-        self.file = val
-
-    @property
-    def line_number(self) -> int:
-        """获取违规所在行号。"""
-        return self.line
-
-    @line_number.setter
-    def line_number(self, val: int) -> None:
-        """设置违规所在行号。"""
-        self.line = val
 
     def to_dict(self) -> dict[str, Any]:
         """将发现条目转换为标准字典表示。"""

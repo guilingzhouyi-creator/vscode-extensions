@@ -22,22 +22,31 @@ from kmod_debug_exporter import DESTINIES_KEYS
 KMOD_MANIFEST_ENTRY: str = "manifest.kdat"
 KMOD_DATA_ENTRY: str = "mod_data.kdat"
 
-_IGNORED_NAMES: frozenset[str] = frozenset({".git", ".DS_Store", "Thumbs.db", "__pycache__"})
+_IGNORED_NAMES: frozenset[str] = frozenset(
+    {".git", ".DS_Store", "Thumbs.db", "__pycache__"}
+)
 _IGNORED_SUFFIXES: tuple[str, ...] = (".tmp", ".swp", ".kmod", ".uid", ".import")
-_TOP_LEVEL_CONTENT_FILES: frozenset[str] = frozenset({
-    "items.json",
-    "skills.json",
-    "game_rules.json",
-    "world.json",
-    "races_catalog.json",
-})
+_TOP_LEVEL_CONTENT_FILES: frozenset[str] = frozenset(
+    {
+        "items.json",
+        "skills.json",
+        "game_rules.json",
+        "world.json",
+        "races_catalog.json",
+    }
+)
 
 
 def compute_entries_content_sha256(entries: dict[str, bytes]) -> str:
     """计算非清单归档条目的确定性 SHA-256（与 GDScript ModPackageArchiveReader 一致）。"""
     sha = hashlib.sha256()
     for entry_path in sorted(entries.keys()):
-        if entry_path == KMOD_MANIFEST_ENTRY or entry_path.endswith("/") or entry_path.endswith(".uid") or entry_path.endswith(".import"):
+        if (
+            entry_path == KMOD_MANIFEST_ENTRY
+            or entry_path.endswith("/")
+            or entry_path.endswith(".uid")
+            or entry_path.endswith(".import")
+        ):
             continue
         sha.update(entry_path.encode("utf-8"))
         sha.update(entries[entry_path])
@@ -75,7 +84,9 @@ def classify_relative_content_path(relative_path: str) -> str:
     return ""
 
 
-def _flatten_i18n_dict(source_dict: dict[str, Any], prefix: str, target: dict[str, str]) -> None:
+def _flatten_i18n_dict(
+    source_dict: dict[str, Any], prefix: str, target: dict[str, str]
+) -> None:
     for key, value in source_dict.items():
         full_key = f"{prefix}.{key}" if prefix else str(key)
         if isinstance(value, dict):
@@ -105,7 +116,9 @@ def _merge_i18n_payload(
             custom_i18n.setdefault(flat_key, flat_val)
 
 
-def _merge_cutscene_entry(rel_path: str, data: dict[str, Any], mod_data: dict[str, Any]) -> None:
+def _merge_cutscene_entry(
+    rel_path: str, data: dict[str, Any], mod_data: dict[str, Any]
+) -> None:
     cutscenes_node = data.get("cutscenes")
     if isinstance(cutscenes_node, dict):
         mod_data.setdefault("cutscene_registry", {}).update(cutscenes_node)
@@ -116,30 +129,40 @@ def _merge_cutscene_entry(rel_path: str, data: dict[str, Any], mod_data: dict[st
                 reg[str(item["cutscene_id"]).strip()] = item
     if isinstance(data.get("hooks"), list):
         mod_data.setdefault("cutscene_hooks", []).extend(data["hooks"])
-    mod_data["content_records"].append({"category": "cutscenes", "domain": "cutscenes", "relative_path": rel_path, "payload": data})
+    mod_data["content_records"].append(
+        {
+            "category": "cutscenes",
+            "domain": "cutscenes",
+            "relative_path": rel_path,
+            "payload": data,
+        }
+    )
 
 
-def _merge_json_source_entry(rel_path: str, raw_parsed: Any, mod_data: dict[str, Any]) -> None:
-    if rel_path == "routing_rules.json" and isinstance(raw_parsed, list):
-        mod_data["custom_routing_rules"].extend(raw_parsed)
-        return
+def _merge_json_source_entry(
+    rel_path: str, raw_parsed: Any, mod_data: dict[str, Any]
+) -> None:
     if not isinstance(raw_parsed, dict):
         return
     if rel_path.startswith("dag_graphs/"):
-        dag_id = str(raw_parsed.get("dag_id") or raw_parsed.get("graph_id") or Path(rel_path).stem)
+        dag_id = str(raw_parsed.get("dag_id") or Path(rel_path).stem)
         mod_data["dag_graphs"][dag_id] = raw_parsed
     elif rel_path.startswith("i18n/"):
-        _merge_i18n_payload(raw_parsed, Path(rel_path).stem, mod_data["custom_i18n"], mod_data["custom_i18n_by_locale"])
+        _merge_i18n_payload(
+            raw_parsed,
+            Path(rel_path).stem,
+            mod_data["custom_i18n"],
+            mod_data["custom_i18n_by_locale"],
+        )
     elif rel_path == "destinies.json":
         for cfg_key in DESTINIES_KEYS:
             if cfg_key in raw_parsed:
                 mod_data[cfg_key] = raw_parsed[cfg_key]
     elif rel_path == "routing_rules.json":
         if isinstance(raw_parsed.get("prologue_routing_rules"), list):
-            mod_data["prologue_routing_rules"].extend(raw_parsed["prologue_routing_rules"])
-        raw_rules = raw_parsed.get("custom_routing_rules", raw_parsed.get("routing_rules"))
-        if isinstance(raw_rules, list):
-            mod_data["custom_routing_rules"].extend(raw_rules)
+            mod_data["prologue_routing_rules"].extend(
+                raw_parsed["prologue_routing_rules"]
+            )
     elif rel_path == "assets/manifest.json":
         mod_data["assets_manifest"] = raw_parsed
     elif rel_path.startswith("cutscenes/"):
@@ -147,7 +170,14 @@ def _merge_json_source_entry(rel_path: str, raw_parsed: Any, mod_data: dict[str,
     elif rel_path.startswith("content/") or rel_path in _TOP_LEVEL_CONTENT_FILES:
         domain = classify_relative_content_path(rel_path)
         if domain:
-            mod_data["content_records"].append({"category": domain, "domain": domain, "relative_path": rel_path, "payload": raw_parsed})
+            mod_data["content_records"].append(
+                {
+                    "category": domain,
+                    "domain": domain,
+                    "relative_path": rel_path,
+                    "payload": raw_parsed,
+                }
+            )
 
 
 def should_ignore_path(file_path: Path) -> bool:
@@ -163,7 +193,11 @@ def collect_mod_compile_inputs(
     pack_meta: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
     """从开发期 JSON 模组目录收集结构化数据（编入 mod_data.kdat）与流式媒体原始字节。"""
-    sanitized_meta = {k: v for k, v in pack_meta.items() if k not in ("content_sha256", "files_manifest")}
+    sanitized_meta = {
+        k: v
+        for k, v in pack_meta.items()
+        if k not in ("content_sha256", "files_manifest")
+    }
     mod_data: dict[str, Any] = {
         "pack_metadata": sanitized_meta,
         "dag_graphs": {},
@@ -178,7 +212,7 @@ def collect_mod_compile_inputs(
         if p.is_dir() or should_ignore_path(p):
             continue
         rel_path = p.relative_to(mod_dir).as_posix()
-        if rel_path in ("pack.json", "manifest.json"):
+        if rel_path == "pack.json":
             continue
         if rel_path.lower().endswith(".json"):
             parsed = json.loads(p.read_text(encoding="utf-8"))

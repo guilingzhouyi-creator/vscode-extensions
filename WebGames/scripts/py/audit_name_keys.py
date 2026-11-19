@@ -20,6 +20,7 @@ import re
 import sys
 
 from audit_common import contains_cjk, ensure_utf8_stdout, resolve_repo_root
+
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -33,8 +34,6 @@ MAGIC_TABLES = ("rank_tiers", "mana_aptitudes", "magic_forms", "profession_ranks
 def collect_magic_keys() -> list[str]:
     """收集魔法域名称键：magic_tiers.json 四表 entry.name_key。"""
     path = CONFIG / "domains" / "magic_tiers" / "core.json"
-    if not path.exists():
-        path = CONFIG / "domains" / "magic_tiers.json"
     if not path.exists():
         return []
 
@@ -76,7 +75,10 @@ def _extract_item_loc_keys(file_path: Path) -> list[str]:
 def collect_item_keys() -> list[str]:
     """收集物品域名称键：config/items/*.json 与官方基础模组包物品的 loc_name_key。"""
     keys: list[str] = []
-    for base_dir in (CONFIG / "items", ROOT / "mods" / "official_kalar" / "content" / "items"):
+    for base_dir in (
+        CONFIG / "items",
+        ROOT / "mods" / "official_kalar" / "content" / "items",
+    ):
         if not base_dir.exists():
             continue
         for f in sorted(base_dir.glob("*.json")):
@@ -113,7 +115,9 @@ def _verify_name_keys(
 
     for k in magic_keys:
         if k not in en_us_keys:
-            violations.append(f"[en_US 缺失] 魔法名称键未在 config/i18n/en_US.json 登记: {k}")
+            violations.append(
+                f"[en_US 缺失] 魔法名称键未在 config/i18n/en_US.json 登记: {k}"
+            )
 
     return violations
 
@@ -136,7 +140,9 @@ def run_name_keys_audit() -> int:
 
     violations = _verify_name_keys(all_keys, magic_keys, en_us_keys)
 
-    print(f"魔法名称键: {len(magic_keys)} 个 / 物品名称键: {len(item_keys)} 个 / en_US 词典: {len(en_us_keys)} 个")
+    print(
+        f"魔法名称键: {len(magic_keys)} 个 / 物品名称键: {len(item_keys)} 个 / en_US 词典: {len(en_us_keys)} 个"
+    )
     print(f"违规总数: {len(violations)}")
     for v in violations:
         print(f"  ✗ {v}")

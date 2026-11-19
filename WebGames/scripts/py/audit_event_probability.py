@@ -20,6 +20,7 @@ import re
 import sys
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
+
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -111,10 +112,16 @@ class CycleDetector:
         self.stack.pop()
 
 
-def _validate_event_entry(eid: str, entry: dict[str, Any], violations: list[str]) -> None:
+def _validate_event_entry(
+    eid: str, entry: dict[str, Any], violations: list[str]
+) -> None:
     """校验单个事件配置的值域、执行字段禁入与条件 AST 合规性。"""
     base = entry.get("base_probability", None)
-    if base is None or not isinstance(base, (int, float)) or not (0.0 <= float(base) <= 1.0):
+    if (
+        base is None
+        or not isinstance(base, (int, float))
+        or not (0.0 <= float(base) <= 1.0)
+    ):
         violations.append(f"[值域] {eid}.base_probability 非法（需 0~1 数值）: {base}")
 
     for f in FORBIDDEN_FIELDS:
@@ -159,9 +166,9 @@ def run_event_probability_audit() -> int:
     violations: list[str] = []
     path = CONFIG / "domains" / "event_probability" / "core.json"
     if not path.exists():
-        path = CONFIG / "domains" / "event_probability.json"
-    if not path.exists():
-        print("【审查结论】未通过（config/domains/event_probability/core.json 缺失，已阻断！）")
+        print(
+            "【审查结论】未通过（config/domains/event_probability/core.json 缺失，已阻断！）"
+        )
         return 1
 
     data = json.loads(path.read_text(encoding="utf-8"))

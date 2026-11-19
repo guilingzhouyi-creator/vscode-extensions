@@ -32,7 +32,9 @@ DESTINIES_KEYS: tuple[str, ...] = (
 
 def _write_json_file(target_path: Path, payload: Any) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    target_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def export_mod_debug_workspace(
@@ -52,8 +54,6 @@ def export_mod_debug_workspace(
             "archive_format_version",
             "manifest_schema",
             "created_timestamp_utc",
-            "bundle_id",
-            "bundle_name",
         )
         pack_meta = {k: v for k, v in manifest_data.items() if k not in skip_keys}
     _write_json_file(export_dir / "pack.json", pack_meta)
@@ -86,7 +86,9 @@ def export_mod_debug_workspace(
 
     for rec in mod_data.get("content_records") or []:
         if isinstance(rec, dict) and rec.get("relative_path") and "payload" in rec:
-            _write_json_file(export_dir / Path(str(rec["relative_path"])), rec["payload"])
+            _write_json_file(
+                export_dir / Path(str(rec["relative_path"])), rec["payload"]
+            )
 
     for media_rel in media_files:
         dest = (export_dir / media_rel).resolve()

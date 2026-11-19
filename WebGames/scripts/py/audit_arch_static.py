@@ -572,6 +572,15 @@ RETIRED_COMPAT_SYMBOLS: tuple[str, ...] = (
   "item_template_id",
   "mod_tier",
   "_normalize_items",
+  "_mock_town_facilities",
+  "_mock_town_npcs",
+  "_mock_territories",
+  "_mock_sovereignty",
+  "\"ALLOCATE_POTENTIAL\"",
+  "\"REST_INN\"",
+  "func exit_world(",
+  "func init_gm_sandbox(",
+  "\"is_safe\"",
 )
 
 
@@ -616,6 +625,13 @@ def check_tc_arch_07(ctx: ArchitectureAuditContext) -> dict[str, Any]:
     _, b_code = ctx.gd_sources.get(band_path, ("", ""))
     if "rank_to_band(rank: int, registry: MagicTierRegistry = null)" in b_code:
       violations.append("magic_rank_band_resolver.gd: rank_to_band 必须移除 = null")
+
+  envelope_path = ctx.root / "backend/domains/world_state/dto/unified_response_envelope_dto.gd"
+  if envelope_path.exists():
+    _, envelope_code = ctx.gd_sources.get(envelope_path, ("", ""))
+    for retired_field in ("is_success", "\"payload\""):
+      if retired_field in envelope_code:
+        violations.append(f"unified_response_envelope_dto.gd: 严禁残留已退役响应信封别名 {retired_field}")
 
   return make_result("TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零）", violations)
 

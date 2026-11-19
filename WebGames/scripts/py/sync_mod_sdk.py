@@ -19,42 +19,17 @@ from pathlib import Path
 from typing import Any
 import argparse
 import sys
-# 兼容性导入与共享底盘 re-export
 from lib.mod_sdk_shared import (
-    STANDARD_PLACEHOLDER_DOCS,
-    SUPPORTED_ERROR_CODES,
     check_contract_drift,
-    collect_placeholders_from_obj,
     ensure_utf8_stdout,
-    extract_agent_hud_telemetry_capabilities,
-    extract_builtin_dag_ids,
     extract_capabilities,
-    extract_destiny_capabilities,
-    extract_unified_protocol_capabilities,
     format_capabilities_json,
-    generate_autogen_spec_section,
-    load_json_file,
     render_full_mod_spec,
     resolve_webgames_root,
 )
 
 __all__ = [
-    "STANDARD_PLACEHOLDER_DOCS",
-    "SUPPORTED_ERROR_CODES",
-    "check_contract_drift",
-    "collect_placeholders_from_obj",
-    "ensure_utf8_stdout",
-    "extract_agent_hud_telemetry_capabilities",
-    "extract_builtin_dag_ids",
-    "extract_capabilities",
-    "extract_destiny_capabilities",
-    "extract_unified_protocol_capabilities",
-    "format_capabilities_json",
-    "generate_autogen_spec_section",
-    "load_json_file",
     "main",
-    "render_full_mod_spec",
-    "resolve_webgames_root",
     "sync_to_disk",
 ]
 

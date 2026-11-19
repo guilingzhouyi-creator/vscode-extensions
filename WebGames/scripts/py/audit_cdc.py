@@ -18,6 +18,7 @@ import re
 import sys
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
+
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -39,7 +40,9 @@ def load_registered_canonical_ids() -> set:
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
                 raw_items = data.get("items", [])
-                items_iter = raw_items.values() if isinstance(raw_items, dict) else raw_items
+                items_iter = (
+                    raw_items.values() if isinstance(raw_items, dict) else raw_items
+                )
                 for item in items_iter:
                     if not isinstance(item, dict):
                         continue
@@ -78,7 +81,12 @@ def check_code_canonical_id_references(registered_ids: set, violations: list) ->
 
 def check_ast_kind_single_source(violations: list) -> set:
     """校验 AST kind 单一真源解析"""
-    src_file = BACKEND / "domains" / "narrative_orchestration" / "narrative_causality_orchestrator.gd"
+    src_file = (
+        BACKEND
+        / "domains"
+        / "narrative_orchestration"
+        / "narrative_causality_orchestrator.gd"
+    )
     if not src_file.exists():
         violations.append(f"[真源缺失] 找不到编排器源文件: {src_file}")
         return set()
@@ -88,10 +96,17 @@ def check_ast_kind_single_source(violations: list) -> set:
     for m in re.finditer(r'^\s*"([A-Z_]+)":', src, re.MULTILINE):
         kinds.add(m.group(1))
 
-    expected_mandatory = {"TOWN_EQUALS", "MIN_LEVEL", "HOUR_BETWEEN", "REPUTATION_GREATER"}
+    expected_mandatory = {
+        "TOWN_EQUALS",
+        "MIN_LEVEL",
+        "HOUR_BETWEEN",
+        "REPUTATION_GREATER",
+    }
     missing = expected_mandatory - kinds
     if missing:
-        violations.append(f"[AST真源缺漏] 编排器 match 分支缺少必要条件 kind: {missing}")
+        violations.append(
+            f"[AST真源缺漏] 编排器 match 分支缺少必要条件 kind: {missing}"
+        )
 
     return kinds
 
@@ -100,7 +115,9 @@ def _validate_rates(rates: dict, violations: list) -> None:
     """校验 Gacha 各档位基础概率合法性。"""
     for key, val in rates.items():
         if not isinstance(val, (int, float)) or val < 0.0 or val > 1.0:
-            violations.append(f"[Gacha概率越界] rates.{key} = {val} 超出 [0.0, 1.0] 合法值域")
+            violations.append(
+                f"[Gacha概率越界] rates.{key} = {val} 超出 [0.0, 1.0] 合法值域"
+            )
 
 
 def _validate_pity_bounds(soft: Any, hard: Any, violations: list) -> None:
@@ -110,28 +127,38 @@ def _validate_pity_bounds(soft: Any, hard: Any, violations: list) -> None:
     if not isinstance(hard, int) or hard <= 0:
         violations.append(f"[Gacha保底非法] pity.hard_threshold = {hard} 必须为正整数")
     if isinstance(soft, int) and isinstance(hard, int) and soft >= hard:
-        violations.append(f"[Gacha保底倒挂] soft_threshold({soft}) 必须严格小于 hard_threshold({hard})")
+        violations.append(
+            f"[Gacha保底倒挂] soft_threshold({soft}) 必须严格小于 hard_threshold({hard})"
+        )
 
 
 def _validate_pity_rates(inc: Any, guaranteed: Any, violations: list) -> None:
     """校验保底递增步长与绝对保底率。"""
     if not isinstance(inc, (int, float)) or inc <= 0.0 or inc > 1.0:
-        violations.append(f"[Gacha步进越界] pity.soft_increment_per_pull = {inc} 必须在 (0.0, 1.0] 之间")
+        violations.append(
+            f"[Gacha步进越界] pity.soft_increment_per_pull = {inc} 必须在 (0.0, 1.0] 之间"
+        )
     if guaranteed != 1.0:
-        violations.append(f"[Gacha绝对保底非法] pity.hard_guaranteed_rate = {guaranteed} 必须严格为 1.0")
+        violations.append(
+            f"[Gacha绝对保底非法] pity.hard_guaranteed_rate = {guaranteed} 必须严格为 1.0"
+        )
 
 
 def _validate_pity_thresholds(pity: dict, violations: list) -> None:
     """校验保底软硬阈值、步进递增与绝对保底率。"""
-    _validate_pity_bounds(pity.get("soft_threshold"), pity.get("hard_threshold"), violations)
-    _validate_pity_rates(pity.get("soft_increment_per_pull"), pity.get("hard_guaranteed_rate"), violations)
+    _validate_pity_bounds(
+        pity.get("soft_threshold"), pity.get("hard_threshold"), violations
+    )
+    _validate_pity_rates(
+        pity.get("soft_increment_per_pull"),
+        pity.get("hard_guaranteed_rate"),
+        violations,
+    )
 
 
 def check_gacha_rates_and_pity(violations: list) -> dict:
     """校验 domains.gacha 概率表值域与保底阶梯单调性"""
     gacha_file = CONFIG / "domains" / "gacha" / "core.json"
-    if not gacha_file.exists():
-        gacha_file = CONFIG / "domains" / "gacha.json"
     if not gacha_file.exists():
         violations.append(f"[配置缺失] 找不到 Gacha 配置文件: {gacha_file}")
         return {}
@@ -172,7 +199,9 @@ def run_cdc_audit() -> int:
         print("\n【审查结论】未通过（存在配置或引用漂移）")
         return 1
     else:
-        print("【审查结论】通过（ID 引用严格自洽、AST Kind 单一真源直读、Gacha 值域守恒）")
+        print(
+            "【审查结论】通过（ID 引用严格自洽、AST Kind 单一真源直读、Gacha 值域守恒）"
+        )
         return 0
 
 

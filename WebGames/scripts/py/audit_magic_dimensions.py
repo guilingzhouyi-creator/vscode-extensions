@@ -21,6 +21,7 @@ import re
 import sys
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
+
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -41,7 +42,9 @@ def _parse_rank_entries(
     for key, entry in rank_gradient.items():
         m = re.match(r"^rank_(\d+)$", key)
         if not m:
-            violations.append(f"[阶位键格式] rank_gradient 键 {key} 非 rank_N 纯梯度命名")
+            violations.append(
+                f"[阶位键格式] rank_gradient 键 {key} 非 rank_N 纯梯度命名"
+            )
             continue
         ranks[int(m.group(1))] = entry
     return ranks
@@ -58,7 +61,9 @@ def _check_rank_monotonicity(ranks: dict[int, Any], violations: list[str]) -> No
     for r in seq:
         w = float(ranks[r].get("strength_weight", 0))
         if w <= prev_w:
-            violations.append(f"[严格递增] strength_weight 未严格递增 @rank_{r}（{prev_w}→{w}）")
+            violations.append(
+                f"[严格递增] strength_weight 未严格递增 @rank_{r}（{prev_w}→{w}）"
+            )
         prev_w = w
 
 
@@ -89,9 +94,7 @@ def _audit_rank_gradient(
     return ranks
 
 
-def _audit_ability_tiers(
-    ability_tiers: dict[str, Any], violations: list[str]
-) -> None:
+def _audit_ability_tiers(ability_tiers: dict[str, Any], violations: list[str]) -> None:
     """校验能力分级四等+超位独立键及参考区间自洽。"""
     if not ability_tiers:
         violations.append("[能力分级缺失] ability_tiers 段为空（能力分级维度缺失）")
@@ -118,9 +121,7 @@ def _audit_ability_tiers(
             )
 
 
-def _check_band_intervals(
-    rank_bands: dict[str, Any], violations: list[str]
-) -> None:
+def _check_band_intervals(rank_bands: dict[str, Any], violations: list[str]) -> None:
     """校验四档区间互斥全覆盖与无缝衔接。"""
     band_ivs: list[tuple[int, int]] = []
     for key, entry in rank_bands.items():
@@ -167,7 +168,9 @@ def _check_band_keys_no_nesting(
     for key in rank_gradient:
         low = key.lower()
         if any(b.lower() in low for b in BAND_KEYS):
-            violations.append(f"[禁嵌套] rank_gradient 键 {key} 含档次名（禁低阶一阶类嵌套）")
+            violations.append(
+                f"[禁嵌套] rank_gradient 键 {key} 含档次名（禁低阶一阶类嵌套）"
+            )
 
 
 def _audit_rank_bands(
@@ -180,9 +183,7 @@ def _audit_rank_bands(
     _check_band_keys_no_nesting(rank_bands, rank_gradient, violations)
 
 
-def _audit_mana_aptitudes(
-    aptitudes: dict[str, Any], violations: list[str]
-) -> None:
+def _audit_mana_aptitudes(aptitudes: dict[str, Any], violations: list[str]) -> None:
     """校验资质四档与 backfire_threshold 严格递增。"""
     if not aptitudes:
         violations.append("[资质缺失] mana_aptitudes 段为空（资质维度缺失）")
@@ -225,9 +226,7 @@ def _audit_magic_forms(forms: dict[str, Any], violations: list[str]) -> None:
             )
 
 
-def _audit_profession_ranks(
-    professions: dict[str, Any], violations: list[str]
-) -> None:
+def _audit_profession_ranks(professions: dict[str, Any], violations: list[str]) -> None:
     """校验实力称号 13 级连续性与 magic_domain 单调性。"""
     if not professions:
         violations.append("[称号缺失] profession_ranks 段为空（实力称号维度缺失）")
@@ -269,7 +268,11 @@ def _audit_backend_gdscript_mappings(violations: list[str]) -> None:
     enum_decl = re.compile(r"^\s*[A-Z][A-Z0-9_]*\s*=\s*\d+\s*,?\s*(#.*)?$")
 
     for gd in GD_BACKEND.rglob("*.gd"):
-        if "magic" not in gd.name and "ability" not in gd.name and "tier" not in gd.name:
+        if (
+            "magic" not in gd.name
+            and "ability" not in gd.name
+            and "tier" not in gd.name
+        ):
             continue
         text = gd.read_text(encoding="utf-8", errors="ignore")
         for idx, line in enumerate(text.splitlines(), 1):
@@ -324,9 +327,9 @@ def run_magic_dimensions_audit() -> int:
 
     cfg_path = CONFIG / "domains" / "magic_tiers" / "core.json"
     if not cfg_path.exists():
-        cfg_path = CONFIG / "domains" / "magic_tiers.json"
-    if not cfg_path.exists():
-        print("【审查结论】未通过（config/domains/magic_tiers/core.json 缺失，已阻断！）")
+        print(
+            "【审查结论】未通过（config/domains/magic_tiers/core.json 缺失，已阻断！）"
+        )
         return 1
 
     try:
