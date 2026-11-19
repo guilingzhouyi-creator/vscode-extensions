@@ -170,6 +170,7 @@ static func advance_prologue_step(
 	if prologue_context.is_completed:
 		var creation_hooks: Dictionary = GameConfig.get_dict("domains.character_creation", "creation_hooks", {})
 		EventBusCore.get_instance().emit_domain_event("prologue.completed", {
+			"category_key": "info",
 			"account_id": prologue_context.account_id,
 			"character_id": prologue_context.character_id,
 			"race_id": prologue_context.race_id,

@@ -272,5 +272,5 @@ static func clear_slot(account: AccountProfile, slot_id: String) -> Dictionary:
 	var repository := AccountRepository.get_instance()
 	if repository.has_account(account.account_id):
 		repository.save_account(account)
-	EventBusCore.get_instance().emit_domain_event("account.slot_cleared", {"args": [slot_id], "summary": {"slot_id": slot_id}})
+	EventBusCore.get_instance().emit_domain_event("account.slot_cleared", {"category_key": "auth", "args": [slot_id], "summary": {"slot_id": slot_id}})
 	return {"success": true, "slot_id": slot_id}

@@ -44,6 +44,7 @@ static func consume_event_channel(
 			total_delta += float(adjustment_result.actual_delta)
 
 	EventBusCore.get_instance().emit_domain_event(EVENT_CHANNEL_ADJUSTED, {
+		"category_key": "system",
 		"args": [channel, total_delta],
 		"summary": { "channel": channel, "applied": applied, "total_delta": total_delta }
 	})

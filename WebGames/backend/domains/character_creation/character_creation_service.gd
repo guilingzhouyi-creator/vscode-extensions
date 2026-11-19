@@ -121,6 +121,7 @@ static func process_character_creation(
 		request.extra_custom_fields.erase(forged_key)
 	if not forged_dropped.is_empty():
 		EventBusCore.get_instance().emit_domain_event("character_creation.forged_fields_dropped", {
+			"category_key": "system",
 			"account_id": request.account_id,
 			"dropped_keys": forged_dropped
 		})
@@ -181,6 +182,7 @@ static func process_character_creation(
 
 	# 4. 事件总线广播：角色创建完成事件
 	EventBusCore.get_instance().emit_domain_event("character_creation.completed", {
+		"category_key": "auth",
 		"account_id": request.account_id,
 		"slot_id": str(slot_state.get("slot_id", "")),
 		"character_id": profile.character_id,

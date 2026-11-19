@@ -54,6 +54,7 @@ func initialize_with_graph(target_graph: NarrativeDAGGraphDTO, initial_context: 
 		_hook_interceptor.call(graph.graph_id, graph.entry_node_id, true)
 
 	_notify_event("narrative.dag.node_activated", {
+		"category_key": "info",
 		"dag_id": graph.graph_id,
 		"node_id": graph.entry_node_id
 	})
@@ -109,6 +110,7 @@ func _commit_node_completion(node_id: String, current_node: NarrativeDAGNode, ac
 		_hook_interceptor.call(graph.graph_id, node_id, false)
 
 	_notify_event("narrative.dag.node_completed", {
+		"category_key": "info",
 		"dag_id": graph.graph_id,
 		"node_id": node_id,
 		"mutations": current_node.mutations_on_complete
@@ -120,6 +122,7 @@ func _try_handle_terminal(node_id: String, current_node: NarrativeDAGNode) -> Di
 		is_terminated = true
 		active_node_ids.clear()
 		_notify_event("narrative.dag.completed", {
+			"category_key": "info",
 			"dag_id": graph.graph_id,
 			"terminal_node": node_id
 		})
@@ -158,6 +161,7 @@ func _derive_downstream_activations(node_id: String, current_node: NarrativeDAGN
 				if _hook_interceptor.is_valid():
 					_hook_interceptor.call(graph.graph_id, next_id, true)
 				_notify_event("narrative.dag.node_activated", {
+					"category_key": "info",
 					"dag_id": graph.graph_id,
 					"node_id": next_id
 				})

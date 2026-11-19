@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/ground_loot/ground_loot_event_listener.gd
 # 架构定位: Value Object DTO / Data Transport Model
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/ground_loot.json | 信号: EventBus 领域广播
-# 职责说明: 订阅 EventBusCore 泛化领域信道（DOMAIN_EVENT_GENERIC），过滤 monster.killed， 将 payload 中的 drop_declarations 声明转化为 GroundDroppedItemAggregate 实例 并登记为活跃掉落物（由战斗结算方触发，解耦掉落声明与地面拾取域）。
+# 职责说明: 精准订阅 monster.killed 领域信道，将 payload 中的 drop_declarations 声明转化为 GroundDroppedItemAggregate 实例并登记为活跃掉落物（由战斗结算方触发，解耦掉落声明与地面拾取域）。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -22,11 +22,10 @@ var _subscription_token: EventBusSubscriptionToken = null # 新总线订阅令�
 # 二、生命周期（构造订阅 / 销毁解绑）
 # ==============================================================================
 
-## 构造即订阅事件总线（注入 catalog 用于声明登记校验，未登记 canonical_id 拒绝生成）
+## 构造即精确订阅 monster.killed 事件信道（注入 catalog 用于声明登记校验，未登记 canonical_id 拒绝生成）
 func _init(catalog: ItemRegistryCatalog) -> void:
 	_catalog = catalog
-	_subscription_token = EventBusCore.get_instance().on_channel(
-		EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_domain_packet)
+	_subscription_token = EventBusCore.get_instance().on_channel("monster.killed", _on_domain_packet)
 
 ## 资源释放与事件解绑（宿主销毁前调用，杜绝闭包泄漏）
 func dispose() -> void:

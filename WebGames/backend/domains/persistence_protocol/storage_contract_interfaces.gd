@@ -104,4 +104,4 @@ class ResourceDecoderContract extends RefCounted:
 
 	## 对二进制或文本输入载荷执行反序列化解码
 	func decode_payload(_raw_bytes: PackedByteArray, _text: String, _entry: RefCounted) -> Dictionary:
-		return {"data": null, "error": "NOT_IMPLEMENTED"}
+		return {"data": null, "error_code": "NOT_IMPLEMENTED"}

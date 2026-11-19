@@ -87,7 +87,7 @@ static func register_account(request: AccountRegistrationDTO.Request, account_st
 		var repository := AccountRepository.get_instance()
 		var save_result := repository.save_account(account)
 		if not bool(save_result.get("success", false)):
-			response.error_code = String(save_result.get("error", "ERR_STORAGE_SAVE_FAILED"))
+			response.error_code = String(save_result.get("error_code", "ERR_STORAGE_SAVE_FAILED"))
 			return response
 		account_store[account.account_id] = account
 
@@ -313,28 +313,71 @@ static func is_token_valid(issued_at_utc: int, now_utc: int = -1) -> bool:
 	var skew := maxi(0, GameConfig.get_int("infrastructure.admin", "security/allow_future_clock_skew_seconds", GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "auth/session/allow_future_clock_skew_seconds", 0)))
 	return issued_at_utc <= now + skew and now <= issued_at_utc + session_ttl_seconds
 
-## 会话 Token 全错误族校验：未知/撤销/未来/过期/账号不匹配/设备绑定不匹配
+static var _session_policy_version: int = -1
+static var _cached_bind_device: bool = true
+static var _last_prune_epoch_second: int = -1
+
+static func _sync_session_policy_cache() -> void:
+	var current_version := GameConfig.config_reload_version()
+	if _session_policy_version == current_version:
+		return
+	_cached_bind_device = GameConfig.get_bool("infrastructure.admin", "session/bind_device", GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/bind_device", true))
+	_session_policy_version = current_version
+
+## 会话 Token 全错误族校验：未知/撤销/未来/过期/账号不匹配/设备绑定不匹配（单次 SHA-256 + 策略版本缓存）
 static func validate_token(token: String, account_id: String = "", device_fingerprint: String = "", now_utc: int = -1) -> Dictionary:
 	if token.is_empty():
 		return {"success": false, "error_code": "TOKEN_UNKNOWN"}
-	var session: Dictionary = _sessions.get(token.sha256_text(), {})
-	if session.is_empty():
+	var token_hash := token.sha256_text()
+	var session_variant: Variant = _sessions.get(token_hash, null)
+	if not (session_variant is Dictionary):
 		return {"success": false, "error_code": "TOKEN_UNKNOWN"}
+	var session: Dictionary = session_variant
 	if bool(session.get("revoked", false)):
 		return {"success": false, "error_code": "TOKEN_REVOKED"}
 	var now := now_utc if now_utc >= 0 else int(Time.get_unix_time_from_system())
-	_prune_sessions(now) # 会话查询路径同样触发收敛（过期优先清理）
+	if _last_prune_epoch_second != now:
+		_last_prune_epoch_second = now
+		_prune_sessions(now)
 	if now < int(session.get("issued_at", 0)):
 		return {"success": false, "error_code": "TOKEN_FUTURE"}
 	if now > int(session.get("expires_at", 0)):
-		_sessions.erase(token.sha256_text())
+		_sessions.erase(token_hash)
 		return {"success": false, "error_code": "TOKEN_EXPIRED"}
 	if not account_id.is_empty() and account_id != str(session.get("account_id", "")):
 		return {"success": false, "error_code": "TOKEN_ACCOUNT_MISMATCH"}
-	var should_bind_device := GameConfig.get_bool("infrastructure.admin", "session/bind_device", GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/bind_device", true))
-	if should_bind_device and not device_fingerprint.is_empty() and device_fingerprint != str(session.get("device_fingerprint", "")):
+	_sync_session_policy_cache()
+	if _cached_bind_device and not device_fingerprint.is_empty() and device_fingerprint != str(session.get("device_fingerprint", "")):
 		return {"success": false, "error_code": "DEVICE_MISMATCH"}
 	return {"success": true, "account_id": session.get("account_id", ""), "issued_at": session.get("issued_at", 0), "expires_at": session.get("expires_at", 0), "state": "ACTIVE"}
+
+## 单次 SHA-256 合并核验：供协议调度门禁同步判定已知撤销/过期与完整鉴权，消除双重哈希与双次查表
+static func validate_session_request(token: String, account_id: String = "", require_auth: bool = true, now_utc: int = -1) -> Dictionary:
+	if token.is_empty():
+		return {"success": false, "error_code": "TOKEN_UNKNOWN", "revoked_or_expired": false}
+	var token_hash := token.sha256_text()
+	var session_variant: Variant = _sessions.get(token_hash, null)
+	if not (session_variant is Dictionary):
+		return {"success": false, "error_code": "TOKEN_UNKNOWN", "revoked_or_expired": false}
+	var session: Dictionary = session_variant
+	var now := now_utc if now_utc >= 0 else int(Time.get_unix_time_from_system())
+	var issued_at: int = int(session.get("issued_at", 0))
+	var expires_at: int = int(session.get("expires_at", 0))
+	if bool(session.get("revoked", false)):
+		return {"success": false, "error_code": "TOKEN_REVOKED", "revoked_or_expired": true}
+	if now < issued_at:
+		return {"success": false, "error_code": "TOKEN_FUTURE", "revoked_or_expired": true}
+	if now > expires_at:
+		_sessions.erase(token_hash)
+		return {"success": false, "error_code": "TOKEN_EXPIRED", "revoked_or_expired": true}
+	if not require_auth:
+		return {"success": true, "revoked_or_expired": false}
+	if _last_prune_epoch_second != now:
+		_last_prune_epoch_second = now
+		_prune_sessions(now)
+	if not account_id.is_empty() and account_id != str(session.get("account_id", "")):
+		return {"success": false, "error_code": "TOKEN_ACCOUNT_MISMATCH", "revoked_or_expired": false}
+	return {"success": true, "account_id": session.get("account_id", ""), "issued_at": issued_at, "expires_at": expires_at, "state": "ACTIVE", "revoked_or_expired": false}
 
 ## 撤销会话（幂等；擦除内存掩码令牌字节，已撤销/不存在的 token 返回 false）
 static func revoke_token(token: String) -> bool:

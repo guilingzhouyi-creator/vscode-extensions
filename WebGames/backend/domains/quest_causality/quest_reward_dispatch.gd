@@ -75,7 +75,7 @@ static func dispatch_item_rewards(reward_items: Array, catalog: ItemRegistryCata
 			return step_result
 		granted += int(step_result.get("granted", 0))
 
-	EventBusCore.get_instance().emit_domain_event("quest.reward_dispatched", {"args": [granted], "summary": {"granted": granted}})
+	EventBusCore.get_instance().emit_domain_event("quest.reward_dispatched", {"category_key": "quest", "args": [granted], "summary": {"granted": granted}})
 	var dispatch_result: Dictionary = {"success": true, "granted": granted, "transaction_id": effective_transaction_id}
 	_completed_transactions[effective_transaction_id] = dispatch_result.duplicate(true)
 	# 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长）

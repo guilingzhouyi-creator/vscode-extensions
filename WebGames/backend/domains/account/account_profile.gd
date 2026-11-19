@@ -80,7 +80,7 @@ func bind_character_to_slot(slot_id: String, slot_summary: SaveSlotDTO) -> Dicti
 		slot_summary.slot_id = slot_id
 	save_slot_summaries[slot_id] = slot_summary
 	active_slot_id = slot_id
-	EventBusCore.get_instance().emit_domain_event("account.slot_bound", {"args": [slot_id], "summary": {"character": slot_summary.character_name, "slot_id": slot_id}})
+	EventBusCore.get_instance().emit_domain_event("account.slot_bound", {"category_key": "auth", "args": [slot_id], "summary": {"character": slot_summary.character_name, "slot_id": slot_id}})
 	return {"success": true, "slot_id": slot_id, "character_name": slot_summary.character_name}
 
 ## 取下一个可用槽位 ID（SLOT_%02d 序号递增探测，满员返回空串）

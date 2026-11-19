@@ -49,23 +49,22 @@ static func calculate_current_5star_rate(pity_count: int) -> float:
 
 ## 执行单次抽奖判定
 ##
-## rng_or_seed 接受两种形态（向后兼容）：
-##   DeterministicRNG 实例 -> 直接复用（十连等批量场景必须共用同一实例，
-##                            否则每抽都从同一状态重开，序列退化为重复值）
-##   int 且 > 0            -> 以该种子创建独立实例，单抽完全可复现
-##   null / 0              -> 回退共享实例 DeterministicRNG.global()
-static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant = null) -> Dictionary:
-	var rng := DeterministicRNG.resolve(rng_or_seed)
+## rng 约定：
+##   传入 DeterministicRNG 实例 -> 直接复用（十连等批量场景必须共用同一实例，
+##                                否则每抽从同一状态重开，序列退化为重复值）
+##   传入 null                 -> 回退共享实例 DeterministicRNG.global()
+static func roll_single_draw(banner: GachaBannerAggregate, rng: DeterministicRNG = null) -> Dictionary:
+	var resolved_rng := DeterministicRNG.resolve(rng)
 
 	banner.total_lifetime_pulls += 1
 	banner.current_pity_count += 1
 
 	var five_star_rate := calculate_current_5star_rate(banner.current_pity_count)
-	var roll := rng.randf()
+	var roll := resolved_rng.randf()
 
 	if roll < five_star_rate:
 		var is_up := false
-		if banner.is_next_guaranteed_up or rng.randf() < _up_rate():
+		if banner.is_next_guaranteed_up or resolved_rng.randf() < _up_rate():
 			is_up = true
 			banner.is_next_guaranteed_up = false
 		else:
@@ -77,7 +76,7 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 		if is_up:
 			reward_item_id = "" if banner.up_5star_item_ids.is_empty() else str(banner.up_5star_item_ids[0])
 		else:
-			var picked: Variant = rng.pick(banner.standard_5star_item_ids)
+			var picked: Variant = resolved_rng.pick(banner.standard_5star_item_ids)
 			reward_item_id = "" if picked == null else str(picked)
 
 		var pity_used: Variant = banner.current_pity_count
@@ -90,10 +89,10 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 			"pity_count_used": pity_used
 		}
 	elif roll < (five_star_rate + _base_4star_rate()):
-		var picked_four_star: Variant = rng.pick(banner.standard_4star_item_ids)
+		var picked_four_star: Variant = resolved_rng.pick(banner.standard_4star_item_ids)
 		var four_star_item_id := "" if picked_four_star == null else str(picked_four_star)
 		return { "rarity": 4, "is_up": false, "item_id": four_star_item_id, "pity_count_used": banner.current_pity_count }
 	else:
-		var picked_three_star: Variant = rng.pick(banner.standard_3star_item_ids)
+		var picked_three_star: Variant = resolved_rng.pick(banner.standard_3star_item_ids)
 		var three_star_item_id := "" if picked_three_star == null else str(picked_three_star)
 		return { "rarity": 3, "is_up": false, "item_id": three_star_item_id, "pity_count_used": banner.current_pity_count }

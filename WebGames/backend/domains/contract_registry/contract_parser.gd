@@ -23,9 +23,9 @@ static var _dispatch_sequence: int = 0
 ## DTO 字段映射解析（Inv-CP-1 类型安全守卫，未知字段丢弃，缺失字段安全回退）
 static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dictionary:
 	if entry == null:
-		return {"error": "CT_ERR_UNKNOWN_CONTRACT"}
+		return {"error_code": "CT_ERR_UNKNOWN_CONTRACT"}
 	if entry.endpoint_kind != EntryClass.EndpointKind.DTO:
-		return {"error": "CT_ERR_SCHEMA_INVALID"}
+		return {"error_code": "CT_ERR_SCHEMA_INVALID"}
 	if backend_dto == null:
 		return {}
 

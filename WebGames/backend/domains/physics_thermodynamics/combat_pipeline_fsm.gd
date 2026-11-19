@@ -247,6 +247,7 @@ static func _emit_monster_killed(attacker: CombatParticipant, defender: CombatPa
 	if declarations.is_empty():
 		return
 	EventBusCore.get_instance().emit_domain_event("monster.killed", {
+		"category_key": "combat",
 		"killer_id": attacker.participant_id,
 		"victim_id": defender.participant_id,
 		"drop_declarations": declarations,

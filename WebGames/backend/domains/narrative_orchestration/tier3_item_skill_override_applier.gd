@@ -39,9 +39,17 @@ static func apply_items_override(
 	if not (mod_items_table.get("items") is Array):
 		mod_items_table["items"] = []
 	var append_target_list: Array = mod_items_table["items"]
+	var item_index_map := _build_item_location_index(working_tables)
 
 	for raw_item in incoming_items:
-		_merge_single_incoming_item(raw_item, working_tables, touched_tables, append_target_list, override_mode)
+		_merge_single_incoming_item(
+			raw_item,
+			working_tables,
+			touched_tables,
+			append_target_list,
+			override_mode,
+			item_index_map
+		)
 	return true
 
 static func _append_dict_copy(target_list: Array, candidate: Variant) -> void:
@@ -53,7 +61,8 @@ static func _merge_single_incoming_item(
 	working_tables: Dictionary,
 	touched_tables: Dictionary,
 	append_target_list: Array,
-	override_mode: String
+	override_mode: String,
+	item_index_map: Dictionary
 ) -> void:
 	if not (raw_item is Dictionary):
 		return
@@ -61,11 +70,13 @@ static func _merge_single_incoming_item(
 	var canonical_identifier := String(item_dictionary.get("canonical_id", "")).strip_edges()
 	if canonical_identifier.is_empty():
 		return
-	var existing_location := _find_existing_item_location(working_tables, canonical_identifier)
-	if bool(existing_location.get("found", false)):
+	if item_index_map.has(canonical_identifier):
+		var existing_location: Dictionary = item_index_map[canonical_identifier]
 		_replace_or_merge_item_at_location(working_tables, touched_tables, existing_location, item_dictionary, override_mode)
 	else:
+		var new_index := append_target_list.size()
 		append_target_list.append(item_dictionary.duplicate(true))
+		item_index_map[canonical_identifier] = {"table_name": TABLE_ITEMS_OVERRIDES, "array_index": new_index}
 
 ## 应用单份技能动作与卡牌差分载荷至 domains.combat.mechanics
 static func apply_skills_override(
@@ -121,7 +132,8 @@ static func _extract_items_array(payload_map: Dictionary) -> Array:
 		return payload_map.get("weapons") as Array
 	return []
 
-static func _find_existing_item_location(working_tables: Dictionary, canonical_identifier: String) -> Dictionary:
+static func _build_item_location_index(working_tables: Dictionary) -> Dictionary:
+	var index_map: Dictionary = {}
 	for table_key_variant in working_tables.keys():
 		var table_name := String(table_key_variant)
 		if not table_name.begins_with("items."):
@@ -133,12 +145,13 @@ static func _find_existing_item_location(working_tables: Dictionary, canonical_i
 		if not (items_variant is Array):
 			continue
 		var items_array: Array = items_variant
-		var array_index: int = 0
-		for existing_entry in items_array:
-			if existing_entry is Dictionary and String((existing_entry as Dictionary).get("canonical_id", "")) == canonical_identifier:
-				return {"found": true, "table_name": table_name, "array_index": array_index}
-			array_index += 1
-	return {"found": false}
+		for array_index in range(items_array.size()):
+			var existing_entry: Variant = items_array[array_index]
+			if existing_entry is Dictionary:
+				var entry_id := String((existing_entry as Dictionary).get("canonical_id", ""))
+				if not entry_id.is_empty() and not index_map.has(entry_id):
+					index_map[entry_id] = {"table_name": table_name, "array_index": array_index}
+	return index_map
 
 static func _replace_or_merge_item_at_location(
 	working_tables: Dictionary,

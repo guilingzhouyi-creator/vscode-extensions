@@ -32,19 +32,19 @@ static func execute_disposal(
 			return {
 				"success": false,
 				"error_code": "OUT_OF_FACILITY_RANGE",
-				"error_message": _msg("facility_too_far") % facility.max_operate_radius
+				"error_message": GameConfig.msg_fmt(
+					"matter_disposal",
+					"facility_too_far",
+					{"max_operate_radius": "%.1f" % facility.max_operate_radius}
+				)
 			}
 
 	var valuable_threshold := GameConfig.get_int("domains.matter_disposal", "safety/valuable_enhance_threshold", 7)
 	var confirm_code := GameConfig.get_string("domains.matter_disposal", "safety/confirm_passcode", "CONFIRM_DESTROY")
 	if target_item == null:
 		return {"success": false, "error_code": "INVALID_ITEM"}
-	# `combat_metrics.enhance_level` is the canonical runtime field.  The
-	# legacy socket key is read only as a migration fallback for older saves;
-	# canonical data always wins when both fields are present.
+	# 统一读取标准字段 `combat_metrics.enhance_level` 判定强化锁级别
 	var enhancement_level := int(target_item.combat_metrics.get("enhance_level", 0))
-	if not target_item.combat_metrics.has("enhance_level"):
-		enhancement_level = int(target_item.affix_sockets.get("enhancement_level", 0))
 	if enhancement_level >= valuable_threshold and security_passcode != confirm_code:
 		return {
 			"success": false,

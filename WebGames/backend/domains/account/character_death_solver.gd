@@ -41,7 +41,7 @@ static func handle_character_death(account: AccountProfile, slot_id: String, wor
 		world.append_history_fragment({"source": slot_summary.character_name, "slot_id": slot_id, "event": "character_death"})
 		world_time_after = world.world_time.duplicate()
 
-	EventBusCore.get_instance().emit_domain_event("character.death", {"args": [slot_id], "summary": {"cleared_keys": cleared_keys, "world_tick": world_time_after.get("tick", 0)}})
+	EventBusCore.get_instance().emit_domain_event("character.death", {"category_key": "bio", "args": [slot_id], "summary": {"cleared_keys": cleared_keys, "world_tick": world_time_after.get("tick", 0)}})
 	return {"success": true, "cleared_keys": cleared_keys, "is_fallen": true, "slot_reusable": true, "world_time": world_time_after}
 
 # ==============================================================================

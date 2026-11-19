@@ -204,9 +204,9 @@ func cancel_task(target: Variant) -> bool:
 func _run_task_execution(task: AsyncLoadTask) -> void:
 	var load_result := _load_resource_payload(task.resource_path)
 	task.duration_ms = float(Time.get_ticks_usec() - task.start_time_usec) / USEC_TO_MS
-	if load_result.has("error") and str(load_result["error"]) != StorageContractInterfaces.ERR_NONE:
+	if load_result.has("error_code") and str(load_result["error_code"]) != StorageContractInterfaces.ERR_NONE:
 		task.status = STATUS_FAILED
-		task.error_code = String(load_result["error"])
+		task.error_code = String(load_result["error_code"])
 	else:
 		task.status = STATUS_COMPLETED
 		task.result_data = load_result.get("data", null)
@@ -254,10 +254,10 @@ func _cache_result(resource_path: String, resource_payload: Variant) -> void:
 static func _load_resource_payload(resource_path: String) -> Dictionary:
 	if resource_path.ends_with(".kdat"):
 		if not FileAccess.file_exists(resource_path):
-			return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
+			return {"error_code": StorageContractInterfaces.ERR_NOT_FOUND}
 		var binary_config_payload: Variant = BinaryConfigReader.load_kdat_file(resource_path)
 		if binary_config_payload == null:
-			return {"error": StorageContractInterfaces.ERR_CORRUPT}
+			return {"error_code": StorageContractInterfaces.ERR_CORRUPT}
 		var file_handle := FileAccess.open(resource_path, FileAccess.READ)
 		var binary_byte_length: int = file_handle.get_length() if file_handle != null else 0
 		if file_handle != null:
@@ -265,11 +265,11 @@ static func _load_resource_payload(resource_path: String) -> Dictionary:
 		return {"data": binary_config_payload, "byte_count": binary_byte_length}
 
 	if not FileAccess.file_exists(resource_path):
-		return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
+		return {"error_code": StorageContractInterfaces.ERR_NOT_FOUND}
 
 	var file := FileAccess.open(resource_path, FileAccess.READ)
 	if file == null:
-		return {"error": StorageContractInterfaces.ERR_IO_FAIL}
+		return {"error_code": StorageContractInterfaces.ERR_IO_FAIL}
 
 	var content_text := file.get_as_text()
 	var byte_length := content_text.length()
@@ -278,7 +278,7 @@ static func _load_resource_payload(resource_path: String) -> Dictionary:
 	if resource_path.ends_with(EXT_JSON):
 		var json := JSON.new()
 		if json.parse(content_text) != OK:
-			return {"error": StorageContractInterfaces.ERR_CORRUPT}
+			return {"error_code": StorageContractInterfaces.ERR_CORRUPT}
 		return {"data": json.get_data(), "byte_count": byte_length}
 
 	return {"data": content_text, "byte_count": byte_length}

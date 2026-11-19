@@ -15,14 +15,14 @@ const CHUNK_SIZE_BYTES: int = 65536 # 64 KB 硬件对齐缓冲区
 
 static func _hash_file_sha256(file_path: String) -> Dictionary:
 	if not FileAccess.file_exists(file_path):
-		return {"ok": false, "sha256": "", "error": "FILE_NOT_FOUND"}
+		return {"ok": false, "sha256": "", "error_code": "FILE_NOT_FOUND"}
 	var file_access := FileAccess.open(file_path, FileAccess.READ)
 	if file_access == null:
-		return {"ok": false, "sha256": "", "error": "FILE_OPEN_FAILED"}
+		return {"ok": false, "sha256": "", "error_code": "FILE_OPEN_FAILED"}
 	var hashing_context := HashingContext.new()
 	if hashing_context.start(HashingContext.HASH_SHA256) != OK:
 		file_access.close()
-		return {"ok": false, "sha256": "", "error": "HASHING_CONTEXT_INIT_FAILED"}
+		return {"ok": false, "sha256": "", "error_code": "HASHING_CONTEXT_INIT_FAILED"}
 	while not file_access.eof_reached():
 		var chunk := file_access.get_buffer(CHUNK_SIZE_BYTES)
 		if chunk.is_empty():
@@ -30,21 +30,21 @@ static func _hash_file_sha256(file_path: String) -> Dictionary:
 		hashing_context.update(chunk)
 	var digest := hashing_context.finish()
 	file_access.close()
-	return {"ok": true, "sha256": digest.hex_encode().to_lower(), "error": ""}
+	return {"ok": true, "sha256": digest.hex_encode().to_lower(), "error_code": ""}
 
 ## 流式分块计算并校验文件的 SHA-256
 static func verify_file_sha256(file_path: String, expected_sha256: String) -> Dictionary:
 	if expected_sha256.is_empty():
-		return {"success": false, "error": "MISSING_EXPECTED_HASH"}
+		return {"success": false, "error_code": "MISSING_EXPECTED_HASH"}
 	var hashed := _hash_file_sha256(file_path)
 	if not bool(hashed.get("ok", false)):
-		return {"success": false, "error": str(hashed.get("error", "FILE_OPEN_FAILED"))}
+		return {"success": false, "error_code": str(hashed.get("error_code", "FILE_OPEN_FAILED"))}
 	var computed_hex := str(hashed.get("sha256", ""))
 	var is_matched := CryptoIntegrityLib.constant_time_equals(computed_hex, expected_sha256.strip_edges().to_lower())
 	return {
 		"success": is_matched,
 		"computed_sha256": computed_hex,
-		"error": "" if is_matched else "HASH_MISMATCH"
+		"error_code": "" if is_matched else "HASH_MISMATCH"
 	}
 
 ## 计算单个文件的 SHA-256 十六进制字符串

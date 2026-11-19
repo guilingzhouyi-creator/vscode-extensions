@@ -296,7 +296,7 @@ static func _validate_manifest_compatibility(pack_map: Dictionary) -> Dictionary
             if parts.is_empty() or not parts[0].is_valid_int() or parts[0].to_int() != SUPPORTED_ENGINE_API_MAJOR:
                 return {
                     "success": false,
-                    "error": "MOD_ERR_INCOMPATIBLE_VERSION",
+                    "error_code": "MOD_ERR_INCOMPATIBLE_VERSION",
                     "pack_id": pack_id,
                     "engine_api_version": manifest_entry.engine_api_version
                 }
@@ -304,7 +304,7 @@ static func _validate_manifest_compatibility(pack_map: Dictionary) -> Dictionary
             if pack_map.has(incompatible_id):
                 return {
                     "success": false,
-                    "error": "ERR_MOD_INCOMPATIBLE_CONFLICT",
+                    "error_code": "ERR_MOD_INCOMPATIBLE_CONFLICT",
                     "pack_id": pack_id,
                     "conflict_with": incompatible_id
                 }
@@ -335,7 +335,7 @@ static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
     if not missing.is_empty():
         return {
             "success": false,
-            "error": "ERR_MISSING_DEPENDENCY",
+            "error_code": "ERR_MISSING_DEPENDENCY",
             "missing": missing
         }
 
@@ -361,7 +361,7 @@ static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
         cycles.sort()
         return {
             "success": false,
-            "error": "ERR_CYCLIC_DEPENDENCY",
+            "error_code": "ERR_CYCLIC_DEPENDENCY",
             "cycles": cycles
         }
 
@@ -584,7 +584,7 @@ static func scan_installed_full_mod_packages_with_diagnostics(custom_roots: Arra
     var sort_result: Dictionary = sort_and_resolve_dependencies(installed_packs)
     var loaded_packages: Array[Dictionary] = []
     if not bool(sort_result.get("success", false)):
-        var raw_error := str(sort_result.get("error", "CONFIG_VALIDATION_FAILED"))
+        var raw_error := str(sort_result.get("error_code", "CONFIG_VALIDATION_FAILED"))
         var registered_code := "MOD_ERR_CYCLE_DETECTED" if raw_error == "ERR_CYCLIC_DEPENDENCY" else (
             "MOD_ERR_INCOMPATIBLE_VERSION" if raw_error == "MOD_ERR_INCOMPATIBLE_VERSION" else "CONFIG_VALIDATION_FAILED"
         )

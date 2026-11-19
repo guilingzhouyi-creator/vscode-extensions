@@ -157,11 +157,11 @@ func _flush_ledger_to_disk() -> bool:
 ## 发射因果虚空共鸣扰动
 func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
     if perturbation == null:
-        return {"success": false, "error": "ERR_NULL_PERTURBATION"}
+        return {"success": false, "error_code": "ERR_NULL_PERTURBATION"}
     if perturbation.perturbation_id.is_empty():
-        return {"success": false, "error": "ERR_EMPTY_PERTURBATION_ID"}
+        return {"success": false, "error_code": "ERR_EMPTY_PERTURBATION_ID"}
     if perturbation.origin_world_id.is_empty():
-        return {"success": false, "error": "ERR_EMPTY_ORIGIN_WORLD_ID"}
+        return {"success": false, "error_code": "ERR_EMPTY_ORIGIN_WORLD_ID"}
 
     var current_timestamp: int = int(Time.get_unix_time_from_system())
     if perturbation.emitted_timestamp_utc <= 0:

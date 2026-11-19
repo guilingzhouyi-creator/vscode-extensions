@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: AgentPlaythroughSession, AuthoritativeHudSyncService | 下游: CompanionBlackboxRecorder, ModWorkbenchView | 配置: 无 | 信号: 无
 # 职责说明: 非侵入式伴侣观察事件总线；维护真定长环形回溯队列（MAX_CAPACITY = 32）与观察者清单，
 #           实现推演步进、回滚、完结事件的 O(1) 取模滚动覆盖、非阻塞只读分发与尾部事件保序溯源，彻底消除 pop_front() 移位。
-# 退出语义与设计依据: 伴侣观察总线平滑迁移与定长环形缓冲规范 (Inv-RING-BUFFER-BOUNDED-2, Inv-SEAMLESS-COMPATIBILITY-1)
+# 退出语义与设计依据: 伴侣观察总线定长环形缓冲与只读事件分发规范 (Inv-RING-BUFFER-BOUNDED-2, Inv-OBSERVER-BUS-FORWARD-1)
 # ==============================================================================
 
 ## CompanionObserverBus：Domain Event Bus / Observer Infrastructure
@@ -64,15 +64,19 @@ func unregister_observer(observer_callback: Callable) -> void:
 # 三、非侵入式只读事件广播与历史追溯 (O(1) 滚动覆盖)
 # ==============================================================================
 
-## 广播推演事件：O(1) 取模入定长环形队列并向所有观察者分发只读副本
+## 广播推演事件：O(1) 原位更新环形槽位并按需向观察者分发只读副本
 func broadcast_event(event_type: String, payload: Dictionary) -> void:
-	var entry: Dictionary = {
-		"event_type": event_type,
-		"payload": payload.duplicate(true),
-		"timestamp": int(Time.get_unix_time_from_system())
-	}
+	_broadcast_internal(event_type, payload, true)
 
-	_slots[_head] = entry
+## 广播已由调用方独占持有的字典载荷：省去多余深拷贝（零观察者时仅存环形槽位）
+func broadcast_owned_event(event_type: String, owned_payload: Dictionary) -> void:
+	_broadcast_internal(event_type, owned_payload, false)
+
+func _broadcast_internal(event_type: String, payload: Dictionary, should_clone_for_slot: bool) -> void:
+	var slot_entry: Dictionary = _slots[_head]
+	slot_entry["event_type"] = event_type
+	slot_entry["payload"] = payload.duplicate(true) if should_clone_for_slot else payload
+	slot_entry["timestamp"] = int(Time.get_unix_time_from_system())
 	_head = (_head + 1) % MAX_CAPACITY
 	_count = mini(MAX_CAPACITY, _count + 1)
 

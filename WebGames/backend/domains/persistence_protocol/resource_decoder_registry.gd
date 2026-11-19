@@ -31,8 +31,8 @@ class JSONResourceDecoder extends StorageContractInterfaces.ResourceDecoderContr
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
 		var json := JSON.new()
 		if json.parse(text) != OK:
-			return {"data": null, "error": ERR_CORRUPT}
-		return {"data": json.get_data(), "error": ERR_NONE}
+			return {"data": null, "error_code": ERR_CORRUPT}
+		return {"data": json.get_data(), "error_code": ERR_NONE}
 
 ## 内置通用文本资源解码器
 class TextResourceDecoder extends StorageContractInterfaces.ResourceDecoderContract:
@@ -45,7 +45,7 @@ class TextResourceDecoder extends StorageContractInterfaces.ResourceDecoderContr
 
 	## 对二进制或文本输入载荷执行反序列化解码
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
-		return {"data": text, "error": ERR_NONE}
+		return {"data": text, "error_code": ERR_NONE}
 
 static var _instance: RefCounted = null
 var _decoders: Array = []
@@ -82,7 +82,7 @@ func get_decoder_for_entry(entry: ResourceIndexEntryDTO) -> StorageContractInter
 func decode(raw_bytes: PackedByteArray, text: String, entry: ResourceIndexEntryDTO) -> Dictionary:
 	var decoder := get_decoder_for_entry(entry)
 	if decoder == null:
-		return {"data": null, "error": ERR_NO_DECODER}
+		return {"data": null, "error_code": ERR_NO_DECODER}
 	return decoder.decode_payload(raw_bytes, text, entry)
 
 ## 测试重置

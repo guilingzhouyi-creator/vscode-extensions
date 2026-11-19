@@ -257,7 +257,7 @@ static func _build_no_base_mod_failure(effective_world_id: String) -> Dictionary
 static func _build_lock_verification_failure(effective_world_id: String, verify_outcome: Dictionary) -> Dictionary:
     return {
         "success": false,
-        "error_code": String(verify_outcome.get("error", "ERR_MISSING_CRITICAL_MOD")),
+        "error_code": String(verify_outcome.get("error_code", "ERR_MISSING_CRITICAL_MOD")),
         "template_message": "Mod lockfile verification failed when entering world '{world_id}': missing critical packs {missing_packs}.",
         "params": {
             "world_id": effective_world_id,

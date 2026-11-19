@@ -59,6 +59,7 @@ func transition_to(target_phase: int) -> bool:
 
 	# 接入统一 EventBus 广播
 	EventBusCore.get_instance().emit_domain_event("lifecycle.phase_changed", {
+		"category_key": "lifecycle",
 		"previous_phase": previous_phase,
 		"new_phase": target_phase,
 		"previous_name": GameLifecycleModel.get_phase_name(previous_phase),

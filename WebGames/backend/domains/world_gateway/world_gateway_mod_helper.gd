@@ -64,7 +64,6 @@ static func build_no_base_mod_failure() -> Dictionary:
     return {
         "success": false,
         "error_code": "ERR_NO_BASE_CONTENT_MOD",
-        "error": "ERR_NO_BASE_CONTENT_MOD",
         "enabled_pack_ids": [],
         "precheck_checklist": [],
         "conflicts": [],

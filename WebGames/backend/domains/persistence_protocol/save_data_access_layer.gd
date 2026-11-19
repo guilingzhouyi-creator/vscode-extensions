@@ -136,6 +136,9 @@ static func build_save_payload(domain_ids: Array = []) -> Dictionary:
 		providers[domain_id] = provider_aggregate
 	return GameSaveAssembler.build_save_payload(providers)
 
+## 缓存已知槽位的基线数据快照（槽位名 -> {"sequence": int, "data": Dictionary}），免重复读盘+双重JSON解析
+static var _slot_baseline_cache: Dictionary = {}
+
 ## 统一反序列化分发入口：反向流回写数据（Inv-SV-6）
 static func apply_save_data(domains_payload: Dictionary, consumer_domain_ids: Array = []) -> Dictionary:
 	_ensure_contracts_fresh()
@@ -178,6 +181,10 @@ static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary
 	var save_result := SaveManager.save_game(slot_name, target_payload)
 	if bool(save_result.get("success", false)):
 		save_result["save_status"] = "SUCCESS"
+		_slot_baseline_cache[slot_name] = {
+			"sequence": SaveManager.get_save_mutation_sequence(),
+			"data": domains_payload.duplicate(true)
+		}
 	return save_result
 
 ## 统一存档读取门面：四层隔离判定 + 介质读取 + 版本感知
@@ -186,7 +193,13 @@ static func load_game(slot_name: String) -> Dictionary:
 	if not RuntimeModeGate.is_single_player() or active_source != SaveManager:
 		return { "success": false, "error_code": "ONLINE_LOAD_RESTRICTED" }
 
-	return SaveManager.load_game(slot_name)
+	var load_result := SaveManager.load_game(slot_name)
+	if bool(load_result.get("success", false)) and load_result.get("data", null) is Dictionary:
+		_slot_baseline_cache[slot_name] = {
+			"sequence": SaveManager.get_save_mutation_sequence(),
+			"data": (load_result["data"] as Dictionary).duplicate(true)
+		}
+	return load_result
 
 ## 脏标记增量写盘（Inv-SV-10）：仅重序列化脏域，但与既有全量档合并后原子落盘，
 ## 避免部分写盘覆盖丢失非脏域数据
@@ -202,13 +215,20 @@ static func flush_dirty(slot_name: String = "quicksave_dirty") -> Dictionary:
 		clear_dirty()
 		return { "success": false, "written": 0, "error_code": "EMPTY_SAVE_BLOCKED" }
 
-	# 2. 读取既有全量档，将脏域数据合并覆盖（非脏域原样保留，Inv-SV-10）
+	# 2. 优先复用序列号对齐的内存基线快照，未命中或外部修改时再读盘合并（Inv-SV-10）
 	var merged_domains_payload: Dictionary = dirty_domains_payload
-	var existing := SaveManager.load_game(slot_name)
-	if bool(existing.get("success", false)) and existing.get("data", null) is Dictionary:
-		merged_domains_payload = (existing["data"] as Dictionary).duplicate(true)
+	var current_sequence := SaveManager.get_save_mutation_sequence()
+	var cached_entry: Variant = _slot_baseline_cache.get(slot_name, null)
+	if cached_entry is Dictionary and int((cached_entry as Dictionary).get("sequence", -1)) == current_sequence:
+		merged_domains_payload = ((cached_entry as Dictionary)["data"] as Dictionary).duplicate(true)
 		for domain_id in dirty_domains_payload.keys():
 			merged_domains_payload[domain_id] = dirty_domains_payload[domain_id]
+	else:
+		var existing := SaveManager.load_game(slot_name)
+		if bool(existing.get("success", false)) and existing.get("data", null) is Dictionary:
+			merged_domains_payload = (existing["data"] as Dictionary).duplicate(true)
+			for domain_id in dirty_domains_payload.keys():
+				merged_domains_payload[domain_id] = dirty_domains_payload[domain_id]
 
 	var save_operation_result := save_game(slot_name, { "data": merged_domains_payload })
 	save_operation_result["written"] = dirty_ids.size()
@@ -222,5 +242,6 @@ static func flush_dirty(slot_name: String = "quicksave_dirty") -> Dictionary:
 static func reset_for_tests() -> void:
 	_domain_contracts.clear()
 	_dirty_domains.clear()
+	_slot_baseline_cache.clear()
 	_config_version = -1
 	_is_mock_busy_for_test = false

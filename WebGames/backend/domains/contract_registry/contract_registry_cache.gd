@@ -80,6 +80,7 @@ static func reload_from_config() -> void:
 	# 经 EventBus 唯一入口广播热重载事件
 	if EventBusCore.get_instance() != null:
 		EventBusCore.get_instance().emit_domain_event("contract_registry.reloaded", {
+			"category_key": "system",
 			"timestamp": _last_load_at,
 			"version": IndexClass.get_schema_version()
 		})

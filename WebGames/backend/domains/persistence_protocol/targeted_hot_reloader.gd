@@ -51,7 +51,7 @@ func get_cached_backup(node_id: String) -> Variant:
 ## reload_resolver: Callable(node_id: String) -> Dictionary {"success": bool, "data": Variant}
 func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()) -> Dictionary:
 	if changed_node.is_empty():
-		return {"success": false, "affected_nodes": [], "reloaded_count": 0, "error": ERR_EMPTY_NODE}
+		return {"success": false, "affected_nodes": [], "reloaded_count": 0, "error_code": ERR_EMPTY_NODE}
 
 	# 1. 依据 DAG 计算失效影响范围
 	var invalidation_list: Array[String] = _dependency_dag.get_invalidation_subgraph(changed_node)

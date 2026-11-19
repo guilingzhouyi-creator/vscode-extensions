@@ -215,6 +215,7 @@ static func _execute_shutdown_stage(stage_context: ShutdownStageContext) -> Dict
 						_record_shutdown_failure(stage_context.response, "flush_saves", stage_error)
 			if stage_context.bus != null:
 				stage_context.bus.emit_domain_event("lifecycle.save_completed", {
+					"category_key": "lifecycle",
 					"success": stage_context.response.is_save_completed,
 					"slot": stage_context.request.target_save_slot,
 					"sha256": stage_context.response.save_sha256,
@@ -232,6 +233,7 @@ static func _execute_shutdown_stage(stage_context: ShutdownStageContext) -> Dict
 				AuthService.revoke_token(stage_context.request.session_token)
 				if stage_context.bus != null:
 					stage_context.bus.emit_domain_event("lifecycle.session_revoked", {
+						"category_key": "lifecycle",
 						"token_prefix": stage_context.request.session_token.substr(0, min(8, stage_context.request.session_token.length()))
 					})
 		"teardown_bootstrap":
@@ -297,6 +299,7 @@ static func execute_graceful_shutdown(
 
 	if bus != null:
 		bus.emit_domain_event("lifecycle.shutdown_started", {
+			"category_key": "lifecycle",
 			"reason": request.exit_reason,
 			"reason_name": GameLifecycleModel.get_reason_name(request.exit_reason),
 			"idempotency_key": request.idempotency_key,
@@ -344,6 +347,7 @@ static func execute_graceful_shutdown(
 
 	if bus != null:
 		bus.emit_domain_event("lifecycle.shutdown_completed", {
+			"category_key": "lifecycle",
 			"elapsed_ms": response.elapsed_milliseconds,
 			"success": response.success,
 			"error_code": response.error_code,
@@ -383,6 +387,7 @@ static func _freeze_world_and_inputs() -> void:
 	if bus == null:
 		return
 	bus.emit_domain_event("lifecycle.inputs_frozen", {
+		"category_key": "lifecycle",
 		"timestamp_utc": int(Time.get_unix_time_from_system())
 	})
 
@@ -449,6 +454,7 @@ static func execute_logout_to_menu(request: GameShutdownDTO.Request, providers: 
 	var bus := EventBusCore.get_instance()
 	if bus != null:
 		bus.emit_domain_event("lifecycle.logout_to_menu_completed", {
+			"category_key": "lifecycle",
 			"account_id": request.account_id if request != null else "",
 			"is_save_completed": response.is_save_completed,
 			"current_phase": response.current_phase

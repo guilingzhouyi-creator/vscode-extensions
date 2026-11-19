@@ -75,12 +75,12 @@ static func apply_save_data(domains_payload: Dictionary, consumers: Dictionary) 
 	return {"restored": restored, "missing": missing, "skipped": skipped}
 
 ## 存档版本校验与链式迁移：将 save_version 迁移到当前配置版本。
-## 缺失 save_version 严格拒绝（MISSING_SAVE_VERSION）；异版且无迁移链 → 明确不兼容并给出 error。
-## 返回 { "compatible": bool, "version": 最终版本, "data": 处理后数据 [, "error"] }
+## 缺失 save_version 严格拒绝（MISSING_SAVE_VERSION）；异版且无迁移链 → 明确不兼容并给出 error_code。
+## 返回 { "compatible": bool, "version": 最终版本, "data": 处理后数据 [, "error_code"] }
 static func migrate_save_data(save_payload: Dictionary, save_version: String) -> Dictionary:
 	var current: String = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	if save_version.is_empty():
-		return {"compatible": false, "version": "", "data": save_payload, "error": "MISSING_SAVE_VERSION"}
+		return {"compatible": false, "version": "", "data": save_payload, "error_code": "MISSING_SAVE_VERSION"}
 	if save_version == current:
 		return {"compatible": true, "version": current, "data": save_payload}
 	var working: Dictionary = save_payload
@@ -88,10 +88,10 @@ static func migrate_save_data(save_payload: Dictionary, save_version: String) ->
 	var visited: Array[String] = []
 	while current_version != current:
 		if visited.has(current_version):
-			return {"compatible": false, "version": current_version, "data": working, "error": "MIGRATION_CYCLE"}
+			return {"compatible": false, "version": current_version, "data": working, "error_code": "MIGRATION_CYCLE"}
 		visited.append(current_version)
 		if not _migrations.has(current_version):
-			return {"compatible": false, "version": current_version, "data": working, "error": "NO_MIGRATION_PATH"}
+			return {"compatible": false, "version": current_version, "data": working, "error_code": "NO_MIGRATION_PATH"}
 		var step: Dictionary = _migrations[current_version]
 		working = step["fn"].call(working)
 		current_version = String(step["to"])

@@ -39,6 +39,7 @@ static func alert_breaking_change_pending(contracts: Array) -> void:
 			clean_contracts.append(contract_item.to_dto())
 
 	EventBusCore.get_instance().emit_domain_event("contract_registry.breaking_change_pending", {
+		"category_key": "system",
 		"contracts": clean_contracts,
 		"count": clean_contracts.size(),
 		"timestamp": Time.get_datetime_string_from_system()

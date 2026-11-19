@@ -149,8 +149,8 @@ func load_all() -> Dictionary:
 		var shard_count := _recover_from_shards(accounts_directory)
 		if shard_count > 0:
 			_save_registry_internal()
-			return {"success": true, "count": shard_count, "error": "", "recovered_from": "shards"}
-		return {"success": true, "count": 0, "error": ""}
+			return {"success": true, "count": shard_count, "error_code": "", "recovered_from": "shards"}
+		return {"success": true, "count": 0, "error_code": ""}
 
 	var load_result := _load_from_file(file_path)
 	if bool(load_result.get("success", false)):
@@ -169,25 +169,25 @@ func load_all() -> Dictionary:
 		var shard_count := _recover_from_shards(accounts_directory)
 		if shard_count > 0:
 			_save_registry_internal()
-			return {"success": true, "count": shard_count, "error": "", "recovered_from": "shards"}
+			return {"success": true, "count": shard_count, "error_code": "", "recovered_from": "shards"}
 
 	return load_result
 
 func _load_from_file(file_path: String) -> Dictionary:
 	var file := FileAccess.open(file_path, FileAccess.READ)
 	if file == null:
-		return {"success": false, "count": 0, "error": "FILE_OPEN_FAILED"}
+		return {"success": false, "count": 0, "error_code": "FILE_OPEN_FAILED"}
 	var content := file.get_as_text()
 	file.close()
 
 	var json := JSON.new()
 	var parse_error := json.parse(content)
 	if parse_error != OK:
-		return {"success": false, "count": 0, "error": "JSON_PARSE_ERROR"}
+		return {"success": false, "count": 0, "error_code": "JSON_PARSE_ERROR"}
 
 	var parsed: Variant = json.get_data()
 	if not parsed is Dictionary:
-		return {"success": false, "count": 0, "error": "INVALID_ROOT_CONTAINER"}
+		return {"success": false, "count": 0, "error_code": "INVALID_ROOT_CONTAINER"}
 
 	var root_dictionary: Dictionary = parsed
 	var raw_accounts: Dictionary = {}
@@ -204,7 +204,7 @@ func _load_from_file(file_path: String) -> Dictionary:
 	for account_key in raw_accounts.keys():
 		_register_raw_account(raw_accounts[account_key])
 
-	return {"success": true, "count": _accounts_cache.size(), "error": ""}
+	return {"success": true, "count": _accounts_cache.size(), "error_code": ""}
 
 func _register_raw_account(raw_account_payload: Variant) -> void:
 	if not raw_account_payload is Dictionary:
@@ -262,11 +262,11 @@ func _load_and_register_single_shard(shard_file_path: String) -> bool:
 ## 原子刷盘单个账号与全局索引表（tmp->bak->rename 事务原子写）
 func save_account(account: AccountProfile) -> Dictionary:
 	if account == null:
-		return {"success": false, "error": "ACCOUNT_IS_NULL"}
+		return {"success": false, "error_code": "ACCOUNT_IS_NULL"}
 	if account.account_id.is_empty():
-		return {"success": false, "error": "EMPTY_ACCOUNT_ID"}
+		return {"success": false, "error_code": "EMPTY_ACCOUNT_ID"}
 	if account.username.is_empty():
-		return {"success": false, "error": "EMPTY_USERNAME"}
+		return {"success": false, "error_code": "EMPTY_USERNAME"}
 
 	# 若用户名发生变更，先从反向索引中移除旧名称
 	var previous_account: AccountProfile = _accounts_cache.get(account.account_id, null)
@@ -289,18 +289,18 @@ func save_account(account: AccountProfile) -> Dictionary:
 		var shard_json := JSON.stringify(shard_payload, "\t")
 		var shard_write_result := _atomic_write_file(shard_path, shard_json)
 		if not bool(shard_write_result.get("success", false)):
-			return {"success": false, "error": "SHARD_WRITE_FAILED", "detail": shard_write_result.get("error", "")}
+			return {"success": false, "error_code": "SHARD_WRITE_FAILED", "detail": shard_write_result.get("error_code", "")}
 
 	# 2. 全局注册表原子落盘
 	var registry_write_result := _save_registry_internal()
 	if not bool(registry_write_result.get("success", false)):
-		return {"success": false, "error": "REGISTRY_WRITE_FAILED", "detail": registry_write_result.get("error", "")}
+		return {"success": false, "error_code": "REGISTRY_WRITE_FAILED", "detail": registry_write_result.get("error_code", "")}
 
 	return {
 		"success": true,
 		"account_id": account.account_id,
 		"username": account.username,
-		"error": ""
+		"error_code": ""
 	}
 
 ## 删除指定账号并原子落盘
@@ -366,16 +366,16 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 		"backup_fail_policy": policy
 	})
 	if bool(write_result.get("success", false)):
-		return {"success": true, "error": ""}
+		return {"success": true, "error_code": ""}
 	var stage: String = str(write_result.get("error_stage", ""))
 	var error_code: int = int(write_result.get("error_code", ERR_FILE_CANT_WRITE))
 	if not is_atomic_enabled:
-		return {"success": false, "error": "DIRECT_WRITE_OPEN_FAILED"}
+		return {"success": false, "error_code": "DIRECT_WRITE_OPEN_FAILED"}
 	if stage == "tmp_open":
-		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
+		return {"success": false, "error_code": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
 	if stage == "backup":
-		return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": error_code})}
-	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
+		return {"success": false, "error_code": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": error_code})}
+	return {"success": false, "error_code": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
 
 func _cleanup_orphan_tmp_files(accounts_directory: String) -> void:
 	if not GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "storage/orphan_tmp_cleanup", true):

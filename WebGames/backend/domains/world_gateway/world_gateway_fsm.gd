@@ -64,11 +64,10 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
     if not bool(precheck_result.get("success", false)):
         adapted_mod_manifest.clear()
         creation_ui_snapshot.clear()
-        var error_code: String = str(precheck_result.get("error_code", precheck_result.get("error", "ERR_MOD_PRECHECK_FAILED")))
+        var error_code: String = str(precheck_result.get("error_code", "ERR_MOD_PRECHECK_FAILED"))
         var failure_payload: Dictionary = precheck_result.duplicate(true)
         failure_payload["success"] = false
         failure_payload["error_code"] = error_code
-        failure_payload["error"] = error_code
         if not failure_payload.has("precheck_checklist"):
             failure_payload["precheck_checklist"] = []
         if not failure_payload.has("conflicts"):
@@ -77,6 +76,7 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
 
     var enriched_result := WorldGatewayModHelper.apply_precheck_adaptation_result(self, candidate_packs, precheck_result)
     _notify_event("world_gateway.mods_prechecked", {
+        "category_key": "system",
         "account_id": context.account_id,
         "enabled_pack_ids": active_mods,
         "precheck_checklist": precheck_result.get("precheck_checklist", []),
@@ -186,6 +186,7 @@ func purge_and_fallback_to_vanilla() -> void:
 
     WorldGatewayRealmLockHelper.purge_unofficial_mods_and_remount(self)
     _notify_event("world_gateway.mods_purged", {
+        "category_key": "system",
         "account_id": context.account_id,
         "retained_mods": active_mods
     })
@@ -210,6 +211,7 @@ func enter_gateway() -> Dictionary:
     ])
     var gateway_hooks: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
     _notify_event("world_gateway.entered", {
+        "category_key": "system",
         "account_id": context.account_id,
         "available_modes": available_modes,
         "configured_hooks": gateway_hooks.get("on_gateway_entered", []),
@@ -300,6 +302,7 @@ func select_mode(
     var character_status := "CHARACTER_PENDING" if context.is_first_time_creation else "SLOT_WORLD_RESOLVED"
     var gateway_hooks_map: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
     _notify_event("world_gateway.mode_selected", {
+        "category_key": "system",
         "account_id": context.account_id,
         "mode": mode,
         "world_id": context.selected_world_id,
@@ -357,6 +360,7 @@ func attach_ready_character(character_id: String) -> Dictionary:
     context.current_phase = WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED
 
     _notify_event("world_gateway.ready_for_entry", {
+        "category_key": "system",
         "account_id": context.account_id,
         "character_id": character_id,
         "world_id": context.selected_world_id,
@@ -410,6 +414,7 @@ func enter_world(target_world_id: String = "", should_allow_safe_degrade: bool =
     _populate_existing_character_context(hud_context)
     WorldSessionRuntimeService.activate_world_session(hud_context, false)
     _notify_event("world_gateway.world_entered", {
+        "category_key": "system",
         "account_id": context.account_id,
         "world_id": context.selected_world_id,
         "slot_id": context.selected_slot_id,
@@ -558,6 +563,7 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
     var snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync(hud_context)
 
     _notify_event("world_gateway.prologue_handed_off", {
+        "category_key": "system",
         "account_id": context.account_id,
         "character_id": handoff.character_id,
         "location_id": handoff.assigned_start_location_id,
@@ -609,6 +615,7 @@ func exit_to_gateway() -> Dictionary:
         _last_probe_reports.clear()
 
     _notify_event("world_gateway.memory_scrubbed", {
+        "category_key": "system",
         "account_id": context.account_id,
         "phase": context.current_phase,
         "probe_refreshed": not _last_probe_reports.is_empty()
@@ -645,6 +652,7 @@ func logout() -> Dictionary:
     WorldSessionRuntimeService.set_active_mod_context([], {})
     _last_probe_reports.clear()
     _notify_event("world_gateway.account_logged_out", {
+        "category_key": "system",
         "account_id": exited_account_id,
         "phase": context.current_phase
     })
@@ -694,6 +702,7 @@ func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, accoun
         selection_result = _finalize_multiplayer_lobby_switch(target_mode, selection_result)
     if bool(selection_result.get("success", false)):
         _notify_event("world_gateway.mode_switched", {
+            "category_key": "system",
             "account_id": context.account_id,
             "mode": target_mode,
             "world_id": context.selected_world_id,
@@ -777,7 +786,6 @@ func _fail(error_code: String, template_message: String, format_parameters: Dict
     return {
         "success": false,
         "error_code": error_code,
-        "error": error_code,
         "message": formatted_message,
         "context": context.to_dto()
     }

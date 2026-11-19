@@ -37,7 +37,7 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 	if file == null:
 		return {
 			"exists": false,
-			"error": "ERR_LOCK_FILE_OPEN_FAILED",
+			"error_code": "ERR_LOCK_FILE_OPEN_FAILED",
 			"world_id": world_id,
 			"locked_packs": []
 		}
@@ -49,7 +49,7 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 	if not (parsed_lock is Dictionary):
 		return {
 			"exists": false,
-			"error": "ERR_LOCK_FILE_CORRUPTED",
+			"error_code": "ERR_LOCK_FILE_CORRUPTED",
 			"world_id": world_id,
 			"locked_packs": []
 		}
@@ -74,7 +74,7 @@ func _serialize_pack_entry(pack_entry: Variant) -> Dictionary:
 ## 原子写落盘单机世界的 world_mod_lock.json
 func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 	if world_id.is_empty():
-		return {"success": false, "error": "ERR_EMPTY_WORLD_ID"}
+		return {"success": false, "error_code": "ERR_EMPTY_WORLD_ID"}
 
 	var target_path := get_lock_file_path(world_id)
 	var serialized_packs: Array[Dictionary] = []
@@ -98,8 +98,8 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 	if not bool(write_result.get("success", false)):
 		var stage: String = str(write_result.get("error_stage", ""))
 		if stage == "tmp_open":
-			return {"success": false, "error": "ERR_TMP_FILE_CREATE_FAILED"}
-		return {"success": false, "error": "ERR_RENAME_FAILED", "code": int(write_result.get("error_code", ERR_FILE_CANT_WRITE))}
+			return {"success": false, "error_code": "ERR_TMP_FILE_CREATE_FAILED"}
+		return {"success": false, "error_code": "ERR_RENAME_FAILED", "code": int(write_result.get("error_code", ERR_FILE_CANT_WRITE))}
 
 	return {
 		"success": true,
@@ -197,7 +197,7 @@ func _collect_lock_entry_drift(
 ## 对比当前世界锁定的 MOD 列表与当前安装的 MOD 并执行绑定裁定
 func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should_allow_safe_degrade: bool = false) -> Dictionary:
 	if world_id.is_empty():
-		return {"success": false, "error": "ERR_EMPTY_WORLD_ID"}
+		return {"success": false, "error_code": "ERR_EMPTY_WORLD_ID"}
 
 	var lock_payload := load_world_mod_lock(world_id)
 	var has_lock_file: bool = bool(lock_payload.get("exists", false))
@@ -208,14 +208,14 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should
 		if not initial_drifts.is_empty():
 			return {
 				"success": false,
-				"error": "MOD_ERR_REALM_DIGEST_MISMATCH",
+				"error_code": "MOD_ERR_REALM_DIGEST_MISMATCH",
 				"missing_packs": [],
 				"digest_drifts": initial_drifts,
 				"version_drifts": []
 			}
 		var save_result := save_world_mod_lock(world_id, installed_packs)
 		if not bool(save_result.get("success", false)):
-			return {"success": false, "error": "ERR_LOCK_INITIALIZE_FAILED"}
+			return {"success": false, "error_code": "ERR_LOCK_INITIALIZE_FAILED"}
 		return {
 			"success": true,
 			"status": "INITIALIZED",
@@ -233,7 +233,7 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should
 	if not digest_drifts.is_empty():
 		return {
 			"success": false,
-			"error": "MOD_ERR_REALM_DIGEST_MISMATCH",
+			"error_code": "MOD_ERR_REALM_DIGEST_MISMATCH",
 			"missing_packs": missing_packs,
 			"digest_drifts": digest_drifts,
 			"version_drifts": version_drifts
@@ -252,7 +252,7 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should
 	if not should_allow_safe_degrade or not version_drifts.is_empty() or _has_critical_missing_pack(missing_packs, locked_packs):
 		return {
 			"success": false,
-			"error": "ERR_MISSING_CRITICAL_MOD",
+			"error_code": "ERR_MISSING_CRITICAL_MOD",
 			"missing_packs": missing_packs,
 			"digest_drifts": digest_drifts,
 			"version_drifts": version_drifts
