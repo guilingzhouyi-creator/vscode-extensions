@@ -134,34 +134,20 @@ function resolveConfig(filePath, overrides = {}) {
  * @param {Record<string, any>} flags - Parsed flag collection
  * @param {string[]} explicitFiles - Target file list accumulator
  */
-const { ts, isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName, analyzeFunction } = analyzers;
-
 function parseSingleFlag(arg, flags, explicitFiles) {
   if (arg.startsWith("--max-cc=")) {
     flags.maxFunctionComplexity = parseInt(arg.slice(9), 10);
-    return;
-  }
-  if (arg.startsWith("--max-depth=")) {
+  } else if (arg.startsWith("--max-depth=")) {
     flags.maxNestingDepth = parseInt(arg.slice(12), 10);
-    return;
-  }
-  if (arg.startsWith("--max-noise=")) {
+  } else if (arg.startsWith("--max-noise=")) {
     flags.maxNoiseRatio = parseFloat(arg.slice(12));
-    return;
-  }
-  if (arg === "--no-flat-bonus") {
+  } else if (arg === "--no-flat-bonus") {
     flags.flatDispatcherBonus = false;
-    return;
-  }
-  if (arg === "--no-blast-bonus") {
+  } else if (arg === "--no-blast-bonus") {
     flags.lowBlastRadiusBonus = false;
-    return;
-  }
-  if (arg === "--agent" || arg === "-a" || arg === "--json") {
+  } else if (arg === "--agent" || arg === "-a" || arg === "--json") {
     flags.agentMode = true;
-    return;
-  }
-  if (!arg.startsWith("-")) {
+  } else if (!arg.startsWith("-")) {
     explicitFiles.push(arg);
   }
 }
@@ -182,26 +168,14 @@ function parseCliFlags(args) {
 }
 
 /**
- * Constructs an isolated Git environment preventing global config permissions errors.
- *
- * @returns {Record<string, string>}
- */
-function getGitEnv() {
-  return getSafeGitEnv(REPO_ROOT);
-}
-
-/**
- * State Machine Helper: Parses a unified diff hunk header and populates changed line index.
- * Matches syntax: @@ -from,len +to,len @@
+ * Parses a unified diff hunk header and populates changed line index.
  *
  * @param {string} line - Unified diff hunk header line
  * @param {string} currentFile - Absolute path of the file currently parsed
  * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} map - Result accumulator map
  */
 function parseHunkLine(line, currentFile, map) {
-  const match = line.match(
-    /@@\s+-[0-9]+(?:,[0-9]+)?\s+\+([0-9]+)(?:,([0-9]+))?\s+@@/,
-  );
+  const match = line.match(/@@\s+-[0-9]+(?:,[0-9]+)?\s+\+([0-9]+)(?:,([0-9]+))?\s+@@/);
   if (!match) return;
   const start = parseInt(match[1], 10);
   const count = match[2] !== undefined ? parseInt(match[2], 10) : 1;
@@ -209,21 +183,23 @@ function parseHunkLine(line, currentFile, map) {
   if (!entry || !entry.changedLines) return;
   if (count === 0) {
     entry.changedLines.add(start);
-  } else {
-    for (let i = 0; i < count; i++) {
-      entry.changedLines.add(start + i);
-    }
+    return;
+  }
+  for (let i = 0; i < count; i++) {
+    entry.changedLines.add(start + i);
   }
 }
 
+/**
+ * Checks whether a repo-relative path is eligible for TS/JS AST slice review.
+ *
+ * @param {string} rel - Repo-relative POSIX path
+ * @returns {boolean}
+ */
 function isEligibleSourcePath(rel) {
   if (!rel.endsWith(".ts") && !rel.endsWith(".js")) return false;
   if (rel.endsWith(".d.ts")) return false;
-  if (
-    rel.includes("dist/") ||
-    rel.includes("out/") ||
-    rel.includes("fixtures/")
-  ) {
+  if (rel.includes("dist/") || rel.includes("out/") || rel.includes("fixtures/")) {
     return false;
   }
   return true;
@@ -238,11 +214,7 @@ function isEligibleSourcePath(rel) {
 function mapFromExplicitFiles(explicitFiles) {
   const map = new Map();
   for (const f of explicitFiles) {
-    if (
-      (f.endsWith(".ts") || f.endsWith(".js")) &&
-      !f.endsWith(".d.ts") &&
-      fs.existsSync(f)
-    ) {
+    if ((f.endsWith(".ts") || f.endsWith(".js")) && !f.endsWith(".d.ts") && fs.existsSync(f)) {
       map.set(path.resolve(f), { changedLines: null, isNew: false });
     }
   }
@@ -250,23 +222,7 @@ function mapFromExplicitFiles(explicitFiles) {
 }
 
 /**
- * Ensure entry exists in hunk map for target file.
- *
- * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} map - Diff hunk map
- * @param {string} filePath - Absolute file path
- * @param {boolean} isNew - Indicates whether file is newly created
- */
-function registerDiffFileEntry(map, filePath, isNew) {
-  if (!map.has(filePath)) {
-    map.set(filePath, {
-      changedLines: new Set(),
-      isNew,
-    });
-  }
-}
-
-/**
- * State Machine: Parses raw git diff text into per-file changed line intervals.
+ * Parses raw git diff text into per-file changed line intervals.
  *
  * @param {string} raw - Raw unified diff output
  * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} map - Map populated with changed lines
@@ -274,13 +230,14 @@ function registerDiffFileEntry(map, filePath, isNew) {
 function parseGitDiffHunks(raw, map) {
   let currentFile = null;
   let isCurrentNew = false;
-  const diffLines = raw.split("\n");
-  for (const line of diffLines) {
+  for (const line of raw.split("\n")) {
     if (line.startsWith("+++ b/")) {
       const rel = line.slice(6).trim();
       if (isEligibleSourcePath(rel)) {
         currentFile = path.resolve(REPO_ROOT, rel);
-        registerDiffFileEntry(map, currentFile, isCurrentNew);
+        if (!map.has(currentFile)) {
+          map.set(currentFile, { changedLines: new Set(), isNew: isCurrentNew });
+        }
       } else {
         currentFile = null;
       }
@@ -291,6 +248,18 @@ function parseGitDiffHunks(raw, map) {
       parseHunkLine(line, currentFile, map);
     }
   }
+}
+
+/**
+ * Lists staged TS/JS sources through the shared Git provider.
+ *
+ * @returns {string[]} Repo-relative staged source paths.
+ */
+function getStagedFilesSafe() {
+  return queryStagedFiles(REPO_ROOT, undefined, { strict: true }).filter(
+    (f) =>
+      isEligibleSourcePath(f) && fs.existsSync(path.resolve(REPO_ROOT, f)),
+  );
 }
 
 /**
@@ -310,18 +279,16 @@ function getStagedHunkMap(explicitFiles) {
       cwd: REPO_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "ignore"],
-      env: getGitEnv(),
+      env: getSafeGitEnv(REPO_ROOT),
     });
     parseGitDiffHunks(raw, map);
   } catch (gitErr) {
     // Hunk diff is an optimisation; the filename fallback below still covers the index.
-    // That fallback must not swallow its own failure: an unreadable repo is not an empty one.
+    void gitErr;
   }
 
   if (map.size === 0) {
-    // Shared provider: one index-enumeration implementation and one failure policy for all gates.
-    const stagedList = getStagedFilesSafe();
-    for (const file of stagedList) {
+    for (const file of getStagedFilesSafe()) {
       map.set(path.resolve(REPO_ROOT, file), { changedLines: null, isNew: false });
     }
   }
@@ -329,72 +296,7 @@ function getStagedHunkMap(explicitFiles) {
   return map;
 }
 
-/**
- * Retrieves list of staged source file paths.
- *
- * @param {string[]} explicitFiles - Explicit CLI targets
- * @returns {string[]}
- */
-/**
- * Lists staged TS/JS sources through the shared Git provider.
- *
- * The extension filter stays here because it is a slice-gate concern; enumeration and error
- * policy belong to git-env so every gate blocks identically when the index is unreadable.
- *
- * @returns {string[]} Repo-relative staged source paths.
- */
-function getStagedFilesSafe() {
-  return queryStagedFiles(REPO_ROOT, undefined, { strict: true }).filter(
-    (f) => (f.endsWith(".ts") || f.endsWith(".js"))
-      && !f.endsWith(".d.ts")
-      && !f.includes("dist/")
-      && !f.includes("out/")
-      && !f.includes("fixtures/")
-      && fs.existsSync(path.resolve(REPO_ROOT, f)),
-  );
-}
-
-function getStagedFiles(explicitFiles) {
-  const map = getStagedHunkMap(explicitFiles);
-  return Array.from(map.keys());
-}
-
-const BRANCHING_KINDS = new Set([
-  ts.SyntaxKind.IfStatement,
-  ts.SyntaxKind.ConditionalExpression,
-  ts.SyntaxKind.ForStatement,
-  ts.SyntaxKind.ForInStatement,
-  ts.SyntaxKind.ForOfStatement,
-  ts.SyntaxKind.WhileStatement,
-  ts.SyntaxKind.DoStatement,
-  ts.SyntaxKind.CaseClause,
-  ts.SyntaxKind.CatchClause,
-]);
-
-const LOGICAL_BINARY_OPS = new Set([
-  ts.SyntaxKind.AmpersandAmpersandToken,
-  ts.SyntaxKind.BarBarToken,
-  ts.SyntaxKind.QuestionQuestionToken,
-]);
-
-const LOOP_KINDS = new Set([
-  ts.SyntaxKind.ForStatement,
-  ts.SyntaxKind.ForInStatement,
-  ts.SyntaxKind.ForOfStatement,
-  ts.SyntaxKind.WhileStatement,
-  ts.SyntaxKind.DoStatement,
-]);
-
-const NESTING_BLOCK_KINDS = new Set([
-  ts.SyntaxKind.IfStatement,
-  ts.SyntaxKind.ForStatement,
-  ts.SyntaxKind.ForInStatement,
-  ts.SyntaxKind.ForOfStatement,
-  ts.SyntaxKind.WhileStatement,
-  ts.SyntaxKind.DoStatement,
-  ts.SyntaxKind.TryStatement,
-  ts.SyntaxKind.SwitchStatement,
-]);
+const { ts, isFunctionNode, isExportedFunction, calculateComplexity, hasLoopConstruct, checkNesting, calculateElocAndNoise, resolveComplexityCeiling, validateFunctionName, analyzeFunction } = analyzers;
 
 function readStagedContentSafe(filePath) {
   const rel = path.relative(REPO_ROOT, filePath).replace(/\\/g, "/");
