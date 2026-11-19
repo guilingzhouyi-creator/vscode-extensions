@@ -22,8 +22,10 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { createIgnoredDirSet } = require('./workspace-walker');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
+const VSCODE_EXTENSION_IGNORED_DIRS = createIgnoredDirSet(['scripts']);
 const RUNTIME_CACHE_CANDIDATES = Object.freeze([
   path.join(REPO_ROOT, '.taxis', 'projects', 'active_projects.json'),
   path.join(REPO_ROOT, '.git', 'projects', 'active_projects.json'),
@@ -283,8 +285,160 @@ function clearCache() {
   lastResolvedTimeMs = 0;
 }
 
+/**
+ * Reads and validates a top-level directory as a VS Code extension package.
+ *
+ * @param {string} resolvedRoot - Resolved workspace root path.
+ * @param {string} dirName - Candidate top-level directory name.
+ * @returns {{dir: string, name: string, version: string, publisher: string, displayName: string, packageJsonPath: string}|null} Canonical entry or null.
+ */
+function readVscodeExtensionEntry(resolvedRoot, dirName) {
+  const packageJsonPath = path.join(resolvedRoot, dirName, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    return null;
+  }
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  } catch {
+    return null;
+  }
+  const engines = pkg && typeof pkg === 'object' ? pkg.engines : null;
+  if (!engines || typeof engines !== 'object' || !engines.vscode) {
+    return null;
+  }
+  return {
+    dir: dirName,
+    name: typeof pkg.name === 'string' ? pkg.name : dirName,
+    version: typeof pkg.version === 'string' ? pkg.version : '',
+    publisher: typeof pkg.publisher === 'string' ? pkg.publisher : '',
+    displayName: typeof pkg.displayName === 'string' ? pkg.displayName : '',
+    packageJsonPath,
+  };
+}
+
+/**
+ * Discovers top-level VS Code extension directories declaring `engines.vscode` in `package.json`.
+ *
+ * @param {string} [rootDir=REPO_ROOT] - Workspace root directory to scan.
+ * @returns {Array<{dir: string, name: string, version: string, publisher: string, displayName: string, packageJsonPath: string}>} Sorted extension entries.
+ */
+function discoverVscodeExtensions(rootDir = REPO_ROOT) {
+  const resolvedRoot = path.resolve(rootDir || REPO_ROOT);
+  if (!fs.existsSync(resolvedRoot)) {
+    return [];
+  }
+
+  let entries;
+  try {
+    entries = fs.readdirSync(resolvedRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const extensions = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || VSCODE_EXTENSION_IGNORED_DIRS.has(entry.name)) {
+      continue;
+    }
+    const item = readVscodeExtensionEntry(resolvedRoot, entry.name);
+    if (item) {
+      extensions.push(item);
+    }
+  }
+
+  extensions.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
+  return extensions;
+}
+
+/**
+ * Parses CLI arguments for VS Code extension discovery.
+ *
+ * @param {string[]} argv - CLI argument tokens.
+ * @returns {{mode: string, format: string, rootDir: string, help: boolean}} Parsed options.
+ */
+function parseCliArgs(argv) {
+  const opts = { mode: '', format: 'lines', rootDir: REPO_ROOT, help: false };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--vscode-extensions') {
+      opts.mode = 'vscode-extensions';
+    } else if (arg === '--json') {
+      opts.format = opts.format === 'matrix-json' ? 'conflict' : 'json';
+    } else if (arg === '--matrix-json') {
+      opts.format = opts.format === 'json' ? 'conflict' : 'matrix-json';
+    } else if (arg === '--root') {
+      const value = argv[++i];
+      if (!value) {
+        throw new Error('Missing directory argument for --root');
+      }
+      opts.rootDir = value;
+    } else if (arg === '--help' || arg === '-h') {
+      opts.help = true;
+    } else {
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+  }
+  if (opts.format === 'conflict') {
+    throw new Error('Cannot combine --json and --matrix-json');
+  }
+  return opts;
+}
+
+/**
+ * Writes discovered VS Code extensions to stdout in the requested format.
+ *
+ * @param {Array<{dir: string}>} entries - Discovered extension entries.
+ * @param {string} format - Output format ('lines', 'json', or 'matrix-json').
+ */
+function formatVscodeExtensions(entries, format) {
+  if (format === 'json') {
+    process.stdout.write(`${JSON.stringify(entries, null, 2)}\n`);
+    return;
+  }
+  if (format === 'matrix-json') {
+    process.stdout.write(`${JSON.stringify(entries.map((entry) => entry.dir))}\n`);
+    return;
+  }
+  if (entries.length > 0) {
+    process.stdout.write(`${entries.map((entry) => entry.dir).join('\n')}\n`);
+  }
+}
+
+/**
+ * CLI entrypoint for workspace registry and VS Code extension discovery.
+ *
+ * @param {string[]} [argv=process.argv.slice(2)] - CLI argument list.
+ * @returns {number} Exit code (0 on success, 2 on CLI usage error).
+ */
+function runCli(argv = process.argv.slice(2)) {
+  let opts;
+  try {
+    opts = parseCliArgs(argv);
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    return 2;
+  }
+  if (opts.help) {
+    process.stdout.write('Usage: node scripts/common/project-registry-resolver.js --vscode-extensions [--json | --matrix-json] [--root <dir>]\n');
+    return 0;
+  }
+  if (opts.mode !== 'vscode-extensions') {
+    console.error('Error: Specify --vscode-extensions (or --help)');
+    return 2;
+  }
+  const entries = discoverVscodeExtensions(opts.rootDir);
+  formatVscodeExtensions(entries, opts.format);
+  return 0;
+}
+
+if (require.main === module) {
+  process.exit(runCli());
+}
+
 module.exports = {
   clearCache,
+  discoverVscodeExtensions,
   getActiveProjectIds,
   getControlledProjectNames,
   getProjectStatus,

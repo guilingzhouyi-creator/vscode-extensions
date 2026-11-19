@@ -54,19 +54,22 @@ if (-not (Test-Path $pkgFile)) {
     exit 1
 }
 
-$isVsCodeExt = $false
-try {
-    $pkgJson = Get-Content -Raw -Encoding utf8 $pkgFile | ConvertFrom-Json
-    if ($pkgJson.PSObject.Properties['engines'] -and $pkgJson.engines.PSObject.Properties['vscode']) {
-        $isVsCodeExt = $true
-    }
-} catch {
-    $isVsCodeExt = $false
+$resolverScript = Join-Path $repoRoot "scripts\common\project-registry-resolver.js"
+if (-not (Test-Path $resolverScript)) {
+    Write-Error "::error::[$Ext] 扩展发现解析器缺失: $resolverScript"
+    exit 1
 }
-if (-not $isVsCodeExt) {
+$discoveredRaw = & node $resolverScript --vscode-extensions --root $repoRoot
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "::error::[$Ext] 扩展发现解析器执行失败"
+    exit 1
+}
+$discoveredExts = @($discoveredRaw | Where-Object { $null -ne $_ } | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+if ($discoveredExts -notcontains $Ext) {
     Write-Error "::error::[$Ext] 非 VS Code 扩展（缺少 engines.vscode），拒绝发布"
     exit 1
 }
+$pkgJson = Get-Content -Raw -Encoding utf8 $pkgFile | ConvertFrom-Json
 
 if (-not (Test-Path $changelogFile)) {
     Write-Error "::error::[$Ext] 缺少 CHANGELOG.md（keep-a-changelog 是发布前置契约）"

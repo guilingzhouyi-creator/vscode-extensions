@@ -96,16 +96,16 @@ function Sync-InstalledExtensionFiles {
     return $syncedCount
 }
 
-# ─── 发现扩展：顶层含 package.json 且声明 engines.vscode 的目录 ───
-$exts = @(Get-ChildItem -LiteralPath $root -Directory |
-    Where-Object {
-        if ($_.Name -in @('dist', 'scripts', 'node_modules')) { return $false }
-        $pkgPath = Join-Path $_.FullName 'package.json'
-        if (-not (Test-Path $pkgPath)) { return $false }
-        $pkg = [System.IO.File]::ReadAllText($pkgPath, [System.Text.UTF8Encoding]::new($false)) | ConvertFrom-Json
-        return ($null -ne $pkg.PSObject.Properties['engines'] -and $null -ne $pkg.engines.PSObject.Properties['vscode'])
-    } |
-    Select-Object -ExpandProperty Name)
+# ─── 发现扩展：通过单源解析器发现顶层含 package.json 且声明 engines.vscode 的目录 ───
+$resolverScript = Join-Path $root 'scripts\common\project-registry-resolver.js'
+if (-not (Test-Path $resolverScript)) {
+    throw "扩展发现解析器缺失: $resolverScript"
+}
+$discoveredRaw = & node $resolverScript --vscode-extensions --root $root
+if ($LASTEXITCODE -ne 0) {
+    throw "扩展发现解析器执行失败 (exit=$LASTEXITCODE)"
+}
+$exts = @($discoveredRaw | Where-Object { $null -ne $_ } | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
 
 if ($exts.Count -eq 0) { Write-Warning '未发现任何扩展目录（顶层含 package.json）'; exit 1 }
 

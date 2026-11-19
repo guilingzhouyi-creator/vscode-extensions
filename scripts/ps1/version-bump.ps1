@@ -33,34 +33,38 @@ $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
 
+$scriptRepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 if ([string]::IsNullOrWhiteSpace($Root)) {
-    $Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+    $Root = $scriptRepoRoot
 }
 
 $extDir = Join-Path $Root $Ext
 $pkgFile = Join-Path $extDir "package.json"
 $changelogFile = Join-Path $extDir "CHANGELOG.md"
 
-# ─── 严格门禁 1：扩展身份（engines.vscode 强标识）───
+# ─── 严格门禁 1：扩展身份（通过单源解析器校验 engines.vscode 强标识）───
 if (-not (Test-Path $pkgFile)) {
     Write-Error "::error::[$Ext] 扩展目录无效（无 package.json）: $extDir"
     exit 1
 }
 
-$hasVsCodeEngine = $false
-try {
-    $pkgJson = Get-Content $pkgFile -Raw -Encoding utf8 | ConvertFrom-Json
-    if ($pkgJson.PSObject.Properties['engines'] -and $pkgJson.engines.PSObject.Properties['vscode']) {
-        $hasVsCodeEngine = $true
-    }
-} catch {
-    $hasVsCodeEngine = $false
+$resolverScript = Join-Path $scriptRepoRoot "scripts\common\project-registry-resolver.js"
+if (-not (Test-Path $resolverScript)) {
+    Write-Error "::error::[$Ext] 扩展发现解析器缺失: $resolverScript"
+    exit 1
 }
 
-if (-not $hasVsCodeEngine) {
+$discoveredRaw = & node $resolverScript --vscode-extensions --root $Root
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "::error::[$Ext] 扩展发现解析器执行失败"
+    exit 1
+}
+$discoveredExts = @($discoveredRaw | Where-Object { $null -ne $_ } | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+if ($discoveredExts -notcontains $Ext) {
     Write-Error "::error::[$Ext] 非 VS Code 扩展（缺少 engines.vscode），拒绝执行版本递增"
     exit 1
 }
+$pkgJson = Get-Content $pkgFile -Raw -Encoding utf8 | ConvertFrom-Json
 
 if ($Ext -notmatch '^[a-z0-9][a-z0-9-]*$') {
     Write-Error "::error::[$Ext] 扩展目录名不合法（须 kebab-case）"

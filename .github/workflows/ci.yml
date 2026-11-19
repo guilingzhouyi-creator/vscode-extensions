@@ -15,11 +15,14 @@ on:
   push:
     branches: ['**']
     paths-ignore:
-      - '**.md'
       - '.gitignore'
       - 'dist/**'
       - 'archive/**'
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
@@ -109,19 +112,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # 仓库顶层所有扩展目录（含 package.json 且声明 engines.vscode 的才是 VS Code 扩展；
-          #   auto-refactor 等纯工具目录虽带 package.json 但无 engines.vscode，自动排除）
-          ALL_EXTS=$(find . -maxdepth 2 -name package.json -not -path '*/node_modules/*' \
-                      -printf '%h\n' | sed 's|^\./||' | sort -u \
-                      | while read -r d; do \
-                          if jq -e '.engines.vscode' "$d/package.json" >/dev/null 2>&1; then echo "$d"; fi; \
-                        done)
+          # 仓库顶层所有扩展目录（通过单源解析器发现含 package.json 且声明 engines.vscode 的目录）
+          ALL_EXTS=$(node scripts/common/project-registry-resolver.js --vscode-extensions)
           echo "Discovered extensions: ${ALL_EXTS:-<none>}"
 
-          FILTERED=""
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # PR：全量校验所有扩展
-            FILTERED="$ALL_EXTS"
+            MATRIX=$(node scripts/common/project-registry-resolver.js --vscode-extensions --matrix-json)
           else
             # push：仅校验变更触及的扩展
             BEFORE="${{ github.event.before }}"
@@ -129,22 +126,24 @@ jobs:
               BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "$GITHUB_SHA")
             fi
             CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" || true)
+            FILTERED=""
             for EXT in $ALL_EXTS; do
               if echo "$CHANGED" | grep -q "^${EXT}/"; then
                 FILTERED="$FILTERED $EXT"
               fi
             done
             FILTERED=$(echo "$FILTERED" | tr ' ' '\n' | sed '/^$/d' | sort -u)
+            if [[ -z "$FILTERED" ]]; then
+              MATRIX="[]"
+            else
+              MATRIX=$(echo "$FILTERED" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
           fi
 
-          if [[ -z "$FILTERED" ]]; then
+          if [[ "$MATRIX" == "[]" ]]; then
             echo "::notice::无变更触及扩展目录 → CI 空跑跳过。"
-            FILTERED="__none__"
           fi
 
-          # 生成 matrix JSON：["ext1","ext2"]；__none__/空 → 空数组（matrix 零作业）。
-          # 用 jq 单步过滤，不依赖 grep -v 的退出码语义（set -e 脆弱性）。
-          MATRIX=$(echo "$FILTERED" | jq -R -s -c 'split("\n") | map(select(length > 0 and . != "__none__"))')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
   # ─── 仓库卫生与脚本系统自检（独立于扩展矩阵；scripts/ 与 .github/ 变更即触发）───
@@ -163,6 +162,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            auto-refactor/package-lock.json
+            WebGames/scripts/js/package-lock.json
 
       - name: Script line endings & encoding
         run: |
@@ -180,10 +183,15 @@ jobs:
             printf '%s' "$BAD_CRLF"
             exit 1
           fi
-          BAD_BOM=$(grep -rl $'^\xEF\xBB\xBF' scripts/ --include='*.sh' --include='*.ps1' 2>/dev/null || true)
+          BAD_BOM=""
+          for d in $SH_DIRS; do
+            [ -d "$d" ] || continue
+            FOUND=$(grep -rl $'^\xEF\xBB\xBF' "$d" --include='*.sh' --include='*.ps1' 2>/dev/null || true)
+            if [ -n "$FOUND" ]; then BAD_BOM="${BAD_BOM}${FOUND}"$'\n'; fi
+          done
           if [[ -n "$BAD_BOM" ]]; then
             echo "::error::以下脚本含 UTF-8 BOM:"
-            echo "$BAD_BOM"
+            printf '%s' "$BAD_BOM"
             exit 1
           fi
           BAD_WS=$(grep -rn '[[:blank:]]$' scripts/sh scripts/ps1 2>/dev/null || true)
@@ -283,8 +291,9 @@ jobs:
           set -euo pipefail
           export FIX=$(mktemp -d)
           trap 'rm -rf "$FIX"' EXIT
-          mkdir -p "$FIX/scripts/sh" "$FIX/demo-ext"
+          mkdir -p "$FIX/scripts/sh" "$FIX/scripts/common" "$FIX/demo-ext"
           cp scripts/sh/release-tag.sh scripts/sh/version-bump.sh scripts/sh/check-display-assets.sh "$FIX/scripts/sh/"
+          cp scripts/common/project-registry-resolver.js scripts/common/workspace-walker.js "$FIX/scripts/common/"
           FIX_DIR="$FIX" node -e '
             const fs = require("fs");
             const d = process.env.FIX_DIR;
@@ -333,9 +342,11 @@ jobs:
           node scripts/common/install-hooks.js
           node scripts/common/install-hooks.js --check
 
-      - name: Git hooks & local gate scripts self-test
+      - name: Hooks & Receipts self-test
         run: |
           set -euo pipefail
+          REFS_TEMP=$(mktemp)
+          trap 'rm -f "$REFS_TEMP"' EXIT
           # 1. install-hooks.sh 激活自检
           bash scripts/sh/install-hooks.sh
           # 1.1 提交树可执行位断言：全新克隆必须保留 100755
@@ -352,7 +363,6 @@ jobs:
           node scripts/common/gate-receipts.js selftest
           # 1.4 多 ref 推送引用安全：受保护删除必须阻断，特性分支删除必须放行
           HEAD_SHA=$(git rev-parse HEAD)
-          REFS_TEMP=$(mktemp)
           printf "refs/heads/main %s refs/heads/main %s\n" "$HEAD_SHA" "$HEAD_SHA" > "$REFS_TEMP"
           node scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_TEMP"
           printf "(delete) %040d refs/heads/feature/ci-probe %s\n" 0 "$HEAD_SHA" >> "$REFS_TEMP"
@@ -361,17 +371,21 @@ jobs:
           if node scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_TEMP" >/dev/null 2>&1; then
             echo "::error::受保护分支删除未被拦截"; exit 1
           fi
-          rm -f "$REFS_TEMP"
-          # 1.5 合并提交结构性豁免：MERGE_HEAD 存在且标题为 Git 生成的合并格式时放行
+          # 2. pre-commit-gate.sh 自检 (无暂存应 exit 0)
+          bash scripts/sh/pre-commit-gate.sh
+
+      - name: Commit-msg gate self-test
+        run: |
+          set -euo pipefail
           MERGE_MSG_TEMP=$(mktemp)
+          MSG_TEMP=$(mktemp)
+          trap 'rm -f .git/MERGE_HEAD "$MERGE_MSG_TEMP" "$MSG_TEMP"' EXIT
+          # 1.5 合并提交结构性豁免：MERGE_HEAD 存在且标题为 Git 生成的合并格式时放行
           printf "Merge branch 'ci/probe'\n\nmerge probe\n" > "$MERGE_MSG_TEMP"
           git rev-parse HEAD > .git/MERGE_HEAD
           bash scripts/sh/commit-msg-gate.sh "$MERGE_MSG_TEMP"
           rm -f .git/MERGE_HEAD "$MERGE_MSG_TEMP"
-          # 2. pre-commit-gate.sh 自检 (无暂存应 exit 0)
-          bash scripts/sh/pre-commit-gate.sh
           # 3. commit-msg-gate.sh 生产工程级结构化合规自检
-          MSG_TEMP=$(mktemp)
           printf "%s\n" \
             "feat(ci): 引入生产工程级提交信息门禁" \
             "" \
@@ -518,54 +532,28 @@ jobs:
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截英文风格元叙事口号"; exit 1
           fi
-          # 8. 单源规则目录生成自检（只读模式：审查动作不得改写受版本控制文件）
-          node scripts/common/generate-rule-catalog.js --check-only
-          # 8.0 规则 ID 闭包：门禁引用的规则必须全部登记
-          node scripts/common/validate-rule-id-closure.js
-          # 8.0.1 文档一致性、文档规模数字真源渲染、规则可达性与双实现行为差分
-          node scripts/common/sync-doc-metrics.js
-          node scripts/common/validate-docs-consistency.js
-          node scripts/common/validate-rule-reachability.js
+
+      - name: Workspace Governance & SSOT guards
+        run: |
+          set -euo pipefail
+          # 8. Pillar-2 单源规则目录、文档一致性、门禁词表与破坏性操作守卫（有界并发调度 23 项）
+          node scripts/common/run-workspace-guards.js --group pillar2
+          # 8.0 双实现行为差分与三态矩阵（独立于 Pillar-2）
           node scripts/common/test-gate-parity.js
           node scripts/common/test-gate-selftest.js
-          # 8.0.2 门禁助手定义顺序与判定词表闭包，并证明各守卫确实能检出缺陷
-          node scripts/common/validate-gate-ordering.js
-          node scripts/common/validate-hardcoded-counts.js
-          node scripts/common/validate-block-chains.js
           node scripts/common/validate-gate-verdicts.js
-          node scripts/common/validate-gate-feedback.js
-          node scripts/common/test-gate-guards.js
-          # 8.1 平台级零空文件与跳板物理卫生自检
+          # 8.1 平台级物理卫生、同构脚本、.gitignore、代码密度与双轨体积
           node scripts/common/validate-physical-hygiene.js
-          # 8.2 跨平台同构脚本与防御契约（27 对 PS1/SH 参数与守卫对齐）
           node scripts/common/validate-script-isomorphism.js
-          # 8.3 .gitignore 治理与受控文件洁净度
           node scripts/common/validate-gitignore-governance.js
-          # 8.4 技能集结构规范与插件包字节等价
-          node scripts/common/validate-skills.js
-          # 8.5 全仓五维代码密度与接线载荷（POR/τ）
           node scripts/common/validate-code-density.js --all
-          # 8.6 全仓双轨体积与动态包络（ELOC/LOC）
           node scripts/common/evaluate-eloc-budget.js --all
-          # 8.7 跨平台命令面兼容层与别名优先级契约 (linux-parity)
-          node scripts/common/validate-shell-parity.js
-          # 8.8 泛化 SubAgent 编排、预置目录与四方级联闭合合规
-          node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
-          node .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js
-          # 8.9 文档锚点与交叉引用可达性
-          node scripts/common/validate-doc-anchors.js
-          node scripts/common/validate-doc-reachability.js
-          # 8.10 度量指标覆盖率与规则族契约
-          node scripts/common/validate-metric-coverage.js
-          node scripts/common/validate-family-contract.js
-          # 8.11 提交历史冻结清单合规
-          node scripts/common/validate-commit-history-baseline.js
-          # 8.12 规则源跨目录严重级一致性与破坏性文件操作守卫
-          node scripts/common/validate-rule-source-consistency.js
-          node scripts/common/validate-destructive-ops.js
           # 9. 平台级 AST 切片审查自检
           node scripts/common/validate-staged-slice.js scripts/common/validate-staged-slice.js
 
+      - name: WebGames config, Mermaid & Trajectory
+        run: |
+          set -euo pipefail
           # 10. 长期轨迹账本物理约束自检
           node scripts/common/validate-trajectory-ledger.js
           # 11. WebGames 配置架构与规范审查
@@ -576,7 +564,6 @@ jobs:
           # 12. 工作区统一轨迹记录与边界自检
           node scripts/common/record-workspace-trajectory.js
           node scripts/common/validate-trajectory-ledger.js
-          rm -f "$MSG_TEMP"
           echo "✔ Git 本地门禁脚本与审查联动自检全部通过"
 
       - name: Commit message gate for the pushed range
@@ -629,23 +616,16 @@ jobs:
               md += `| Repo hygiene (scripts & packaging) | ${jobStatus === "success" ? "🟢 达标" : "🔴 阻断 (" + jobStatus.toUpperCase() + ")"} |\n\n`;
               md += "> 本看板仅反映 hygiene 作业内实际执行的检查。扩展构建与 auto-refactor 门禁由独立作业承担，未执行项不再标注为达标。\n\n";
 
-              md += "### 🎯 全工作区十维工程质量看板\n\n";
+              md += "### 🎯 全工作区十维工程质量看板（冻结基线参考快照：`auto-refactor/reports/self-audit-baseline.json`）\n\n";
               if (tenDims) {
                 md += `> **综合健康分**: **${compositeScore}**${grade} &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**${autonomyRate}\n\n`;
                 md += "| 序号 | 质量维度 | 得分 | 进度可视化 |\n";
                 md += "| :---: | :--- | :---: | :--- |\n";
-                const dims = [
-                  { num: "1", name: "架构一致 (Architecture Consistency)", key: "architectureConsistency" },
-                  { num: "2", name: "语义纯度 (Semantic Purity)", key: "semanticPurity" },
-                  { num: "3", name: "代码安全 (Code Security)", key: "codeSecurity" },
-                  { num: "4", name: "性能预算 (Performance Efficiency)", key: "performanceEfficiency" },
-                  { num: "5", name: "标准化 (Standardization)", key: "standardization" },
-                  { num: "6", name: "现代化 (Modernity)", key: "modernity" },
-                  { num: "7", name: "可维护性 (Maintainability)", key: "maintainability" },
-                  { num: "8", name: "注释质量 (Comment Quality)", key: "commentQuality" },
-                  { num: "9", name: "重复率 (Duplication)", key: "duplication" },
-                  { num: "10", name: "技术债风险 (Tech Debt Risk)", key: "techDebtRisk" }
-                ];
+                const dims = JSON.parse(fs.readFileSync("scripts/common/ten-dimensions-contract.json", "utf8")).dimensions.map((d) => ({
+                  num: String(d.num),
+                  name: `${d.zhName} (${d.enName})`,
+                  key: d.key
+                }));
                 for (const d of dims) {
                   const score = Number(tenDims[d.key] ?? 0);
                   const filled = Math.max(0, Math.min(20, Math.round((score / 100) * 20)));
@@ -714,6 +694,12 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build
+        if: steps.scope.outputs.run == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: auto-refactor/crates
+
       - name: Build native addon
         if: steps.scope.outputs.run == 'true'
         working-directory: auto-refactor
@@ -754,9 +740,31 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Setup Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: |
+            fractal-git/package-lock.json
+            auto-refactor/package-lock.json
+
+      - name: Install Node dependencies (fractal-git & tsc toolchain)
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          npm ci --prefix fractal-git --no-audit --no-fund --silent
+          npm ci --prefix auto-refactor --legacy-peer-deps --ignore-scripts --no-audit --no-fund --silent
+
       - name: Setup Rust toolchain
         if: steps.scope.outputs.run == 'true'
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        if: steps.scope.outputs.run == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fractal-git
 
       - name: Fractal-git architectural and zero-alloc static validation
         if: steps.scope.outputs.run == 'true'
@@ -766,15 +774,10 @@ jobs:
           node fractal-git/scripts/common/validate-git-parity.js --require-git
           node fractal-git/scripts/common/validate-gate-bridge.js
 
-      - name: Cargo check
+      - name: Cargo test (workspace)
         if: steps.scope.outputs.run == 'true'
         working-directory: fractal-git
-        run: cargo check --all-targets
-
-      - name: Cargo test
-        if: steps.scope.outputs.run == 'true'
-        working-directory: fractal-git
-        run: cargo test
+        run: cargo test --workspace
 
       - name: Rustfmt check
         if: steps.scope.outputs.run == 'true'
@@ -785,6 +788,15 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         working-directory: fractal-git
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Fractal-git TypeScript tests
+        if: steps.scope.outputs.run == 'true'
+        working-directory: fractal-git
+        run: npm test
+
+      - name: Hosted repo parity (Git vs Taxis)
+        if: steps.scope.outputs.run == 'true'
+        run: node fractal-git/scripts/common/run-hosted-repo-parity.js
 
   gate-parity-windows:
     name: Gate parity (Windows dual runtime)

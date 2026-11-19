@@ -154,19 +154,20 @@ for iv_path in "$ROOT/scripts/sh/package.sh" "$ROOT/scripts/ps1/package.ps1" "$R
   fi
 done
 
-# ─── 发现扩展：顶层含 package.json 且声明 engines.vscode 的目录 ───
+# ─── 发现扩展：通过单源解析器发现顶层含 package.json 且声明 engines.vscode 的目录 ───
 #   （engines.vscode 是 VS Code 扩展的强标识；auto-refactor 等纯工具目录
 #     虽带 package.json 但无此字段，自动排除，避免被误打包为 .vsix）
-mapfile -t EXTS < <(
-  find "$ROOT" -maxdepth 2 -name "package.json" -not -path "*/node_modules/*" -printf "%h\n" \
-  | sed "s|^$ROOT/||" | grep -Ev "^(dist|scripts|node_modules)$" | sort -u \
-  | while read -r d; do
-      # 路径作为独立 argv 传入：MSYS 自动将 /c/... 转为 Windows 路径，避免嵌入 -e 字符串丢失转换
-      if node -e "process.exit(require(process.argv[1]).engines?.vscode ? 0 : 1)" "$ROOT/$d/package.json" 2>/dev/null; then
-        echo "$d"
-      fi
-    done || true
-)
+RESOLVER="$ROOT/scripts/common/project-registry-resolver.js"
+if [[ ! -f "$RESOLVER" ]]; then
+  echo "::error::扩展发现解析器缺失: $RESOLVER" >&2
+  exit 1
+fi
+DISCOVERED_RAW=$(node "$RESOLVER" --vscode-extensions --root "$ROOT")
+EXTS=()
+while IFS= read -r line; do
+  line="${line%$'\r'}"
+  [[ -n "$line" ]] && EXTS+=("$line")
+done <<< "$DISCOVERED_RAW"
 
 if [[ ${#EXTS[@]} -eq 0 ]]; then
   echo "未发现任何扩展目录（顶层含 package.json）" >&2

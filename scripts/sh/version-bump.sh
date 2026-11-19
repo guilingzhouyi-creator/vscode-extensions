@@ -38,20 +38,27 @@ if [[ -z "$EXT" || -z "$MODE" ]]; then
 fi
 
 # ─── 根目录解析（与 package.sh 同构；夹具模式覆盖）───
+SCRIPT_REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 if [[ -z "$ROOT" ]]; then
-  ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+  ROOT="$SCRIPT_REPO_ROOT"
 fi
 
 EXT_DIR="$ROOT/$EXT"
 PKG_FILE="$EXT_DIR/package.json"
 CHANGELOG_FILE="$EXT_DIR/CHANGELOG.md"
 
-# ─── 严格门禁 1：扩展身份（engines.vscode 强标识，与 CI 发现逻辑同源）───
+# ─── 严格门禁 1：扩展身份（通过单源解析器校验 engines.vscode 强标识，与 CI 发现逻辑同源）───
 if [[ ! -f "$PKG_FILE" ]]; then
   echo "::error::[$EXT] 扩展目录无效（无 package.json）: $EXT_DIR" >&2
   exit 1
 fi
-if ! node -e "process.exit(require(process.argv[1]).engines?.vscode ? 0 : 1)" "$PKG_FILE" 2>/dev/null; then
+RESOLVER="$SCRIPT_REPO_ROOT/scripts/common/project-registry-resolver.js"
+if [[ ! -f "$RESOLVER" ]]; then
+  echo "::error::[$EXT] 扩展发现解析器缺失: $RESOLVER" >&2
+  exit 1
+fi
+DISCOVERED_EXTS=$(node "$RESOLVER" --vscode-extensions --root "$ROOT")
+if ! printf '%s\n' "$DISCOVERED_EXTS" | tr -d '\r' | grep -Fxq "$EXT"; then
   echo "::error::[$EXT] 非 VS Code 扩展（缺少 engines.vscode），拒绝执行版本递增" >&2
   exit 1
 fi

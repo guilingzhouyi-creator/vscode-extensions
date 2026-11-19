@@ -28,6 +28,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: godot-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   # 与 WebGames/project.godot 的 config/features ("4.7") 对齐；
   # 取本机实测引擎版本 4.7.2.stable 的精确发布 tag，避免 4.7 这类不存在的 tag 404
@@ -49,17 +53,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: 缓存 Godot ${{ env.GODOT_VERSION }} 二进制
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/godot/${{ env.GODOT_VERSION }}
+          key: godot-${{ runner.os }}-x86_64-${{ env.GODOT_VERSION }}
+
       - name: 安装 Godot ${{ env.GODOT_VERSION }}
         run: |
           set -euo pipefail
-          curl -fsSL -o godot.zip \
-            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          unzip -q godot.zip
-          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
-          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          GODOT_CACHE_DIR="$HOME/.cache/godot/${GODOT_VERSION}"
+          GODOT_BIN="${GODOT_CACHE_DIR}/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          if [ ! -x "$GODOT_BIN" ]; then
+            mkdir -p "$GODOT_CACHE_DIR"
+            curl -fsSL -o "${GODOT_CACHE_DIR}/godot.zip" \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+            unzip -q -o "${GODOT_CACHE_DIR}/godot.zip" -d "$GODOT_CACHE_DIR"
+            rm -f "${GODOT_CACHE_DIR}/godot.zip"
+          fi
+          chmod +x "$GODOT_BIN"
+          sudo ln -sf "$GODOT_BIN" /usr/local/bin/godot
           godot --version
 
-      # Phase 87：门禁脚本头声明「运行时: Python 3.10+」，必须显式固定解释器版本。
+      # 门禁脚本头声明「运行时: Python 3.10+」，必须显式固定解释器版本。
       # 缺失本步骤时 runner 默认 Python 随镜像漂移，配置审查/全量聚合会因语法与
       # 注解求值差异恒红——形成"一道永远失败的门禁"，比没有门禁更糟。
       - name: 固定 Python 版本（门禁脚本运行时契约）
@@ -71,62 +87,45 @@ jobs:
       - name: 导入工程（生成 .godot 类缓存，失败即中断）
         run: godot --headless --import
 
+      - name: 准备门禁重试辅助函数
+        run: |
+          cat << 'EOF' > "${RUNNER_TEMP:-/tmp}/retry.sh"
+          retry_once() {
+            local label="$1"
+            shift
+            if "$@"; then
+              return 0
+            fi
+            echo "[retry] ${label} 第 1 次失败，${RETRY_SLEEP} 秒后重试"
+            sleep "$RETRY_SLEEP"
+            if "$@"; then
+              return 0
+            fi
+            echo "[retry] ${label} 两次均失败，判定为真实问题"
+            return 1
+          }
+          EOF
+
       - name: 运行全域单元测试（DoD 验收，失败重试一次）
         run: |
-          for i in 1 2; do
-            if bash scripts/sh/test-run.sh; then
-              exit 0
-            fi
-            echo "[retry] test-run.sh 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
-            if [ "$i" -eq 2 ]; then
-              echo "[retry] 两次均失败，判定为真实问题"
-              exit 1
-            fi
-            sleep "$RETRY_SLEEP"
-          done
+          source "${RUNNER_TEMP:-/tmp}/retry.sh"
+          retry_once "test-run.sh" bash scripts/sh/test-run.sh
 
       - name: 架构护栏审查（领域清单/配置表/测试注册/确定性/文档计数/键级漂移，失败重试一次）
         run: |
-          for i in 1 2; do
-            if bash scripts/sh/audit-arch.sh; then
-              exit 0
-            fi
-            echo "[retry] audit-arch.sh 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
-            if [ "$i" -eq 2 ]; then
-              echo "[retry] 两次均失败，判定为真实架构违规"
-              exit 1
-            fi
-            sleep "$RETRY_SLEEP"
-          done
+          source "${RUNNER_TEMP:-/tmp}/retry.sh"
+          retry_once "audit-arch.sh" bash scripts/sh/audit-arch.sh
 
       - name: 配置一致性审查（JSON 可解析/键命名/必需表齐全，失败重试一次）
         run: |
-          for i in 1 2; do
-            if python3 scripts/py/audit_config.py --strict; then
-              exit 0
-            fi
-            echo "[retry] audit_config.py 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
-            if [ "$i" -eq 2 ]; then
-              echo "[retry] 两次均失败，判定为真实配置问题"
-              exit 1
-            fi
-            sleep "$RETRY_SLEEP"
-          done
+          source "${RUNNER_TEMP:-/tmp}/retry.sh"
+          retry_once "audit_config.py" python3 scripts/py/audit_config.py --strict
 
       - name: 全量审查聚合（23 项静态门禁 + 文档四域基线棘轮门禁 + SARIF 导出；失败重试一次）
         run: |
           mkdir -p ../sarif
-          for i in 1 2; do
-            if bash scripts/sh/audit-all.sh --sarif-out ../sarif/webgames-audit.sarif; then
-              exit 0
-            fi
-            echo "[retry] audit-all.sh 第 $i 次失败，${RETRY_SLEEP} 秒后重试"
-            if [ "$i" -eq 2 ]; then
-              echo "[retry] 两次均失败，判定为真实审查问题"
-              exit 1
-            fi
-            sleep "$RETRY_SLEEP"
-          done
+          source "${RUNNER_TEMP:-/tmp}/retry.sh"
+          retry_once "audit-all.sh" bash scripts/sh/audit-all.sh --sarif-out ../sarif/webgames-audit.sarif
 
       # SARIF 上传独立于审查结果（if: always()）：即便门禁失败也上传报告，
       # 使 GitHub code scanning 能展示失败任务的定位信息
