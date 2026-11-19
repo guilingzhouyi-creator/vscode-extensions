@@ -50,6 +50,7 @@ except ImportError:
             self.fix_suggestion = fix_suggestion
 
         def to_dict(self) -> dict[str, str]:
+            """将诊断条目序列化为结构化字典。"""
             return {
                 "code": self.code,
                 "file": self.file,
@@ -58,9 +59,11 @@ except ImportError:
             }
 
     def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:  # type: ignore[no-redef]
+        """校验引擎目录不可用时的安全降级占位校验器。"""
         return True, []
 
     def validate_multi_mods(mod_dirs: list[Path]) -> tuple[bool, list[DiagnosticItem]]:  # type: ignore[no-redef]
+        """批量校验引擎目录不可用时的安全降级占位校验器。"""
         return True, []
 
 

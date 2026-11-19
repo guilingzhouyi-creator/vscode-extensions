@@ -31,6 +31,7 @@ from gd.strict_governance_rules import (
     check_strict_class_and_docs,
     check_strict_header,
     check_strict_jargon_and_decls,
+    has_preceding_doc_comment,
     is_strict_governance_target,
 )
 STYLE_CLASS_NAME_RE = re.compile(r"\bclass_name\s+([A-Za-z_][A-Za-z0-9_]*)")
@@ -47,7 +48,7 @@ def _audit_file_header(rel: Path, lines: list[str], text: str, violations: list[
     """校验文件头部注释与全局调用禁令。"""
     head = "\n".join(lines[:15])
     rel_posix = rel.as_posix()
-    if is_strict_governance_target(rel_posix):
+    if is_strict_governance_target(rel_posix) or rel_posix.startswith(("benchmarks/", "dev_harness/")):
         check_strict_header(rel, rel_posix, head, violations)
     elif not rel_posix.startswith("tests/"):
         for marker in HEADER_MUST:
@@ -148,25 +149,51 @@ def audit_file(path: Path, violations: list[str], base_root: Path | None = None)
         check_strict_jargon_and_decls(
             rel, lines, violations, STYLE_FUNC_RE, STYLE_VAR_RE
         )
+    elif rel_posix.startswith(("benchmarks/", "dev_harness/")):
+        check_strict_class_and_docs(
+            rel, path.name, lines, violations, STYLE_CLASS_NAME_RE, STYLE_FUNC_RE
+        )
+        check_forbidden_jargon(rel, lines, violations)
     elif rel_posix.startswith("tests/"):
         check_forbidden_jargon(rel, lines, violations)
+        _check_tests_docs(rel, lines, violations)
 
     for i, ln in enumerate(lines, 1):
         _audit_line_style(rel, i, ln, violations)
 
 
+def _check_tests_docs(rel: Path, lines: list[str], violations: list[str]) -> None:
+    """校验 tests/ 目录文件的 class_name 与非 test_ 公开辅助方法 ## 文档注释。"""
+    for idx, ln in enumerate(lines):
+        lineno = idx + 1
+        m_cls = STYLE_CLASS_NAME_RE.search(ln)
+        if m_cls and ln.strip().startswith("class_name "):
+            cname = m_cls.group(1)
+            if not has_preceding_doc_comment(lines, idx):
+                violations.append(f"{rel}:{lineno}: 类声明「{cname}」上方缺少 ## 文档注释 (STYLE-DOC-001)")
+        m_fn = STYLE_FUNC_RE.match(ln)
+        if m_fn:
+            fname = m_fn.group(1)
+            if not fname.startswith("_") and not fname.startswith("test_") and not has_preceding_doc_comment(lines, idx):
+                violations.append(f"{rel}:{lineno}: 公开方法「{fname}」上方缺少 ## 文档注释 (STYLE-DOC-001)")
+
+
 def _audit_tests_jargon(violations: list[str]) -> None:
-    """对 tests/ 目录执行术语净空审查，避免触发非严格域的长度或函数名规范限制。"""
+    """对 tests/ 目录执行术语净空、六字段题头与 ## 文档注释审查。"""
     test_root = ROOT / "tests"
     if not test_root.exists():
         return
     for test_file in sorted(p for p in test_root.rglob("*.gd") if p.is_file()):
+        rel = test_file.relative_to(ROOT)
+        rel_posix = rel.as_posix()
         try:
             _, test_lines = GDFileCache.get(test_file)
         except (UnicodeDecodeError, OSError) as exc:
-            violations.append(f"{test_file.relative_to(ROOT)}: 非 UTF-8 编码或读取失败（{exc}）")
+            violations.append(f"{rel}: 非 UTF-8 编码或读取失败（{exc}）")
             continue
-        check_forbidden_jargon(test_file.relative_to(ROOT), test_lines, violations)
+        check_strict_header(rel, rel_posix, "\n".join(test_lines[:15]), violations)
+        check_forbidden_jargon(rel, test_lines, violations)
+        _check_tests_docs(rel, test_lines, violations)
 
 
 def run_style_audit(include_tests: bool = False) -> int:

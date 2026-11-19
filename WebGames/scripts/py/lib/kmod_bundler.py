@@ -78,6 +78,7 @@ class ModBundleManifest:
     extra_fields: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
+        """将打包清单对象序列化为可写入 JSON 的字典。"""
         payload = dict(self.extra_fields)
         payload.update(
             {

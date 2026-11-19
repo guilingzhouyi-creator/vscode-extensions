@@ -57,6 +57,7 @@ class DocsAuditor:
 
     # ---------- 装载：单趟 os.walk 同时建目录索引（命名域零额外遍历） ----------
     def load(self) -> None:
+        """单趟遍历文档目录并构建 Markdown 解析与目录索引缓存。"""
         self.docs_map.clear()
         self.decode_errors.clear()
         self.dir_index.clear()
@@ -132,6 +133,7 @@ class DocsAuditor:
 
     # ---------- 审查 ----------
     def check(self) -> list:
+        """执行四域静态文档审查并返回 Finding 列表。"""
         findings: list = []
         self._current_findings = findings
         self._transient = {}   # 按需加载的锚点目标（不并入正式审计集合）

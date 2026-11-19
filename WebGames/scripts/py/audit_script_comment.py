@@ -38,10 +38,11 @@ ensure_utf8_stdout()
 ROOT = resolve_repo_root()
 STANDARD_SEPARATOR_WIDTH = 78
 
-# 全域扫描目标目录（WebGames 与仓库根目录脚本库）
+# 全域扫描目标目录（WebGames、仓库根目录脚本库与 Mod SDK 工具链）
 SCAN_ROOTS = [
     ROOT / "scripts",
     ROOT.parent / "scripts",
+    ROOT / "mod_sdk" / "tools",
 ]
 
 HEADER_MUST = (

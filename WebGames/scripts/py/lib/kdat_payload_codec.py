@@ -176,6 +176,7 @@ class TLVDecoder:
         self.pool = string_pool
 
     def decode_next(self) -> Any:
+        """从当前字节游标顺序解码单个 TLV 值并推进偏移。"""
         if self.offset >= len(self.data):
             raise ValueError("TLV 解码提前遇到流末尾")
         tag = self.data[self.offset]

@@ -25,7 +25,7 @@ repos:
         name: audit-gd (GDScript质量规范治理)
         entry: python scripts/py/audit_gd.py
         language: system
-        files: ^backend/.*\.gd$
+        files: ^(backend|frontend|benchmarks|dev_harness)/.*\.gd$
         pass_filenames: false
 
       # 3. 零硬编码与调试残留扫描
@@ -33,7 +33,7 @@ repos:
         name: audit-hardcode (零硬编码/调试残留)
         entry: python scripts/py/audit_hardcode.py
         language: system
-        files: ^backend/.*\.gd$
+        files: ^(backend|frontend)/.*\.gd$
         pass_filenames: false
 
       # 4. 凭证与敏感密钥扫描
@@ -49,5 +49,5 @@ repos:
         name: audit-perf (循环热点与堆分配审查)
         entry: python scripts/py/audit_perf_hotspots.py
         language: system
-        files: ^backend/.*\.gd$
+        files: ^(backend|frontend)/.*\.gd$
         pass_filenames: false

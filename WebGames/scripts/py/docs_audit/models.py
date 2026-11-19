@@ -88,6 +88,7 @@ class Finding:
     is_new: bool = False  # 基线棘轮模式下：True=超出基线的新增违规（阻断门禁）
 
     def to_dict(self) -> dict:
+        """将文档审查条目序列化为稳定 JSON 字典。"""
         d = {
             "rule": self.rule,
             "severity": RULES[self.rule][0],

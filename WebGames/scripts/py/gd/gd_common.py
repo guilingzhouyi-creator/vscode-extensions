@@ -50,8 +50,8 @@ class GDFileCache:
 
 @functools.lru_cache(maxsize=None)
 def get_gd_files(include_tests: bool = False) -> list[Path]:
-    """全库 .gd 文件表单例缓存（含可选 tests 目录）。"""
-    roots = [ROOT / "backend", ROOT / "frontend", ROOT / "benchmarks"]
+    """全库 .gd 文件表单例缓存（默认含 backend/frontend/benchmarks/dev_harness，可选 tests）。"""
+    roots = [ROOT / "backend", ROOT / "frontend", ROOT / "benchmarks", ROOT / "dev_harness"]
     if include_tests:
         roots.append(ROOT / "tests")
     return sorted(p for r in roots for p in r.rglob("*.gd") if p.is_file())

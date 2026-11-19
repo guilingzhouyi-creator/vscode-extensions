@@ -85,6 +85,7 @@ class DiagnosticItem:
         self.fix_suggestion = fix_suggestion
 
     def to_dict(self) -> dict[str, str]:
+        """将资产烘焙诊断条目序列化为字典。"""
         return {"code": self.code, "file": self.file, "detail": self.detail, "fix_suggestion": self.fix_suggestion}
 
 

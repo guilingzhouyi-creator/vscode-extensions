@@ -16,6 +16,7 @@
 from __future__ import annotations
 from pathlib import Path
 import argparse
+import json
 import re
 import sys
 
@@ -185,6 +186,7 @@ def main() -> int:
     """CLI 入口。"""
     ap = argparse.ArgumentParser(description="业务源码字面量与调试残留扫描器")
     ap.add_argument("--strict", action="store_true", help="存在 print/TODO/禁忌词或业务硬编码串时返回 1")
+    ap.add_argument("--json", action="store_true", help="以标准 JSON 格式输出扫描摘要")
     args = ap.parse_args()
 
     findings: list[str] = []
@@ -206,16 +208,32 @@ def main() -> int:
         if summary:
             findings.append(summary)
 
+    top_files = [
+        {"file": name, "count": cnt}
+        for cnt, name in sorted(per_file, key=lambda t: t[0], reverse=True)[:TOP_N]
+    ]
+    if args.json:
+        passed = not (args.strict and total > 0)
+        print(json.dumps({
+            "tool": "audit-hardcode",
+            "files_scanned": len(per_file),
+            "candidates_total": total,
+            "strict_total": strict_total,
+            "strict": args.strict,
+            "passed": passed,
+            "top_files": top_files,
+            "findings": findings,
+        }, ensure_ascii=False, indent=2))
+        return 0 if passed else 1
+
     print(
         f"【audit-hardcode】扫描 backend+frontend 共 {total} 处候选（严格项 {strict_total}，提示级需人工复核）"
     )
     for fd in findings:
         print(f"  · {fd}")
     print(f"【audit-hardcode】Top {TOP_N} 候选文件（优先复核）:")
-    for rank, (cnt, name) in enumerate(
-        sorted(per_file, key=lambda t: t[0], reverse=True)[:TOP_N], 1
-    ):
-        print(f"  {rank:>2}. {name} — {cnt} 处")
+    for rank, entry in enumerate(top_files, 1):
+        print(f"  {rank:>2}. {entry['file']} — {entry['count']} 处")
     if args.strict and total:
         print("【审查结论】--strict 模式未通过")
         return 1

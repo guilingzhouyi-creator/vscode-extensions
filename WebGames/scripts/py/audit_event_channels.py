@@ -29,6 +29,8 @@ ensure_utf8_stdout()
 ROOT = resolve_repo_root()
 CONFIG = ROOT / "config"
 BACKEND = ROOT / "backend"
+FRONTEND = ROOT / "frontend"
+CODE_SCAN_ROOTS = (BACKEND, FRONTEND)
 
 CHANNEL_RE = re.compile(r"^([a-z][a-z0-9_]*)\.([a-z0-9_]+(?:\.[a-z0-9_]+)*)$")
 CONST_RE = re.compile(r"const\s+([A-Z0-9_]+)\s*:\s*int\s*=\s*(0x[0-9A-Fa-f]+|\d+)")
@@ -68,6 +70,18 @@ def collect_domain_mapping() -> dict[str, dict]:
     return out
 
 
+def collect_allowed_channel_namespaces(domain_map: dict[str, dict]) -> set[str]:
+    """合法频道前缀全集：domains.json 领域 + event_bus_config 声明基础设施与别名命名空间。"""
+    allowed: set[str] = set(domain_map.keys())
+    bus_data = load_json("infrastructure/event_bus_config.json")
+    aliases = bus_data.get("channel_namespace_aliases", {})
+    if isinstance(aliases, dict):
+        for prefix in aliases.keys():
+            if prefix:
+                allowed.add(str(prefix))
+    return allowed
+
+
 def _walk_string_values(o: Any, out: list[str]) -> None:
     """递归提取嵌套字典与列表中的所有字符串字面量。"""
     if isinstance(o, dict):
@@ -98,67 +112,135 @@ def _extract_channel_candidates(data: dict, subkey: str | None) -> list[str]:
     return candidates
 
 
-def collect_config_channels(domain_map: dict) -> list[dict]:
-    """仅扫描频道声明源契约。"""
+def _collect_protocol_flow_channels(node: Any, out: list[str]) -> None:
+    """递归提取 contracts.json protocol_flows 中所有 event_channels 列表项。"""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "event_channels" and isinstance(value, list):
+                for item in value:
+                    out.append(str(item))
+            else:
+                _collect_protocol_flow_channels(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_protocol_flow_channels(item, out)
+
+
+def _iter_gd_texts() -> list[tuple[Path, str]]:
+    """读取 backend 与 frontend 全域 .gd 脚本文本。"""
+    items: list[tuple[Path, str]] = []
+    for scan_root in CODE_SCAN_ROOTS:
+        if not scan_root.exists():
+            continue
+        for file_path in sorted(scan_root.rglob("*.gd")):
+            try:
+                items.append((file_path, file_path.read_text(encoding="utf-8")))
+            except UnicodeDecodeError:
+                continue
+    return items
+
+
+def _extract_local_string_consts(text: str) -> dict[str, str]:
+    """提取单文件顶部或类内声明的局部频道字符串常量。"""
+    const_map: dict[str, str] = {}
+    str_const_re = re.compile(r'^\s*const\s+([A-Z0-9_]+)\s*:\s*String\s*=\s*"([a-z0-9_.]+)"', re.M)
+    for match in str_const_re.finditer(text):
+        const_map[match.group(1)] = match.group(2)
+    return const_map
+
+
+def collect_config_channels() -> list[dict]:
+    """全量扫描频道声明源契约（领域配置/总线注册表/前端桥接白名单/协议契约流）。"""
     account_path = CONFIG / "domains" / "account" / "core.json"
     world_state_path = CONFIG / "domains" / "world_state" / "core.json"
-    channel_sources: list[tuple[Path, str | None]] = [
+    bus_config_path = CONFIG / "infrastructure" / "event_bus_config.json"
+    bridge_path = CONFIG / "frontend" / "views" / "hud_event_bridge.json"
+    contracts_path = CONFIG / "infrastructure" / "contracts.json"
+
+    sources: list[tuple[Path, str | None]] = [
         (account_path, "auth/channels"),
         (world_state_path, "hud/channels"),
-        (CONFIG / "infrastructure" / "event_bus_config.json", None),
+        (bus_config_path, None),
     ]
     channels: list[dict] = []
 
-    for path, subkey in channel_sources:
+    def _append_candidates(src_path: Path, raw_candidates: list[str]) -> None:
+        rel_src = str(src_path.relative_to(CONFIG))
+        for raw in raw_candidates:
+            m = CHANNEL_RE.match(raw.strip())
+            if m:
+                channels.append(
+                    {
+                        "domain": m.group(1),
+                        "event_name": m.group(2),
+                        "source": rel_src,
+                        "from_config": True,
+                    }
+                )
+
+    for path, subkey in sources:
         if not path.exists():
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        candidates = _extract_channel_candidates(data, subkey)
-        for raw in candidates:
-            m = CHANNEL_RE.match(raw.strip())
-            if m and m.group(1) in domain_map:
-                channels.append(
-                    {
-                        "domain": m.group(1),
-                        "event_name": m.group(2),
-                        "source": str(path.relative_to(CONFIG)),
-                        "from_config": True,
-                    }
-                )
+        _append_candidates(path, _extract_channel_candidates(data, subkey))
+
+    if bridge_path.exists():
+        try:
+            bridge_data = json.loads(bridge_path.read_text(encoding="utf-8"))
+            bridge_candidates = [
+                str(entry.get("channel", ""))
+                for entry in bridge_data.get("subscribed_channels", [])
+                if isinstance(entry, dict) and entry.get("channel")
+            ]
+            _append_candidates(bridge_path, bridge_candidates)
+        except Exception:
+            pass
+
+    if contracts_path.exists():
+        try:
+            contracts_data = json.loads(contracts_path.read_text(encoding="utf-8"))
+            flow_candidates: list[str] = []
+            _collect_protocol_flow_channels(contracts_data.get("protocol_flows", {}), flow_candidates)
+            _append_candidates(contracts_path, flow_candidates)
+        except Exception:
+            pass
+
     return channels
 
 
-def collect_channel_registry() -> dict[int, dict]:
-    """channel_registry: id -> {name, channel_name, category, narrative_exempt}。"""
+def collect_channel_registry() -> tuple[dict[int, dict], list[int]]:
+    """channel_registry: id -> {name, channel_name, category, narrative} 与重复 id 清单。"""
     out: dict[int, dict] = {}
+    duplicates: list[int] = []
     data = load_json("infrastructure/event_bus_config.json")
     for entry in data.get("channel_registry", []):
         if not isinstance(entry, dict):
             continue
         cid = int(entry.get("id", 0))
+        if cid in out:
+            duplicates.append(cid)
         out[cid] = {
             "name": str(entry.get("name", "")),
             "channel_name": str(entry.get("channel_name", "")),
             "category": str(entry.get("category", "")),
             "narrative": bool(entry.get("narrative", True)),
         }
-    return out
+    return out, duplicates
 
 
-def collect_code_channels(domain_map: dict) -> list[dict]:
-    """扫描 backend gd 中 emit_domain_event 静态字面量频道。"""
+def collect_code_channels() -> list[dict]:
+    """扫描 backend 与 frontend .gd 中的 emit_domain_event/_notify_event 字面量及常量频道。"""
     channels: list[dict] = []
-    emit_re = re.compile(r'emit_domain_event\(\s*"([a-z0-9_.]+)"')
-    for f in BACKEND.rglob("*.gd"):
-        try:
-            text = f.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        for m in emit_re.finditer(text):
-            raw = m.group(1)
+    call_arg_re = re.compile(r'(?:emit_domain_event|_notify_event)\(\s*(?:"([a-z0-9_.]+)"|([A-Z][A-Z0-9_]*))')
+    for f, text in _iter_gd_texts():
+        const_map = _extract_local_string_consts(text)
+        for m in call_arg_re.finditer(text):
+            raw = m.group(1) if m.group(1) else const_map.get(m.group(2), "")
+            if not raw:
+                continue
             cm = CHANNEL_RE.match(raw)
             if cm:
                 channels.append(
@@ -199,18 +281,22 @@ def collect_narrative_tables(domain_map: dict) -> dict[str, dict]:
     return out
 
 
-def check_payload_contract() -> list[dict]:
-    """R4（WARN）：emit_domain_event 字面量载荷缺失 category_key/args 扫描。"""
+def check_payload_contract(registry: dict[int, dict]) -> list[dict]:
+    """R4（WARN）：emit_domain_event/_notify_event 字面量载荷缺失 category_key/args 扫描。"""
+    structured_only_channels: set[str] = {
+        entry["channel_name"]
+        for entry in registry.values()
+        if entry.get("channel_name") and not entry.get("narrative", True)
+    }
     findings: list[dict] = []
-    call_re = re.compile(r'emit_domain_event\(\s*"([a-z0-9_.]+)"\s*,\s*\{')
-    for f in BACKEND.rglob("*.gd"):
-        try:
-            text = f.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
+    call_re = re.compile(r'(?:emit_domain_event|_notify_event)\(\s*(?:"([a-z0-9_.]+)"|([A-Z][A-Z0-9_]*))\s*,\s*\{')
+    for f, text in _iter_gd_texts():
+        const_map = _extract_local_string_consts(text)
         for m in call_re.finditer(text):
-            # 收集紧随的载荷窗口（至首个 "})" 或行尾，多行宽容）
-            window = text[m.end() : m.end() + 400]
+            channel_name = m.group(1) if m.group(1) else const_map.get(m.group(2), "")
+            if not channel_name:
+                continue
+            window = text[m.end() : m.end() + 450]
             end = window.find("})")
             if end != -1:
                 window = window[:end]
@@ -222,33 +308,33 @@ def check_payload_contract() -> list[dict]:
                         "detector": "R4",
                         "rule_id": "ADV-EVT-004",
                         "severity": SEV_WARN,
-                        "channel": m.group(1),
+                        "channel": channel_name,
                         "source": str(f.relative_to(ROOT)),
-                        "message": "emit_domain_event 字面量载荷缺 category_key（叙事取色契约）",
+                        "message": "emit_domain_event/_notify_event 字面量载荷缺 category_key（叙事取色契约）",
                     }
                 )
-            if not has_args:
+            if not has_args and channel_name not in structured_only_channels:
                 findings.append(
                     {
                         "detector": "R4",
                         "rule_id": "ADV-EVT-004",
                         "severity": SEV_WARN,
-                        "channel": m.group(1),
+                        "channel": channel_name,
                         "source": str(f.relative_to(ROOT)),
-                        "message": "emit_domain_event 字面量载荷缺 args（模板占位填充契约，纯结构化事件可忽略）",
+                        "message": "emit_domain_event/_notify_event 字面量载荷缺 args（模板占位填充契约，纯结构化事件可忽略）",
                     }
                 )
     return findings
 
 
 def _check_r1_channel_naming(
-    channels: list[dict], domain_map: dict[str, dict]
+    channels: list[dict], allowed_namespaces: set[str]
 ) -> list[dict]:
-    """R1 频道命名合规：配置驱动频道严格 ERROR；代码频道按首段归属分级。"""
+    """R1 频道命名合规：配置驱动频道严格 ERROR；代码频道按已登记领域与别名表校验。"""
     findings: list[dict] = []
     for ch in channels:
         ch_name = get_full_channel_name(ch)
-        if ch["domain"] not in domain_map:
+        if ch["domain"] not in allowed_namespaces:
             if ch.get("from_config"):
                 findings.append(
                     {
@@ -315,12 +401,26 @@ def _check_r2_narrative_alignment(
 
 
 def _check_r3_registry_constants(
-    registry: dict[int, dict], consts: dict[str, int]
+    registry: dict[int, dict], duplicate_ids: list[int], consts: dict[str, int]
 ) -> list[dict]:
-    """R3 注册表-常量对齐。"""
+    """R3 注册表-常量双向对齐（值一致 + 唯一 id + 全常量覆盖）。"""
     findings: list[dict] = []
+    registry_names: set[str] = set()
+    for dup_id in duplicate_ids:
+        findings.append(
+            {
+                "detector": "R3",
+                "rule_id": "ADV-EVT-003",
+                "severity": SEV_ERROR,
+                "channel": f"registry_id:{dup_id}",
+                "source": "config/infrastructure/event_bus_config.json",
+                "message": f"channel_registry 存在重复整型信道 id: {dup_id}",
+            }
+        )
     for cid, entry in registry.items():
         const_name = entry["name"]
+        if const_name:
+            registry_names.add(const_name)
         if const_name and const_name in consts and consts[const_name] != cid:
             findings.append(
                 {
@@ -332,16 +432,26 @@ def _check_r3_registry_constants(
                     "message": f"channel_registry id {cid} 与 EventChannelDefinition.{const_name}（{consts[const_name]}）不一致",
                 }
             )
+    for const_name, const_val in consts.items():
+        if const_name not in registry_names:
+            findings.append(
+                {
+                    "detector": "R3",
+                    "rule_id": "ADV-EVT-003",
+                    "severity": SEV_ERROR,
+                    "channel": f"const:{const_name}",
+                    "source": "backend/infrastructure/event_bus/event_channel_definition.gd",
+                    "message": f"EventChannelDefinition.{const_name} ({const_val}) 尚未登记至 channel_registry",
+                }
+            )
     return findings
 
 
-def _collect_all_candidate_channels(
-    domain_map: dict[str, dict], registry: dict[int, dict]
-) -> list[dict]:
+def _collect_all_candidate_channels(registry: dict[int, dict]) -> list[dict]:
     """合并配置驱动频道与代码字面量频道，并注入叙事豁免标志。"""
     channels: list[dict] = []
     seen: set[tuple] = set()
-    for ch in collect_config_channels(domain_map) + collect_code_channels(domain_map):
+    for ch in collect_config_channels() + collect_code_channels():
         key = (ch["domain"], ch["event_name"])
         if key in seen:
             continue
@@ -369,19 +479,20 @@ def main() -> int:
     args = ap.parse_args()
 
     domain_map = collect_domain_mapping()
+    allowed_namespaces = collect_allowed_channel_namespaces(domain_map)
     narrative_tables = collect_narrative_tables(domain_map)
-    registry = collect_channel_registry()
+    registry, duplicate_ids = collect_channel_registry()
     consts = collect_channel_constants()
 
-    channels = _collect_all_candidate_channels(domain_map, registry)
+    channels = _collect_all_candidate_channels(registry)
 
     findings: list[dict] = []
-    findings.extend(_check_r1_channel_naming(channels, domain_map))
+    findings.extend(_check_r1_channel_naming(channels, allowed_namespaces))
     findings.extend(
         _check_r2_narrative_alignment(channels, domain_map, narrative_tables)
     )
-    findings.extend(_check_r3_registry_constants(registry, consts))
-    findings.extend(check_payload_contract())
+    findings.extend(_check_r3_registry_constants(registry, duplicate_ids, consts))
+    findings.extend(check_payload_contract(registry))
 
     errors = [f for f in findings if f["severity"] == SEV_ERROR]
     warns = [f for f in findings if f["severity"] == SEV_WARN]
