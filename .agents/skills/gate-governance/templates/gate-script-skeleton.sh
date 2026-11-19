@@ -11,13 +11,29 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
+GATE_ROOT_DIR="$ROOT"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT/scripts/sh/lib/gate-runtime.sh"
+gate_init_git_isolation "$ROOT"
+gate_resolve_runtime_bins
+
+if [[ -z "${NODE_BIN:-}" ]]; then
+  echo "✖ BLOCK  Missing Node.js runtime" >&2
+  exit 1
+fi
+
+if [[ -z "${NPM_BIN:-}" ]]; then
+  echo "✖ BLOCK  Missing npm runtime" >&2
+  exit 1
+fi
+
 echo "Starting local quality gate..."
 
 FAST_GATE="$ROOT/scripts/common/gate-fast-staged.js"
 if [[ -f "$FAST_GATE" ]]; then
   echo "Running fast streaming staged audit..."
   STATUS=0
-  node "$FAST_GATE" || STATUS=$?
+  "$NODE_BIN" "$FAST_GATE" || STATUS=$?
   if [[ "$STATUS" -ne 0 ]]; then
     echo "✖ BLOCK  Fast staged audit failed" >&2
     exit "$STATUS"
@@ -28,7 +44,7 @@ SUBPROJECT="$ROOT/auto-refactor"
 if [[ -d "$SUBPROJECT" ]]; then
   echo "Running isolated subproject test suite..."
   STATUS=0
-  (cd "$SUBPROJECT" && npm test) || STATUS=$?
+  (cd "$SUBPROJECT" && "$NPM_BIN" test) || STATUS=$?
   if [[ "$STATUS" -ne 0 ]]; then
     echo "✖ BLOCK [AR-TEST-02] Subproject tests failed" >&2
     exit "$STATUS"

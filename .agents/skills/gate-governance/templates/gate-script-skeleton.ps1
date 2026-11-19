@@ -21,12 +21,30 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 Write-Host "Starting local quality gate..." -ForegroundColor Cyan
 
-$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+
+$script:GateRepoRoot = $repoRoot
+. (Join-Path $repoRoot "scripts/ps1/lib/gate-runtime.ps1")
+Initialize-GateGitIsolation -RepoRoot $repoRoot
+
+$tools = Resolve-GateRuntimeTools
+$nodeCmd = $tools.Node
+$npmCmd = $tools.Npm
+
+if (-not $nodeCmd) {
+  Write-Host "✖ BLOCK  Missing Node.js runtime" -ForegroundColor Red
+  exit 1
+}
+
+if (-not $npmCmd) {
+  Write-Host "✖ BLOCK  Missing npm runtime" -ForegroundColor Red
+  exit 1
+}
 
 $fastGateScript = Join-Path $repoRoot "scripts/common/gate-fast-staged.js"
 if (Test-Path $fastGateScript) {
   Write-Host "Running fast streaming staged audit..." -ForegroundColor Cyan
-  & node $fastGateScript
+  & $nodeCmd $fastGateScript
   if ($LASTEXITCODE -ne 0) {
     Write-Host "✖ BLOCK  Fast staged audit failed" -ForegroundColor Red
     exit 1
@@ -36,7 +54,7 @@ if (Test-Path $fastGateScript) {
 $targetProject = Join-Path $repoRoot "auto-refactor"
 if (Test-Path $targetProject) {
   Write-Host "Running isolated subproject test suite..." -ForegroundColor Cyan
-  $proc = Start-Process -FilePath "npm" `
+  $proc = Start-Process -FilePath $npmCmd `
     -ArgumentList "test" `
     -WorkingDirectory $targetProject `
     -NoNewWindow -PassThru

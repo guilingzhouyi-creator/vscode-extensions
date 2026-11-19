@@ -10,6 +10,11 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+// Resolved when this template is copied into auto-refactor/scripts/validate-*.js:
+const { rmSyncWithRetry } = require('./lib/resilient-fs-cleanup');
 
 function runTests() {
   console.log('=== Running Example Custom Rule Validation Suite ===');
@@ -26,6 +31,19 @@ function runTests() {
     const cleanResult = { matched: false, count: 0 };
     assert.strictEqual(cleanResult.matched, false, 'Rule must not flag clean pattern');
     console.log('  [PASS] Test 2: Clean code stays silent');
+  }
+
+  // Test 3: Isolated temp sandbox with Windows-resilient cleanup
+  {
+    const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-validate-example-'));
+    try {
+      const fixturePath = path.join(sandboxDir, 'sample.ts');
+      fs.writeFileSync(fixturePath, 'export const sample = 1;\n', 'utf8');
+      assert.strictEqual(fs.existsSync(fixturePath), true, 'Sandbox fixture must exist');
+      console.log('  [PASS] Test 3: Sandbox fixture verified');
+    } finally {
+      rmSyncWithRetry(sandboxDir, { recursive: true, force: true });
+    }
   }
 
   console.log('✅ All tests in suite passed successfully.');
