@@ -46,7 +46,7 @@ func _exit_tree() -> void:
 ## 渲染标准 NarrativeDAGGraph 字典载荷到 GraphEdit 画布，并高亮当前推演活跃节点
 func render_dag_payload(dag_payload: Dictionary, active_node_id: String = "") -> void:
 	clear_graph()
-	_graph_id = str(dag_payload.get("dag_id", dag_payload.get("graph_id", "DAG_CUSTOM")))
+	_graph_id = str(dag_payload.get("dag_id", "DAG_CUSTOM"))
 	_entry_node_id = str(dag_payload.get("entry_node_id", ""))
 	_terminal_node_id = str(dag_payload.get("terminal_node_id", ""))
 
@@ -70,8 +70,8 @@ func render_dag_payload(dag_payload: Dictionary, active_node_id: String = "") ->
 		_graph_nodes_by_id[node_id] = created_node
 
 	for edge_entry in _edge_records:
-		var from_id: String = str(edge_entry.get("from_node_id", edge_entry.get("from", "")))
-		var to_id: String = str(edge_entry.get("to_node_id", edge_entry.get("to", "")))
+		var from_id: String = str(edge_entry.get("from_node_id", ""))
+		var to_id: String = str(edge_entry.get("to_node_id", ""))
 		if _graph_nodes_by_id.has(from_id) and _graph_nodes_by_id.has(to_id):
 			_graph_editor.connect_node(StringName(from_id), 0, StringName(to_id), 0)
 
@@ -90,7 +90,6 @@ func export_dag_payload() -> Dictionary:
 		exported_edges = _edge_records.duplicate(true)
 
 	return {
-		"graph_id": _graph_id,
 		"dag_id": _graph_id,
 		"entry_node_id": _entry_node_id,
 		"terminal_node_id": _terminal_node_id,

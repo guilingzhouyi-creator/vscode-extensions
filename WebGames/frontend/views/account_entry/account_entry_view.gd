@@ -115,8 +115,7 @@ var rolled_attributes: Dictionary = {}
 @onready var char_create_back_btn: Button = %CharCreateBackBtn
 
 func _init() -> void:
-    if ServiceLocator.get_mode() == "mock":
-        _load_mock_snapshot()
+    _load_account_snapshot()
 
 func _ready() -> void:
     var theme_manager := ThemeManager.get_instance()
@@ -133,7 +132,7 @@ func _ready() -> void:
     _connect_signals()
     UIIntermediary.adapt_view(self)
 
-func _load_mock_snapshot() -> void:
+func _load_account_snapshot() -> void:
     var account_payload: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("account")
     if not account_payload.is_empty():
         apply_snapshot(account_payload)
@@ -161,17 +160,7 @@ func submit_login(username: String, password_plain: String, on_completed: Callab
         if on_completed.is_valid():
             on_completed.call(empty_reply)
         return empty_reply
-    var service_mode := ServiceLocator.get_mode()
-    if service_mode == "backend" or service_mode == "real":
-        return BackendHelper.login_backend_flow(self, form_username, form_password, on_completed)
-
-    current_account_id = "ACC_" + form_username.to_upper()
-    current_session_token = "TOKEN_" + current_account_id
-    switch_state(EntryState.CHARACTER_SELECT)
-    var success_reply := {"success": true, "account_id": current_account_id, "token": current_session_token}
-    if on_completed.is_valid():
-        on_completed.call(success_reply)
-    return success_reply
+    return BackendHelper.login_backend_flow(self, form_username, form_password, on_completed)
 
 ## 提交账号注册表单校验并切换至创角状态
 func submit_register(username: String, password_plain: String, on_completed: Callable = Callable()) -> Dictionary:
@@ -183,17 +172,7 @@ func submit_register(username: String, password_plain: String, on_completed: Cal
         if on_completed.is_valid():
             on_completed.call(short_reply)
         return short_reply
-    var service_mode := ServiceLocator.get_mode()
-    if service_mode == "backend" or service_mode == "real":
-        return BackendHelper.register_backend_flow(self, form_username, form_password, on_completed)
-
-    current_account_id = "ACC_" + form_username.to_upper()
-    current_session_token = "TOKEN_" + current_account_id
-    switch_state(EntryState.CHARACTER_CREATE)
-    var success_reply := {"success": true, "account_id": current_account_id, "token": current_session_token}
-    if on_completed.is_valid():
-        on_completed.call(success_reply)
-    return success_reply
+    return BackendHelper.register_backend_flow(self, form_username, form_password, on_completed)
 
 ## 选定目标区服并激活对应网关连接上下文
 func select_server(server_id: String) -> Dictionary:
@@ -211,9 +190,6 @@ func logout_account() -> Dictionary:
     return BackendHelper.logout_and_reset_flow(self)
 
 ## 注入角色槽位列表快照
-func set_character_slots_snapshot(slots: Array) -> void:
-    apply_snapshot({"character_slots": slots})
-
 func _render_from_snapshot() -> void:
     if snapshot.has("default_servers"):
         server_list = FrontendSnapshot.read_array(snapshot, "default_servers")
@@ -223,7 +199,7 @@ func _render_from_snapshot() -> void:
         _get_tabs().sync_mod_creation_snapshot(snapshot)
 
 func _has_mod_creation_snapshot_keys(snapshot_payload: Dictionary) -> bool:
-    return snapshot_payload.has("creation_ui_snapshot") or snapshot_payload.has("mod_precheck_checklist") or snapshot_payload.has("precheck_checklist") or snapshot_payload.has("ui_controls") or snapshot_payload.has("creation_ui_controls") or snapshot_payload.has("available_origins_list") or snapshot_payload.has("available_origins") or snapshot_payload.has("available_traits_list") or snapshot_payload.has("available_trait_pairs")
+    return snapshot_payload.has("creation_ui_snapshot") or snapshot_payload.has("precheck_checklist") or snapshot_payload.has("ui_controls") or snapshot_payload.has("available_origins") or snapshot_payload.has("available_trait_pairs")
 
 ## 在受控权限允许时按索引选中自定义出身
 func select_custom_origin_by_index(origin_index: int) -> bool:
@@ -393,23 +369,12 @@ func create_character(character_name: String, race: String = "") -> Dictionary:
     form_selected_race = race
     if form_character_name.is_empty():
         return {"success": false, "error_code": "ERR_NAME_EMPTY"}
-    var service_mode := ServiceLocator.get_mode()
-    if service_mode != "mock":
-        if current_account_id.is_empty():
-            return {"success": false, "error_code": "ERR_AUTH_REQUIRED"}
-        var backend_reply: Dictionary = BackendHelper.create_character_backend_flow(self, _get_tabs(), form_character_name, form_selected_race)
-        if bool(backend_reply.get("_handled", false)):
-            return backend_reply.get("result", {}) as Dictionary
-        return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
-
-    var created_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "", "empty": false}
-    for slot_index in range(character_slots.size()):
-        if character_slots[slot_index].get("empty", false) or str(character_slots[slot_index].get("name", "")) == "":
-            character_slots[slot_index] = created_slot
-            break
-    _get_tabs().populate_character_slots()
-    switch_state(EntryState.CHARACTER_SELECT)
-    return {"success": true, "character": created_slot}
+    if current_account_id.is_empty():
+        return {"success": false, "error_code": "ERR_AUTH_REQUIRED"}
+    var backend_reply: Dictionary = BackendHelper.create_character_backend_flow(self, _get_tabs(), form_character_name, form_selected_race)
+    if bool(backend_reply.get("_handled", false)):
+        return backend_reply.get("result", {}) as Dictionary
+    return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
 
 func _on_char_create_confirm_pressed() -> void:
     var character_name_text := char_name_edit.text.strip_edges() if char_name_edit != null else form_character_name

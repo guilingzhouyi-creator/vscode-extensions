@@ -75,14 +75,10 @@ func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
 		"gateway_mode": "current_gateway_mode"
 	})
 	_sync_mode_tab_selection()
-	refresh_gateway_state()
+	_get_tabs().refresh_gateway_state()
 
 ## 从 MOD 工坊返回后恢复刷新世界网关就绪态
 func on_screen_resume() -> void:
-	refresh_gateway_state()
-
-## 触发后端网关状态全量同步（探针就绪检查、档案列表与联机界域）
-func refresh_gateway_state() -> void:
 	_get_tabs().refresh_gateway_state()
 
 ## 统一快照渲染映射：将后端网关状态字典映射到界面控件
@@ -191,7 +187,7 @@ func _on_delete_world_debounced() -> void:
 
 func _on_refresh_worlds_debounced() -> void:
 	if try_consume_action_cooldown("wg_refresh_worlds", 200):
-		refresh_gateway_state()
+		_get_tabs().refresh_gateway_state()
 
 func _on_realm_item_selected(item_index: int) -> void:
 	selected_realm_index = item_index

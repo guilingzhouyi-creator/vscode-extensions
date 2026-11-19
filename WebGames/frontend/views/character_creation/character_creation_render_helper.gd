@@ -176,17 +176,14 @@ static func _populate_trait_options(host_view: Variant, allow_trait: bool) -> vo
 ## 从身世条目中提取规范化出身标识
 static func extract_origin_id(entry: Variant) -> String:
 	if entry is Dictionary:
-		var entry_map := entry as Dictionary
-		return str(entry_map.get("origin_id", entry_map.get("id", "")))
+		return str((entry as Dictionary).get("origin_id", ""))
 	return str(entry) if entry is String else ""
 
 
 ## 从特质对条目中提取正向特质标识
 static func extract_positive_trait_id(entry: Variant) -> String:
 	if entry is Dictionary:
-		var entry_map := entry as Dictionary
-		var positive_id := str(entry_map.get("positive", entry_map.get("positive_trait", entry_map.get("positive_id", ""))))
-		return positive_id if not positive_id.is_empty() else str(entry_map.get("trait_id", entry_map.get("id", "")))
+		return str((entry as Dictionary).get("positive", ""))
 	return str(entry) if entry is String else ""
 
 

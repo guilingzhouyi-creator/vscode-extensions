@@ -58,7 +58,7 @@ static func refresh_remote_realms(host_view: Variant) -> void:
         host_view.current_session_token,
         func(response_payload: Dictionary) -> void:
             var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
-            host_view.apply_snapshot({"realms": data_map.get("realms", response_payload.get("realms", []))})
+            host_view.apply_snapshot({"realms": data_map.get("realms", [])})
     )
 
 
@@ -128,7 +128,7 @@ static func join_verified_realm(
         return missing_view_reply
     var result_holder: Dictionary = {}
     var proceed_enter := func() -> Dictionary:
-        var realm_world_id := str(realm_map.get("realm_id", realm_map.get("world_id", "")))
+        var realm_world_id := str(realm_map.get("realm_id", ""))
         if realm_world_id.is_empty():
             var verified_reply := {"success": true, "verified": true}
             result_holder.merge(verified_reply, true)

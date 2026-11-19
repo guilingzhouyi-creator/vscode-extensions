@@ -90,10 +90,6 @@ func _ensure_studio_view_mounted() -> Control:
 func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
 	super.on_screen_enter(screen_parameters)
 	_sync_navigation_context_properties(screen_parameters, {"world_id": "target_world_id"})
-	refresh_installed_packs()
-
-## 从网关边界服务拉取已安装 MOD 包与当前勾选清单
-func refresh_installed_packs() -> void:
 	_get_tabs().refresh_installed_packs()
 
 ## 统一快照渲染映射：将已安装包列表与预检结果映射到控件
@@ -141,7 +137,7 @@ func _on_rescan_debounced() -> void:
 		var root_path := custom_root_edit.text.strip_edges() if custom_root_edit != null else ""
 		if not root_path.is_empty() and not (root_path in custom_scan_roots):
 			custom_scan_roots.append(root_path)
-		refresh_installed_packs()
+		_get_tabs().refresh_installed_packs()
 
 func _on_pack_selected(item_index: int) -> void:
 	focused_pack_index = item_index

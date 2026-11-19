@@ -73,7 +73,7 @@ func refresh_gateway_state() -> void:
 		func(response_payload: Dictionary) -> void:
 			var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
 			if _view != null and is_instance_valid(_view):
-				_view.apply_snapshot({"realms": data_map.get("realms", response_payload.get("realms", []))})
+				_view.apply_snapshot({"realms": data_map.get("realms", [])})
 	)
 
 ## 按世界 ID 刷新只读 MOD 锁诊断快照

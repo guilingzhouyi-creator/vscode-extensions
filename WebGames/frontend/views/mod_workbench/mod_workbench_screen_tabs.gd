@@ -45,7 +45,7 @@ func refresh_installed_packs() -> void:
 		_view.custom_scan_roots,
 		func(response_payload: Dictionary) -> void:
 			var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
-			var package_rows: Variant = data_map.get("packages", data_map.get("installed_packs", []))
+			var package_rows: Variant = data_map.get("packages", [])
 			_view.apply_snapshot({
 				"installed_packs": package_rows,
 				"selected_pack_ids": data_map.get("selected_pack_ids", _view.selected_pack_ids)

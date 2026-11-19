@@ -310,21 +310,18 @@ func sync_mod_creation_snapshot(snapshot_payload: Dictionary) -> void:
     var source_payload: Dictionary = snapshot_payload
     if snapshot_payload.get("creation_ui_snapshot") is Dictionary:
         source_payload = snapshot_payload.get("creation_ui_snapshot") as Dictionary
-    var checklist_source: Dictionary = source_payload if (source_payload.has("mod_precheck_checklist") or source_payload.has("precheck_checklist")) else snapshot_payload
-    var checklist_key: String = "mod_precheck_checklist" if checklist_source.has("mod_precheck_checklist") else "precheck_checklist"
-    if checklist_source.has(checklist_key):
-        view.mod_precheck_checklist = FrontendSnapshot.read_array(checklist_source, checklist_key)
-    var origin_source: Dictionary = source_payload if (source_payload.has("available_origins_list") or source_payload.has("available_origins")) else snapshot_payload
-    var origin_key: String = "available_origins_list" if origin_source.has("available_origins_list") else "available_origins"
-    if origin_source.has(origin_key):
-        view.available_origins_list = FrontendSnapshot.read_array(origin_source, origin_key)
-    var trait_source: Dictionary = source_payload if (source_payload.has("available_traits_list") or source_payload.has("available_trait_pairs")) else snapshot_payload
-    var trait_key: String = "available_traits_list" if trait_source.has("available_traits_list") else "available_trait_pairs"
-    if trait_source.has(trait_key):
-        view.available_traits_list = FrontendSnapshot.read_array(trait_source, trait_key)
-    var raw_controls: Variant = source_payload.get("ui_controls", source_payload.get("creation_ui_controls", null))
+    var checklist_source: Dictionary = source_payload if source_payload.has("precheck_checklist") else snapshot_payload
+    if checklist_source.has("precheck_checklist"):
+        view.mod_precheck_checklist = FrontendSnapshot.read_array(checklist_source, "precheck_checklist")
+    var origin_source: Dictionary = source_payload if source_payload.has("available_origins") else snapshot_payload
+    if origin_source.has("available_origins"):
+        view.available_origins_list = FrontendSnapshot.read_array(origin_source, "available_origins")
+    var trait_source: Dictionary = source_payload if source_payload.has("available_trait_pairs") else snapshot_payload
+    if trait_source.has("available_trait_pairs"):
+        view.available_traits_list = FrontendSnapshot.read_array(trait_source, "available_trait_pairs")
+    var raw_controls: Variant = source_payload.get("ui_controls", null)
     if not (raw_controls is Dictionary):
-        raw_controls = snapshot_payload.get("ui_controls", snapshot_payload.get("creation_ui_controls", null))
+        raw_controls = snapshot_payload.get("ui_controls", null)
     if raw_controls is Dictionary:
         var control_flags: Dictionary = raw_controls as Dictionary
         view.creation_ui_controls = {
@@ -343,15 +340,13 @@ func sync_mod_creation_snapshot(snapshot_payload: Dictionary) -> void:
 ## 从出身条目中提取规范化出身标识
 static func extract_origin_id(entry: Variant) -> String:
     if entry is Dictionary:
-        return str((entry as Dictionary).get("origin_id", (entry as Dictionary).get("id", "")))
+        return str((entry as Dictionary).get("origin_id", ""))
     return String(entry) if entry is String else ""
 
 ## 从特质条目中提取正向特质标识
 static func extract_positive_trait_id(entry: Variant) -> String:
     if entry is Dictionary:
-        var entry_map: Dictionary = entry as Dictionary
-        var positive_id: String = str(entry_map.get("positive", entry_map.get("positive_trait", entry_map.get("positive_id", ""))))
-        return positive_id if not positive_id.is_empty() else str(entry_map.get("trait_id", entry_map.get("id", "")))
+        return str((entry as Dictionary).get("positive", ""))
     return String(entry) if entry is String else ""
 
 ## 同步调用认证服务异步方法并收集回调响应字典

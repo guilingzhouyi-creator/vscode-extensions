@@ -148,7 +148,8 @@ func _ready() -> void:
 	_apply_theme()
 	_init_all_text()
 	ServiceLocator.get_instance().game_settings().get_settings_async("", "", func(settings_reply: Dictionary) -> void:
-		var settings_map: Dictionary = settings_reply.get("settings", settings_reply.get("data", settings_reply)) as Dictionary
+		var data_map: Dictionary = settings_reply.get("data", {}) as Dictionary
+		var settings_map: Dictionary = data_map.get("settings", {}) as Dictionary
 		if bool(settings_reply.get("success", false)) and not settings_map.is_empty():
 			apply_snapshot(settings_map)
 	)

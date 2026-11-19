@@ -35,7 +35,7 @@ static func login_backend_flow(
                 view.current_account_id = str(auth_reply.get("account_id", ""))
                 view.current_session_token = str(auth_reply.get("token", ""))
                 var slots_list: Array = auth_reply.get("character_slots", [])
-                view.set_character_slots_snapshot(slots_list)
+                view.apply_snapshot({"character_slots": slots_list})
                 view.switch_state(AccountEntryView.EntryState.CHARACTER_SELECT)
             if on_completed.is_valid():
                 on_completed.call(auth_reply)
@@ -68,12 +68,12 @@ static func register_backend_flow(
                 return
             if view != null and is_instance_valid(view):
                 view.current_account_id = str(reply_payload.get("account_id", ""))
-                view.current_session_token = str(reply_payload.get("token", reply_payload.get("session_token", "")))
+                view.current_session_token = str(reply_payload.get("token", ""))
             var character_list: Array = reply_payload.get("character_slots", []) if reply_payload.get("character_slots") is Array else []
             var finalize_register := func(slots_array: Array) -> void:
                 if view != null and is_instance_valid(view):
                     if not slots_array.is_empty():
-                        view.set_character_slots_snapshot(slots_array)
+                        view.apply_snapshot({"character_slots": slots_array})
                     view.switch_state(AccountEntryView.EntryState.CHARACTER_CREATE)
                 if on_completed.is_valid():
                     on_completed.call(reply_payload)
@@ -115,7 +115,7 @@ static func create_character_backend_flow(
             var finalize_create := func(refreshed_characters: Array) -> void:
                 if view != null and is_instance_valid(view):
                     if not refreshed_characters.is_empty():
-                        view.set_character_slots_snapshot(refreshed_characters)
+                        view.apply_snapshot({"character_slots": refreshed_characters})
                     if tabs_delegate != null:
                         tabs_delegate.populate_character_slots()
                     view.switch_state(AccountEntryView.EntryState.CHARACTER_SELECT)
@@ -218,7 +218,7 @@ static func clear_character_slot_flow(view: AccountEntryView, tabs_delegate: Acc
     var slot_to_clear := view.selected_character_slot
     var auth_service: IAuthService = ServiceLocator.get_instance().auth()
     auth_service.clear_slot_async(view.current_account_id, view.current_session_token, slot_to_clear, func(clear_reply: Dictionary) -> void:
-        if ServiceLocator.get_mode() != "mock" and not bool(clear_reply.get("success", false)):
+        if not bool(clear_reply.get("success", false)):
             NavManager.get_instance().show_toast(str(clear_reply.get("message", "ui.fe01.toast.slot_reset")), NavTypes.ToastLevel.WARNING)
             return
         if view == null or not is_instance_valid(view):

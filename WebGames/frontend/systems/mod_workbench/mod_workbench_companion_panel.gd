@@ -225,7 +225,7 @@ func _append_choice_entry(choice_variant: Variant) -> void:
 	if not (choice_variant is Dictionary):
 		return
 	var choice_map: Dictionary = choice_variant as Dictionary
-	var choice_id: String = str(choice_map.get("choice_id", choice_map.get("action", "NEXT")))
+	var choice_id: String = str(choice_map.get("choice_id", "NEXT"))
 	var choice_label: String = str(choice_map.get("text", choice_id))
 	var row_index: int = _choices_list.add_item("%s (%s)" % [choice_label, choice_id])
 	_choices_list.set_item_metadata(row_index, choice_id)

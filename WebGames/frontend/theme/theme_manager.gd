@@ -28,19 +28,7 @@ static func reset_instance() -> void:
 var theme: Theme
 
 ## 配色令牌（从 event_categories.json 动态注入）
-var category_colors: Dictionary = {}  # { "combat": Color, "travel": Color, ... }
-
-## 基础颜色令牌（单一真源：值全部派生自 DesignTokens，本类不再复写字面量；
-## 保留 DEFAULT_* 常量名仅为兼容既有内部调用面，外部消费方应直接引用 DesignTokens.*）
-const DEFAULT_BG := DesignTokens.COLOR_BG_DEFAULT
-const DEFAULT_SURFACE := DesignTokens.COLOR_SURFACE_DEFAULT
-const DEFAULT_BORDER := DesignTokens.COLOR_BORDER_DEFAULT
-const DEFAULT_TEXT := DesignTokens.COLOR_TEXT_DEFAULT
-const DEFAULT_TEXT_MUTED := DesignTokens.COLOR_TEXT_MUTED_DEFAULT
-const DEFAULT_ACCENT := DesignTokens.COLOR_ACCENT_DEFAULT
-const DEFAULT_SUCCESS := DesignTokens.COLOR_SUCCESS_DEFAULT
-const DEFAULT_WARNING := DesignTokens.COLOR_WARNING_DEFAULT
-const DEFAULT_DANGER := DesignTokens.COLOR_DANGER_DEFAULT
+var category_colors: Dictionary = {} # { "combat": Color, "travel": Color, ... }
 
 func _init_theme() -> void:
 	theme = Theme.new()
@@ -62,14 +50,14 @@ func get_category_color(category_key: String) -> Color:
 	var upper := category_key.to_upper()
 	if category_colors.has(upper):
 		return category_colors[upper]
-	return DEFAULT_TEXT_MUTED
+	return DesignTokens.COLOR_TEXT_MUTED_DEFAULT
 
 ## 设置基础样式（Control 基类通用）
 func _setup_base_styles() -> void:
 	# Button 样式
 	var button_style := StyleBoxFlat.new()
-	button_style.bg_color = DEFAULT_SURFACE
-	button_style.border_color = DEFAULT_BORDER
+	button_style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
+	button_style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
 	button_style.border_width_left = 1
 	button_style.border_width_right = 1
 	button_style.border_width_top = 1
@@ -82,7 +70,7 @@ func _setup_base_styles() -> void:
 
 	# Button hover
 	var button_hover := button_style.duplicate()
-	button_hover.bg_color = DEFAULT_BORDER
+	button_hover.bg_color = DesignTokens.COLOR_BORDER_DEFAULT
 	theme.set_stylebox("hover", "Button", button_hover)
 
 	# Button pressed（按下态色引用 DesignTokens，消除裸 Color 字面量）
@@ -91,13 +79,13 @@ func _setup_base_styles() -> void:
 	theme.set_stylebox("pressed", "Button", button_pressed)
 
 	# Label 基础字体颜色
-	theme.set_color("font_color", "Label", DEFAULT_TEXT)
-	theme.set_color("font_uneditable_color", "LineEdit", DEFAULT_TEXT_MUTED)
+	theme.set_color("font_color", "Label", DesignTokens.COLOR_TEXT_DEFAULT)
+	theme.set_color("font_uneditable_color", "LineEdit", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 
 	# Panel 样式
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = DEFAULT_SURFACE
-	panel_style.border_color = DEFAULT_BORDER
+	panel_style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
+	panel_style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
 	panel_style.border_width_left = 1
 	panel_style.border_width_right = 1
 	panel_style.border_width_top = 1
@@ -109,11 +97,11 @@ func _setup_base_styles() -> void:
 	theme.set_stylebox("panel", "PanelContainer", panel_style)
 
 	# ProgressBar
-	theme.set_color("font_color", "ProgressBar", DEFAULT_TEXT)
+	theme.set_color("font_color", "ProgressBar", DesignTokens.COLOR_TEXT_DEFAULT)
 
 	# TabContainer
-	theme.set_color("font_selected_color", "TabContainer", DEFAULT_ACCENT)
-	theme.set_color("font_color", "TabContainer", DEFAULT_TEXT_MUTED)
+	theme.set_color("font_selected_color", "TabContainer", DesignTokens.COLOR_ACCENT_DEFAULT)
+	theme.set_color("font_color", "TabContainer", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 
 ## 便捷方法：获取 bbcode 用的颜色标签（用于 RichTextLabel）
 func get_bbcode_color_tag(category_key: String) -> String:

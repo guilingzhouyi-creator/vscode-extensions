@@ -231,12 +231,8 @@ func _enter_created_world(create_data: Dictionary, initial_prologue_state: Varia
 
 func _extract_creation_snapshot(source_payload: Dictionary) -> void:
 	available_origins = FrontendSnapshot.read_array(source_payload, "available_origins")
-	if available_origins.is_empty() and source_payload.has("available_origins_list"):
-		available_origins = FrontendSnapshot.read_array(source_payload, "available_origins_list")
 	available_trait_pairs = FrontendSnapshot.read_array(source_payload, "available_trait_pairs")
-	if available_trait_pairs.is_empty() and source_payload.has("available_traits_list"):
-		available_trait_pairs = FrontendSnapshot.read_array(source_payload, "available_traits_list")
-	var raw_controls: Variant = source_payload.get("ui_controls", source_payload.get("creation_ui_controls", null))
+	var raw_controls: Variant = source_payload.get("ui_controls", null)
 	if raw_controls is Dictionary:
 		var control_flags := raw_controls as Dictionary
 		creation_ui_controls = {
