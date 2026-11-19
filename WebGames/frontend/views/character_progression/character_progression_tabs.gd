@@ -151,7 +151,7 @@ func _on_pot_confirm_pressed() -> void:
 			allocation_deltas[attribute_key] = delta
 		_view.attributes_base[attribute_key] = _view.attributes_preview[attribute_key]
 	_view.available_potential_points = _view.unallocated_points_preview
-	if ServiceLocator.get_mode() != "mock" and not allocation_deltas.is_empty():
+	if not allocation_deltas.is_empty():
 		ServiceLocator.get_instance().hud_sync().dispatch_hud_directive_async("", "", "", "ALLOCATE_POTENTIAL_STAT", {
 			"allocations": allocation_deltas,
 			"remaining_potential": _view.available_potential_points,

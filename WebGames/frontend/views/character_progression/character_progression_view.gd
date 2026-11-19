@@ -220,18 +220,19 @@ func _ready() -> void:
 	_tabs = _register_owned_subcontroller(_create_tabs_controller()) as CharacterProgressionTabsClass
 	_tabs.setup(self)
 
-	_load_mock_snapshot()
-	_setup_tab_titles()
-	_init_static_text()
+	_load_character_snapshot()
+	var inv_panel: Variant = _tabs._get_inventory_panel()
+	_tabs._setup_tab_titles()
+	_tabs._init_static_text()
 
-	_init_attributes_tab()
-	_init_potential_tab()
-	_init_vitality_tab()
-	_init_skill_tree_tab()
-	_init_equipment_tab()
-	_init_inventory_tab()
-	_init_titles_tab()
-	_init_lore_tab()
+	_tabs._init_attributes_tab()
+	_tabs._init_potential_tab()
+	_tabs._init_vitality_tab()
+	_tabs._init_skill_tree_tab()
+	inv_panel.init_equipment_tab()
+	inv_panel.init_inventory_tab()
+	_tabs._init_titles_tab()
+	_tabs._init_lore_tab()
 
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
@@ -246,130 +247,28 @@ func _apply_theme() -> void:
 	if theme_manager.theme != null:
 		theme = theme_manager.theme
 
-## 从 domain_boundary 快照服务加载角色快照并补本地 Mock
-func _load_mock_snapshot() -> void:
-	var is_mock_mode := (ServiceLocator.get_mode() == "mock")
-	if not is_mock_mode:
-		age_years = 18
-		age_months = 0
-		available_potential_points = 0
-		unallocated_points_preview = 0
-		vitality_sf = 1.0
-		vitality_msf = 1.0
-		vitality_hunger = 100.0
-		vitality_energy = 100.0
+## 从 domain_boundary 快照服务加载角色快照并应用默认空态结构
+func _load_character_snapshot() -> void:
+	age_years = 18
+	age_months = 0
+	available_potential_points = 0
+	unallocated_points_preview = 0
+	vitality_sf = 1.0
+	vitality_msf = 1.0
+	vitality_hunger = 100.0
+	vitality_energy = 100.0
 	var character_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("character")
 	if not character_snapshot.is_empty():
-		if character_snapshot.has("name"):
-			character_name = character_snapshot["name"]
-		if character_snapshot.has("title"):
-			character_title = character_snapshot["title"]
-		if character_snapshot.has("age_years"):
-			age_years = int(character_snapshot["age_years"])
-		if character_snapshot.has("age_months"):
-			age_months = int(character_snapshot["age_months"])
-		if character_snapshot.has("attributes"):
-			var attribute_map: Dictionary = character_snapshot["attributes"]
-			attributes_base = attribute_map.duplicate()
-			attributes_preview = attribute_map.duplicate()
-		if character_snapshot.has("potential_points"):
-			available_potential_points = int(character_snapshot["potential_points"])
-		unallocated_points_preview = available_potential_points
-		if character_snapshot.has("vitality"):
-			var vitality_map: Dictionary = character_snapshot["vitality"]
-			vitality_sf = float(vitality_map.get("sf", vitality_sf))
-			vitality_msf = float(vitality_map.get("msf", vitality_msf))
-			vitality_hunger = float(vitality_map.get("hunger", vitality_hunger))
-			vitality_energy = float(vitality_map.get("energy", vitality_energy))
-		if character_snapshot.has("equipped_slots"):
-			equipped_slots = (character_snapshot["equipped_slots"] as Dictionary).duplicate()
-		if character_snapshot.has("inventory_count"):
-			inventory_count = int(character_snapshot["inventory_count"])
-		if character_snapshot.has("inventory_max"):
-			inventory_max = int(character_snapshot["inventory_max"])
+		apply_snapshot(character_snapshot)
 	if equipped_slots.is_empty():
 		equipped_slots = {
 			"MAIN_HAND": null, "OFF_HAND": null, "HEAD": null, "CHEST": null,
 			"LEGS": null, "FEET": null, "NECK": null, "RING_L": null, "RING_R": null
 		}
-	if _tabs != null and is_mock_mode:
-		_tabs._get_inventory_panel().load_mock_supplements()
 
 # ==============================================================================
-# Tab 委托转发
+# 信号绑定
 # ==============================================================================
-
-func _setup_tab_titles() -> void:
-	if _tabs != null:
-		_tabs._setup_tab_titles()
-
-func _init_static_text() -> void:
-	if _tabs != null:
-		_tabs._init_static_text()
-
-func _init_attributes_tab() -> void:
-	if _tabs != null:
-		_tabs._init_attributes_tab()
-
-func _init_potential_tab() -> void:
-	if _tabs != null:
-		_tabs._init_potential_tab()
-
-func _refresh_potential_tab() -> void:
-	if _tabs != null:
-		_tabs._refresh_potential_tab()
-
-func _init_vitality_tab() -> void:
-	if _tabs != null:
-		_tabs._init_vitality_tab()
-
-func _refresh_vitality_tab() -> void:
-	if _tabs != null:
-		_tabs._refresh_vitality_tab()
-
-func _init_skill_tree_tab() -> void:
-	if _tabs != null:
-		_tabs._init_skill_tree_tab()
-
-func _refresh_skill_tree_tab() -> void:
-	if _tabs != null:
-		_tabs._refresh_skill_tree_tab()
-
-func _init_equipment_tab() -> void:
-	if _tabs != null:
-		_tabs._get_inventory_panel().init_equipment_tab()
-
-func _refresh_equipment_detail(slot_index: int) -> void:
-	if _tabs != null:
-		_tabs._get_inventory_panel().refresh_equipment_detail(slot_index)
-
-func _refresh_equipment_affix() -> void:
-	if _tabs != null:
-		_tabs._get_inventory_panel().refresh_equipment_affix()
-
-func _init_inventory_tab() -> void:
-	if _tabs != null:
-		_tabs._get_inventory_panel().init_inventory_tab()
-
-func _refresh_inventory_grid() -> void:
-	if _tabs != null:
-		_tabs._get_inventory_panel().refresh_inventory_grid()
-
-func _refresh_inventory_status() -> void:
-	if _tabs != null:
-		_tabs._get_inventory_panel().refresh_inventory_status()
-
-func _init_titles_tab() -> void:
-	if _tabs != null:
-		_tabs._init_titles_tab()
-
-func _refresh_titles_tab() -> void:
-	if _tabs != null:
-		_tabs._refresh_titles_tab()
-
-func _init_lore_tab() -> void:
-	if _tabs != null:
-		_tabs._init_lore_tab()
 
 func _connect_signals() -> void:
 	if _tabs != null:
@@ -380,7 +279,7 @@ func _on_back_btn_pressed() -> void:
 	self.back()
 
 # ==============================================================================
-# 兼容公开交互接口（保留原 API 供上层与测试调用）
+# 公开交互接口
 # ==============================================================================
 
 ## 切换 Tab
@@ -389,12 +288,15 @@ func switch_tab(tab: TabType) -> void:
 	if _main_tab_container != null:
 		_main_tab_container.current_tab = int(tab)
 
-## 设置属性快照（经统一快照入口）
-func set_attributes_snapshot(base_attributes: Dictionary, potential_points: int) -> void:
-	apply_snapshot({"attributes": base_attributes, "potential_points": potential_points})
-
-## 统一快照渲染映射：基础属性与潜能点 → 视图状态
-func _render_from_snapshot() -> void:
+func _apply_core_profile_snapshot() -> void:
+	if snapshot.has("name"):
+		character_name = FrontendSnapshot.read_string(snapshot, "name", character_name)
+	if snapshot.has("title"):
+		character_title = FrontendSnapshot.read_string(snapshot, "title", character_title)
+	if snapshot.has("age_years"):
+		age_years = int(snapshot.get("age_years", age_years))
+	if snapshot.has("age_months"):
+		age_months = int(snapshot.get("age_months", age_months))
 	if snapshot.has("attributes"):
 		var attribute_map: Dictionary = FrontendSnapshot.read_dict(snapshot, "attributes")
 		attributes_base = attribute_map
@@ -402,6 +304,42 @@ func _render_from_snapshot() -> void:
 	if snapshot.has("potential_points"):
 		available_potential_points = int(snapshot.get("potential_points", available_potential_points))
 		unallocated_points_preview = available_potential_points
+	if snapshot.get("vitality") is Dictionary:
+		var vitality_map: Dictionary = snapshot.get("vitality") as Dictionary
+		vitality_sf = float(vitality_map.get("sf", vitality_sf))
+		vitality_msf = float(vitality_map.get("msf", vitality_msf))
+		vitality_hunger = float(vitality_map.get("hunger", vitality_hunger))
+		vitality_energy = float(vitality_map.get("energy", vitality_energy))
+
+func _apply_progression_details_snapshot() -> void:
+	if snapshot.has("equipped_slots"):
+		equipped_slots = FrontendSnapshot.read_dict(snapshot, "equipped_slots")
+	if snapshot.has("inventory_count"):
+		inventory_count = int(snapshot.get("inventory_count", inventory_count))
+	if snapshot.has("inventory_max"):
+		inventory_max = int(snapshot.get("inventory_max", inventory_max))
+	if snapshot.has("skills"):
+		skill_nodes = FrontendSnapshot.read_array(snapshot, "skills")
+	if snapshot.has("titles"):
+		title_list_data = FrontendSnapshot.read_array(snapshot, "titles")
+		for title_entry in title_list_data:
+			if bool(title_entry.get("equipped", false)):
+				title_equipped = str(title_entry.get("name", ""))
+				title_rank = str(title_entry.get("rank", "ui.fe03.title.rank.mortal"))
+				break
+	if snapshot.get("lore") is Dictionary:
+		var lore_map: Dictionary = snapshot.get("lore") as Dictionary
+		lore_background = str(lore_map.get("background", lore_background))
+		lore_milestones = FrontendSnapshot.read_array(lore_map, "milestones")
+		lore_achievements = FrontendSnapshot.read_array(lore_map, "achievements")
+	if snapshot.has("inventory_items"):
+		inventory_items = FrontendSnapshot.read_array(snapshot, "inventory_items")
+		inventory_weight = ServiceLocator.get_instance().character().calculate_inventory_weight(inventory_items)
+
+## 统一快照渲染映射：基础属性与潜能点 → 视图状态
+func _render_from_snapshot() -> void:
+	_apply_core_profile_snapshot()
+	_apply_progression_details_snapshot()
 
 ## 潜能加点预览
 func preview_add_point(attribute_key: String) -> Dictionary:

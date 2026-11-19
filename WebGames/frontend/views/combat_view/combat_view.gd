@@ -22,14 +22,6 @@ func _get_subpanels():
 	return _subpanels
 
 # ==============================================================================
-# 内部数据类: 飘字实体兼容壳
-# ==============================================================================
-
-## 飘字渲染兼容数据结构（沿用 CombatFloatingTextDTO 字段契约）
-class FloatingTextDTO extends CombatFloatingTextDTO:
-	pass
-
-# ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
 # ==============================================================================
 
@@ -128,42 +120,28 @@ var battle_duration_sec: float = 0.0
 func _ready() -> void:
 	var theme_manager := ThemeManager.get_instance()
 	theme = theme_manager.theme
-	var is_mock_mode := (ServiceLocator.get_mode() == "mock")
-	if is_mock_mode:
-		boss_name = UIIntermediary.text("ui.fe04.boss.name")
-		boss_total_hp = 8500.0
-		boss_max_hp = 12000.0
-		boss_parts = [
-			{"part_name": UIIntermediary.text("ui.fe04.mock.part.head"), "hp": 2000.0, "max_hp": 2000.0, "is_broken": false},
-			{"part_name": UIIntermediary.text("ui.fe04.mock.part.wing_left"), "hp": 800.0, "max_hp": 1500.0, "is_broken": false},
-			{"part_name": UIIntermediary.text("ui.fe04.mock.part.wing_right"), "hp": 300.0, "max_hp": 1500.0, "is_broken": true},
-			{"part_name": UIIntermediary.text("ui.fe04.mock.part.tail"), "hp": 1000.0, "max_hp": 1000.0, "is_broken": false},
-		]
-		player_name = UIIntermediary.text("ui.fe04.player.name")
-		append_battle_log("COMBAT", UIIntermediary.text("ui.fe04.log.boss_awaken"))
-		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.battle_start"))
-		append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_cd", {"skill": UIIntermediary.text("ui.fe04.skill.SKILL_FIREBALL"), "seconds": "2.0"}))
-		append_battle_log("LOOT", UIIntermediary.text("ui.fe04.log.part_broken_loot"))
+	player_name = UIIntermediary.text("ui.fe04.player.name")
+	var initial_combat_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("combat")
+	if not initial_combat_snapshot.is_empty():
+		apply_snapshot(initial_combat_snapshot)
 	else:
-		player_name = UIIntermediary.text("ui.fe04.player.name")
-		ServiceLocator.get_instance().combat().get_combat_snapshot_async("ACTIVE_ENCOUNTER", func(combat_reply: Dictionary) -> void:
-			var combat_table: Dictionary = combat_reply.get("combat", combat_reply.get("data", combat_reply)) as Dictionary
-			set_boss_status_snapshot(
-				str(combat_table.get("boss_name", UIIntermediary.text("ui.fe04.boss.name"))),
-				float(combat_table.get("boss_hp", 0.0)),
-				maxf(1.0, float(combat_table.get("boss_max_hp", 1.0))),
-				combat_table.get("boss_parts", []) if combat_table.get("boss_parts") is Array else []
-			)
-			update_player_status(
-				float(combat_table.get("player_hp", stat_hp_current)),
-				maxf(1.0, float(combat_table.get("player_max_hp", stat_hp_max))),
-				float(combat_table.get("player_mp", stat_mp_current)),
-				maxf(1.0, float(combat_table.get("player_max_mp", stat_mp_max))),
-				float(combat_table.get("player_ap", stat_ap_current)),
-				maxf(1.0, float(combat_table.get("player_max_ap", stat_ap_max)))
-			)
-		)
 		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.battle_start"))
+	ServiceLocator.get_instance().combat().get_combat_snapshot_async("ACTIVE_ENCOUNTER", func(combat_reply: Dictionary) -> void:
+		if not bool(combat_reply.get("success", false)) or combat_reply.is_empty():
+			return
+		apply_snapshot({
+			"boss_name": str(combat_reply.get("boss_name", UIIntermediary.text("ui.fe04.boss.name"))),
+			"boss_hp": float(combat_reply.get("boss_hp", 0.0)),
+			"boss_max_hp": maxf(1.0, float(combat_reply.get("boss_max_hp", 1.0))),
+			"boss_parts": combat_reply.get("boss_parts", []) if combat_reply.get("boss_parts") is Array else [],
+			"player_hp_current": float(combat_reply.get("player_hp", stat_hp_current)),
+			"player_hp_max": maxf(1.0, float(combat_reply.get("player_max_hp", stat_hp_max))),
+			"player_mp_current": float(combat_reply.get("player_mp", stat_mp_current)),
+			"player_mp_max": maxf(1.0, float(combat_reply.get("player_max_mp", stat_mp_max))),
+			"player_ap_current": float(combat_reply.get("player_ap", stat_ap_current)),
+			"player_ap_max": maxf(1.0, float(combat_reply.get("player_max_ap", stat_ap_max))),
+		})
+	)
 	_refresh_boss_bar()
 	_get_subpanels().refresh_boss_parts()
 	_refresh_player_status()
@@ -184,7 +162,7 @@ func _connect_signals() -> void:
 		connect_managed(skill_button.pressed, func(): _on_skill_pressed(slot_number))
 
 	connect_managed(_settlement_back_button.pressed, _on_settlement_back_pressed)
-	connect_managed(_part_break_close_button.pressed, _on_part_break_close_pressed)
+	connect_managed(_part_break_close_button.pressed, _get_subpanels().hide_part_break_detail)
 	connect_managed(_back_button.pressed, _on_back_pressed)
 
 # ==============================================================================
@@ -245,11 +223,10 @@ func _on_skill_pressed(slot_number: int) -> void:
 		return
 	append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_cast", {"skill": skill_name, "slot": slot_number}))
 	ServiceLocator.get_instance().combat().cast_skill_async(skill_id, "ACTIVE_BOSS", func(cast_reply: Dictionary) -> void:
-		var reply_table: Dictionary = cast_reply.get("data", cast_reply) as Dictionary
-		var hit_damage := float(reply_table.get("actual_damage", reply_table.get("damage", 0.0)))
-		var is_critical := bool(reply_table.get("is_crit", false))
-		if reply_table.has("boss_hp"):
-			boss_total_hp = float(reply_table.get("boss_hp", boss_total_hp))
+		var hit_damage := float(cast_reply.get("actual_damage", 0.0))
+		var is_critical := bool(cast_reply.get("is_crit", false))
+		if cast_reply.has("boss_hp"):
+			boss_total_hp = float(cast_reply.get("boss_hp", boss_total_hp))
 			_refresh_boss_bar()
 		spawn_floating_damage(Vector2(640, 360), hit_damage, is_critical, false)
 	)
@@ -274,13 +251,13 @@ func append_battle_log(category: String, log_message: String) -> void:
 # ==============================================================================
 
 ## 生成一条伤害或治疗飘字记录并在入树后委托子面板播映
-func spawn_floating_damage(world_position: Vector2, damage_amount: float, is_critical: bool = false, is_heal: bool = false) -> FloatingTextDTO:
+func spawn_floating_damage(world_position: Vector2, damage_amount: float, is_critical: bool = false, is_heal: bool = false) -> CombatFloatingTextDTO:
 	_floating_text_sequence += 1
 	var config_version: int = GameConfig.config_reload_version()
 	if _lifetime_config_version != config_version:
 		_lifetime_config_cached = GameConfig.get_float("frontend.views", "fe04_combat_view/default_text_lifetime", 1.0)
 		_lifetime_config_version = config_version
-	var floating_entry := FloatingTextDTO.new()
+	var floating_entry := CombatFloatingTextDTO.new()
 	floating_entry.text_id = _floating_text_sequence
 	floating_entry.amount = damage_amount
 	floating_entry.is_crit = is_critical
@@ -294,51 +271,9 @@ func spawn_floating_damage(world_position: Vector2, damage_amount: float, is_cri
 		_get_subpanels().spawn_floating_label(floating_entry)
 	return floating_entry
 
-## 注入战斗结算数据快照
-func set_settlement_snapshot(victory: bool, gold_amount: int, reward_item_list: Array, mvp_name: String) -> void:
-	is_victory = victory
-	reward_gold = gold_amount
-	reward_items = reward_item_list.duplicate()
-	mvp_player_name = mvp_name
-
-## 打开战斗结算弹窗
-func show_settlement() -> void:
-	_get_subpanels().show_settlement()
-
-## 关闭战斗结算弹窗
-func hide_settlement() -> void:
-	_get_subpanels().hide_settlement()
-
 func _on_settlement_back_pressed() -> void:
-	hide_settlement()
+	_get_subpanels().hide_settlement()
 	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.settlement_closed"))
-
-## 打开指定首领部位的破坏详情弹窗
-func show_part_break_detail(part_name: String, is_broken: bool) -> void:
-	_get_subpanels().show_part_break_detail(part_name, is_broken)
-
-## 关闭部位破坏详情弹窗
-func hide_part_break_detail() -> void:
-	_get_subpanels().hide_part_break_detail()
-
-func _on_part_break_close_pressed() -> void:
-	hide_part_break_detail()
-
-## 更新首领名称、总血量与部位快照并刷新界面
-func set_boss_status_snapshot(target_boss_name: String, current_health: float, maximum_health: float, part_entries: Array) -> void:
-	_combat_view_model.update_from_snapshot({
-		"boss_name": target_boss_name,
-		"boss_hp": current_health,
-		"boss_max_hp": maximum_health,
-		"boss_parts": part_entries,
-	})
-	boss_name = _combat_view_model.boss_name
-	boss_total_hp = _combat_view_model.boss_hp_current
-	boss_max_hp = _combat_view_model.boss_hp_max
-	boss_parts = _combat_view_model.boss_parts
-	if is_inside_tree():
-		_refresh_boss_bar()
-		_get_subpanels().refresh_boss_parts()
 
 ## 更新底部玩家生命、魔力与行动点状态栏
 func update_player_status(health_points: float, health_max: float, mana_points: float, mana_max: float, action_points: float, action_max: float) -> void:
@@ -359,13 +294,57 @@ func update_player_status(health_points: float, health_max: float, mana_points: 
 	if is_inside_tree():
 		_refresh_player_status()
 
+func _apply_boss_snapshot() -> void:
+	if not snapshot.has("boss_name"):
+		return
+	var raw_boss_name := str(snapshot.get("boss_name", ""))
+	var localized_boss_name := UIIntermediary.text(raw_boss_name) if raw_boss_name.begins_with("ui.") else raw_boss_name
+	var raw_parts: Variant = snapshot.get("boss_parts", [])
+	var localized_parts: Array = []
+	if raw_parts is Array:
+		for part_item in raw_parts:
+			if not part_item is Dictionary:
+				continue
+			var part_entry := part_item as Dictionary
+			var raw_part_name := str(part_entry.get("part_name", ""))
+			var localized_part_name := UIIntermediary.text(raw_part_name) if raw_part_name.begins_with("ui.") else raw_part_name
+			localized_parts.append({
+				"part_name": localized_part_name,
+				"hp": float(part_entry.get("hp", 0.0)),
+				"max_hp": float(part_entry.get("max_hp", 100.0)),
+				"is_broken": bool(part_entry.get("is_broken", false)),
+			})
+	_combat_view_model.update_from_snapshot({
+		"boss_name": localized_boss_name,
+		"boss_hp": float(snapshot.get("boss_hp", 0.0)),
+		"boss_max_hp": float(snapshot.get("boss_max_hp", 1.0)),
+		"boss_parts": localized_parts,
+	})
+	boss_name = _combat_view_model.boss_name
+	boss_total_hp = _combat_view_model.boss_hp_current
+	boss_max_hp = _combat_view_model.boss_hp_max
+	boss_parts = _combat_view_model.boss_parts
+	if is_inside_tree():
+		_refresh_boss_bar()
+		_get_subpanels().refresh_boss_parts()
+
+func _apply_battle_logs_snapshot() -> void:
+	if not (snapshot.get("battle_logs") is Array) or _battle_log_rich_text == null or _battle_log_rich_text.get_paragraph_count() != 0:
+		return
+	for log_item in (snapshot.get("battle_logs") as Array):
+		if not log_item is Dictionary:
+			continue
+		var message_key := str(log_item.get("message_key", ""))
+		var format_arguments := {}
+		if log_item.has("skill_key"):
+			format_arguments["skill"] = UIIntermediary.text(str(log_item.get("skill_key", "")))
+		if log_item.has("seconds"):
+			format_arguments["seconds"] = str(log_item.get("seconds", ""))
+		append_battle_log(str(log_item.get("channel", "SYSTEM")), UIIntermediary.text(message_key, format_arguments))
+
 func _render_from_snapshot() -> void:
-	if snapshot.has("boss_name"):
-		set_boss_status_snapshot(
-			str(snapshot.get("boss_name", "")),
-			float(snapshot.get("boss_hp", 0.0)),
-			float(snapshot.get("boss_max_hp", 1.0)),
-			snapshot.get("boss_parts", []))
+	_apply_boss_snapshot()
+	_apply_battle_logs_snapshot()
 	if snapshot.has("player_hp_current") or snapshot.has("player_hp_max"):
 		update_player_status(
 			float(snapshot.get("player_hp_current", 0.0)),
@@ -376,11 +355,10 @@ func _render_from_snapshot() -> void:
 			float(snapshot.get("player_ap_max", 1.0)))
 	if snapshot.has("settlement"):
 		var settlement_payload: Dictionary = snapshot.get("settlement", {})
-		set_settlement_snapshot(
-			bool(settlement_payload.get("victory", false)),
-			int(settlement_payload.get("gold", 0)),
-			settlement_payload.get("items", []),
-			str(settlement_payload.get("mvp", "")))
+		is_victory = bool(settlement_payload.get("victory", false))
+		reward_gold = int(settlement_payload.get("gold", 0))
+		reward_items = settlement_payload.get("items", []).duplicate() if settlement_payload.get("items") is Array else []
+		mvp_player_name = str(settlement_payload.get("mvp", ""))
 
 func _on_back_pressed() -> void:
 	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.back_view"))
