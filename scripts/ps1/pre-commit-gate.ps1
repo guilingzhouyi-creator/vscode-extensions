@@ -30,63 +30,18 @@ $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+# 步骤身份、环境隔离、工具探测与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
 $script:GateRepoRoot = $repoRoot
 $script:GateEntryId = 'pre-commit'
 $script:GateSuppressOutput = [bool]$Agent
 . (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
+Initialize-GateGitIsolation -RepoRoot $repoRoot
 
-<#
-.SYNOPSIS
-    Resolves a trusted absolute path for a runtime executable.
-.DESCRIPTION
-    Probes PATH first, then a deterministic list of trusted absolute install
-    roots, so a machine with the runtime installed but not exported to PATH
-    still runs the gate. Returns $null when every candidate fails, letting the
-    caller fail closed with actionable guidance.
-.PARAMETER Name
-    Base executable name without extension (for example 'node').
-.PARAMETER TrustedRoots
-    Ordered absolute directories that may contain the executable.
-#>
-function Resolve-TrustedRuntime {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)][string]$Name,
-        [string[]]$TrustedRoots = @()
-    )
-
-    $extensions = @('.exe', '.cmd', '.bat', '')
-    foreach ($ext in $extensions) {
-        $onPath = Get-Command "$Name$ext" -ErrorAction SilentlyContinue
-        if ($onPath) { return $onPath.Source }
-    }
-
-    foreach ($root in $TrustedRoots) {
-        if ([string]::IsNullOrWhiteSpace($root)) { continue }
-        foreach ($ext in $extensions) {
-            $probe = Join-Path $root "$Name$ext"
-            if (Test-Path -Path $probe -PathType Leaf) { return $probe }
-        }
-    }
-
-    return $null
-}
-
-$nodeTrustedRoots = @(
-    $env:NODE_HOME,
-    (Join-Path $env:ProgramFiles 'nodejs'),
-    (Join-Path ${env:ProgramFiles(x86)} 'nodejs'),
-    (Join-Path $env:LOCALAPPDATA 'Programs\nodejs')
-) | Where-Object { $_ }
-
-$nodeCmd = Resolve-TrustedRuntime -Name 'node' -TrustedRoots $nodeTrustedRoots
-$npmCmd = if ($nodeCmd) {
-    $npmRoot = Split-Path -Parent $nodeCmd
-    Resolve-TrustedRuntime -Name 'npm' -TrustedRoots @($npmRoot)
-} else { $null }
-$pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
-$cargoCmd = Resolve-GateCargoCommand
+$tools = Resolve-GateRuntimeTools
+$nodeCmd = $tools.Node
+$npmCmd = $tools.Npm
+$pythonCmd = $tools.Python
+$cargoCmd = $tools.Cargo
 
 if (-not $nodeCmd) {
     Write-GateHost "✖ BLOCK  未检测到 Node.js 运行时，提交前门禁无法执行。" -ForegroundColor Red
@@ -107,11 +62,6 @@ if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
     exit $LASTEXITCODE
 }
-
-if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
-if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
-if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
-if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 
 $runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 
@@ -858,7 +808,7 @@ if ($streamRes.Output) {
     } catch {}
 }
 
-if ($streamRes.ExitCode -ne 0 -or -not $streamData) {
+if (-not $streamData -or ($streamRes.ExitCode -ne 0 -and $streamData.passed)) {
     if ($Agent) {
         $failSummary = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DIFF-14'])) {
             $streamData.steps.'STAGED-DIFF-14'.detail

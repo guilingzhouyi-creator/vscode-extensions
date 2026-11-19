@@ -36,6 +36,34 @@ GATE_NODE_BIN="${GATE_NODE_BIN:-node}"
 GATE_START_TIME="$(date +%s 2>/dev/null || echo 0)"
 GATE_STEP_RESULTS=""
 
+# 隔离 Git 全局/系统配置：POSIX 下使用 /dev/null，仅在 Windows Git Bash/MSYS/Cygwin 下使用 NUL，
+# 防止在 Linux 仓库根目录下误建字面量为 NUL 的实体文件。
+gate_init_git_isolation() {
+    local root_fallback="${1:-${GATE_ROOT_DIR:-$(pwd)}}"
+    local null_dev="/dev/null"
+    case "$(uname -s 2>/dev/null || echo '')" in
+        MINGW*|MSYS*|CYGWIN*) null_dev="NUL" ;;
+    esac
+    export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$null_dev}"
+    export GIT_CONFIG_SYSTEM="${GIT_CONFIG_SYSTEM:-$null_dev}"
+    export GIT_CONFIG_NOSYSTEM="${GIT_CONFIG_NOSYSTEM:-1}"
+    export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$root_fallback}"
+}
+
+# 统一探测运行时工具链（Node/Npm/Python/Cargo），并同步更新 GATE_NODE_BIN。
+gate_resolve_runtime_bins() {
+    NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "")
+    NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "")
+    PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+    CARGO_BIN=$(command -v cargo 2>/dev/null || command -v cargo.exe 2>/dev/null || echo "")
+    if [[ -z "$CARGO_BIN" && -n "$NODE_BIN" && -n "${GATE_ROOT_DIR:-}" && -f "${GATE_ROOT_DIR}/scripts/common/resolve-cargo.js" ]]; then
+        CARGO_BIN=$("$NODE_BIN" "${GATE_ROOT_DIR}/scripts/common/resolve-cargo.js" --print 2>/dev/null || echo "")
+    fi
+    if [[ -n "$NODE_BIN" ]]; then
+        GATE_NODE_BIN="$NODE_BIN"
+    fi
+}
+
 # 抑制模式承诺在标准输出给出单一机器可读文档，
 # 任何人类可读行都会破坏该文档，故宿主输出统一受此开关抑制。
 gate_log() {

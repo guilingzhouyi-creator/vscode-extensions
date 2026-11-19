@@ -40,6 +40,117 @@ if (-not (Test-Path variable:script:GateSuppressOutput)) { $script:GateSuppressO
 
 # 默认登记表条目：各门禁在引导段声明自身条目，调用点无需反复传入同一条目名。
 if (-not (Test-Path variable:script:GateEntryId)) { $script:GateEntryId = '' }
+if (-not (Test-Path variable:script:GateRepoRoot)) { $script:GateRepoRoot = '' }
+
+<#
+.SYNOPSIS
+    Initializes idempotent Git config isolation environment variables for gate subprocesses.
+.DESCRIPTION
+    Redirects global and system Git config lookups to the OS null device (`NUL` on Windows,
+    `/dev/null` on POSIX) and anchors `XDG_CONFIG_HOME` when not already set by the caller.
+#>
+function Initialize-GateGitIsolation {
+    [CmdletBinding()]
+    param([string]$RepoRoot = "")
+
+    $nullDevice = if ($IsWindows -or $env:OS -match "Windows") { "NUL" } else { "/dev/null" }
+    if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = $nullDevice }
+    if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = $nullDevice }
+    if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = "1" }
+    if (-not $env:XDG_CONFIG_HOME) {
+        $resolvedRoot = if ($RepoRoot) { $RepoRoot } elseif ($script:GateRepoRoot) { $script:GateRepoRoot } else { (Get-Location).Path }
+        $env:XDG_CONFIG_HOME = $resolvedRoot
+    }
+}
+
+<#
+.SYNOPSIS
+    Resolves a trusted executable path via PATH first, then explicit trusted directories.
+#>
+function Resolve-GateTrustedExecutable {
+    [CmdletBinding()]
+    param(
+        [string]$Name,
+        [string[]]$TrustedRoots = @()
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name)) { return $null }
+    $isWin = $IsWindows -or ($env:OS -match "Windows")
+    $extensions = if ($isWin) { @('.exe', '.cmd', '.bat', '') } else { @('') }
+
+    foreach ($ext in $extensions) {
+        $onPath = Get-Command "$Name$ext" -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($onPath -and $onPath.Source) { return $onPath.Source }
+    }
+
+    foreach ($root in $TrustedRoots) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        foreach ($ext in $extensions) {
+            $probe = Join-Path $root "$Name$ext"
+            if (Test-Path -LiteralPath $probe -PathType Leaf) { return $probe }
+        }
+    }
+
+    return $null
+}
+
+<#
+.SYNOPSIS
+    Resolves Node, Npm, Python, and Cargo commands across Windows and POSIX hosts.
+.OUTPUTS
+    System.Collections.Specialized.OrderedDictionary with keys Node, Npm, Python, Cargo.
+#>
+function Resolve-GateRuntimeTools {
+    [CmdletBinding()]
+    param()
+
+    $isWin = $IsWindows -or ($env:OS -match "Windows")
+    $nodeTrustedRoots = if ($isWin) {
+        @(
+            $env:NODE_HOME,
+            $(if ($env:ProgramFiles) { Join-Path $env:ProgramFiles 'nodejs' }),
+            $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'nodejs' }),
+            $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Programs\nodejs' })
+        ) | Where-Object { $_ }
+    } else {
+        @(
+            $env:NODE_HOME,
+            '/usr/local/bin',
+            '/usr/bin'
+        ) | Where-Object { $_ }
+    }
+
+    $nodeCmd = Resolve-GateTrustedExecutable -Name 'node' -TrustedRoots $nodeTrustedRoots
+    $npmCmd = if ($nodeCmd) {
+        $npmRoot = Split-Path -Parent $nodeCmd
+        Resolve-GateTrustedExecutable -Name 'npm' -TrustedRoots @($npmRoot)
+    } else {
+        Resolve-GateTrustedExecutable -Name 'npm'
+    }
+
+    $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) {
+        "python3.12"
+    } elseif (Get-Command python -ErrorAction SilentlyContinue) {
+        "python"
+    } elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
+        "python3"
+    } elseif (Get-Command py -ErrorAction SilentlyContinue) {
+        "py"
+    } elseif ($isWin) {
+        "py"
+    } else {
+        "python3"
+    }
+
+    $cargoCmd = Resolve-GateCargoCommand
+
+    return [ordered]@{
+        Node = $nodeCmd
+        Npm = $npmCmd
+        Python = $pythonCmd
+        Cargo = $cargoCmd
+    }
+}
 
 <#
 .SYNOPSIS

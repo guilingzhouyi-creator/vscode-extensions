@@ -17,15 +17,12 @@ set -euo pipefail
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT_DIR" || exit 1
 
-export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-NUL}"
-export GIT_CONFIG_SYSTEM="${GIT_CONFIG_SYSTEM:-NUL}"
-export GIT_CONFIG_NOSYSTEM="${GIT_CONFIG_NOSYSTEM:-1}"
-export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
-
-NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
-NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
-PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
-CARGO_BIN=$(command -v cargo 2>/dev/null || command -v cargo.exe 2>/dev/null || echo "")
+# 步骤身份、环境隔离与工具探测由共享运行时库提供，禁止在各门禁内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init_git_isolation "$ROOT_DIR"
+gate_resolve_runtime_bins
 
 AGENT_MODE=0
 PUSHED_SHA=""
@@ -50,6 +47,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ -z "$NODE_BIN" ]]; then
+    echo "✖ BLOCK  未检测到 Node.js 运行时，推送前门禁无法执行。" >&2
+    exit 1
+fi
+
 for arg in "$@"; do
     case "$arg" in
         --help|-h|-Help)
@@ -65,6 +67,11 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+if [[ -z "$NPM_BIN" ]]; then
+    echo "✖ BLOCK  未检测到 npm 包管理器，推送前门禁无法执行。" >&2
+    exit 1
+fi
 
 if [[ "$AGENT_MODE" -eq 0 ]]; then
     echo "================================================================="
@@ -83,15 +90,11 @@ AUDIT_LOG_DIR="$ROOT_DIR/.audit-logs"
 mkdir -p "$AUDIT_LOG_DIR"
 # 步骤日志必须按进程隔离：两个并发门禁共用同一路径会让 rm 失败并吞掉真实诊断输出。
 STEP_LOG="$AUDIT_LOG_DIR/pre-push-step-$$.log"
+trap 'rm -f "$STEP_LOG" 2>/dev/null || true' EXIT
 
 # 步骤身份、显示序号与规则归因只来自单源登记表（scripts/common/gate-step-registry.json）。
 # 未知标识直接阻断，绝不静默回落到合成标识：静默回落会把真实失败归因到错误的规则上。
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
-GATE_ROOT_DIR="$ROOT_DIR"
-GATE_NODE_BIN="$NODE_BIN"
 GATE_SUPPRESS="$AGENT_MODE"
-# shellcheck source=scripts/sh/lib/gate-runtime.sh
-. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
 gate_init pre-push
 
 # 兼容既有调用点：门禁正文统一使用 log_gate 作为抑制式输出别名。

@@ -39,25 +39,33 @@ $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+# 步骤身份、环境隔离、工具探测与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
 $script:GateRepoRoot = $repoRoot
 $script:GateEntryId = 'pre-push'
 $script:GateSuppressOutput = [bool]$Agent
 . (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
-$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
-$cargoCmd = Resolve-GateCargoCommand
+Initialize-GateGitIsolation -RepoRoot $repoRoot
+
+$tools = Resolve-GateRuntimeTools
+$nodeCmd = $tools.Node
+$npmCmd = $tools.Npm
+$pythonCmd = $tools.Python
+$cargoCmd = $tools.Cargo
+
+if (-not $nodeCmd) {
+    Write-GateHost "✖ BLOCK  未检测到 Node.js 运行时，推送前门禁无法执行。" -ForegroundColor Red
+    exit 1
+}
 
 if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
     exit $LASTEXITCODE
 }
 
-if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
-if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
-if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
-if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
+if (-not $npmCmd) {
+    Write-GateHost "✖ BLOCK  未检测到 npm 包管理器，推送前门禁无法执行。" -ForegroundColor Red
+    exit 1
+}
 
 if (-not $Agent) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
@@ -96,89 +104,92 @@ function Invoke-GateStep {
     if (-not (Test-Path $logDir)) {
         [void](New-Item -ItemType Directory -Path $logDir -Force)
     }
-    $stepLog = Join-Path $logDir "pre-push-step.log"
-    $stepErrLog = Join-Path $logDir "pre-push-step.err.log"
+    $stepLog = Join-Path $logDir "pre-push-step-$PID.log"
+    $stepErrLog = Join-Path $logDir "pre-push-step-$PID.err.log"
     if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
     if (Test-Path $stepErrLog) { Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue }
 
     Write-StepBanner -StepId $StepId
 
-    $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
-        -RedirectStandardOutput $stepLog -RedirectStandardError $stepErrLog -NoNewWindow -PassThru
+    try {
+        $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
+            -RedirectStandardOutput $stepLog -RedirectStandardError $stepErrLog -NoNewWindow -PassThru
 
-    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $meta.Id -LogFiles @($stepLog, $stepErrLog) -DiagPrefix "timeout-prepush"
-    if (Test-Path $stepErrLog) {
-        $errContent = Get-Content -Path $stepErrLog -Raw -ErrorAction SilentlyContinue
-        if ($errContent) {
-            Add-Content -Path $stepLog -Value "`n--- Standard Error ---`n$errContent" -ErrorAction SilentlyContinue
+        $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $meta.Id -LogFiles @($stepLog, $stepErrLog) -DiagPrefix "timeout-prepush"
+        if (Test-Path $stepErrLog) {
+            $errContent = Get-Content -Path $stepErrLog -Raw -ErrorAction SilentlyContinue
+            if ($errContent) {
+                Add-Content -Path $stepLog -Value "`n--- Standard Error ---`n$errContent" -ErrorAction SilentlyContinue
+            }
+            Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue
         }
-        Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue
-    }
-    if (-not $ok) {
-        if (-not $Agent) { Write-Host "  ✖ BLOCK  $($meta.Id) 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
-        return 124
-    }
-    if ($p.ExitCode -ne 0) {
-        if (-not $Agent) {
-            Write-GateHost "  ✖ BLOCK  $($meta.Id) 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
-            if (Test-Path $stepLog) {
-                $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
-                if ($tail) {
-                    Write-GateHost "   --- 错误日志摘要 ---" -ForegroundColor DarkRed
-                    foreach ($line in $tail) {
-                        Write-GateHost "   $line" -ForegroundColor DarkRed
+        if (-not $ok) {
+            if (-not $Agent) { Write-Host "  ✖ BLOCK  $($meta.Id) 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
+            return 124
+        }
+        if ($p.ExitCode -ne 0) {
+            if (-not $Agent) {
+                Write-GateHost "  ✖ BLOCK  $($meta.Id) 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
+                if (Test-Path $stepLog) {
+                    $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
+                    if ($tail) {
+                        Write-GateHost "   --- 错误日志摘要 ---" -ForegroundColor DarkRed
+                        foreach ($line in $tail) {
+                            Write-GateHost "   $line" -ForegroundColor DarkRed
+                        }
                     }
                 }
             }
-        }
-        $cmdStr = "$FilePath $($ArgumentList -join ' ')"
-        Register-GateFailure -StepId $StepId -Command $cmdStr -ExitCode $p.ExitCode `
-            -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)" `
-            -TargetFiles @($WorkingDirectory)
-        Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail "退出码 $($p.ExitCode)"
-        # 保留现场快照与 Agent-Native Envelope
-        try {
-            $lastLog = Join-Path $logDir "last-pre-push.log"
-            Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
-            Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
+            $cmdStr = "$FilePath $($ArgumentList -join ' ')"
+            Register-GateFailure -StepId $StepId -Command $cmdStr -ExitCode $p.ExitCode `
+                -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)" `
+                -TargetFiles @($WorkingDirectory)
+            Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail "退出码 $($p.ExitCode)"
+            # 保留现场快照与 Agent-Native Envelope
+            try {
+                $lastLog = Join-Path $logDir "last-pre-push.log"
+                Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
+                Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
 
-            $violation = [ordered]@{
-                ruleId = $meta.Rule
-                severity = "BLOCK"
-                file = $WorkingDirectory
-                message = "Step $($meta.Id) failed with exit code $($p.ExitCode)"
-                verificationCommand = $cmdStr
-            }
-            $envelope = [ordered]@{
-                protocolVersion = "1.0.0"
-                runId = $runId
-                recordedAt = (Get-Date).ToString("o")
-                status = "BLOCK"
-                gate = "pre-push"
-                step = $meta.Id
-                stepTitle = $meta.Title
-                stepId = $meta.Id
-                failedCommand = $cmdStr
-                exitCode = $p.ExitCode
-                summary = "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)"
-                logFile = ".audit-logs/last-pre-push.log"
-                violations = @($violation)
-                agentDirectives = [ordered]@{
-                    targetFiles = @($WorkingDirectory)
-                    remediationPriority = @($meta.Rule)
+                $violation = [ordered]@{
+                    ruleId = $meta.Rule
+                    severity = "BLOCK"
+                    file = $WorkingDirectory
+                    message = "Step $($meta.Id) failed with exit code $($p.ExitCode)"
                     verificationCommand = $cmdStr
-                    fastRecheckCommand = "pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent"
                 }
-            }
-            $snapshotJson = $envelope | ConvertTo-Json -Depth 5
-            [System.IO.File]::WriteAllText((Join-Path $logDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
-        } catch {}
-    } else {
-        Write-StepVerdict -StepId $StepId -Status "PASS" -Detail ""
-        # 步骤执行成功，清理临时 step 日志保持目录干净
+                $envelope = [ordered]@{
+                    protocolVersion = "1.0.0"
+                    runId = $runId
+                    recordedAt = (Get-Date).ToString("o")
+                    status = "BLOCK"
+                    gate = "pre-push"
+                    step = $meta.Id
+                    stepTitle = $meta.Title
+                    stepId = $meta.Id
+                    failedCommand = $cmdStr
+                    exitCode = $p.ExitCode
+                    summary = "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)"
+                    logFile = ".audit-logs/last-pre-push.log"
+                    violations = @($violation)
+                    agentDirectives = [ordered]@{
+                        targetFiles = @($WorkingDirectory)
+                        remediationPriority = @($meta.Rule)
+                        verificationCommand = $cmdStr
+                        fastRecheckCommand = "pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent"
+                    }
+                }
+                $snapshotJson = $envelope | ConvertTo-Json -Depth 5
+                [System.IO.File]::WriteAllText((Join-Path $logDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
+            } catch {}
+        } else {
+            Write-StepVerdict -StepId $StepId -Status "PASS" -Detail ""
+        }
+        return $p.ExitCode
+    } finally {
         if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
+        if (Test-Path $stepErrLog) { Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue }
     }
-    return $p.ExitCode
 }
 
 # --- 影响域智能分析 (Impact-driven Routing) ---

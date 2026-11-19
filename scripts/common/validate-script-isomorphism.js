@@ -42,7 +42,7 @@ const REQUIRED_FLAG_ALIGNMENTS = {
   'audit-all': ['Fast', 'Json', 'Agent'],
   'commit-msg-gate': ['Agent', 'ViewLog'],
   package: ['HotSync'],
-  'pre-commit-gate': ['Agent', 'ViewLog'],
+  'pre-commit-gate': ['Agent', 'ViewLog', 'Fast'],
   'pre-push-gate': ['Agent', 'ViewLog'],
   'release-tag': ['DryRun', 'NoPush'],
   'version-bump': ['DryRun'],

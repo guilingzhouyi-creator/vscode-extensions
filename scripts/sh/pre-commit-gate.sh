@@ -17,15 +17,12 @@ set -euo pipefail
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT_DIR" || exit 1
 
-export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-NUL}"
-export GIT_CONFIG_SYSTEM="${GIT_CONFIG_SYSTEM:-NUL}"
-export GIT_CONFIG_NOSYSTEM="${GIT_CONFIG_NOSYSTEM:-1}"
-export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
-
-NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "")
-NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "")
-PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
-CARGO_BIN=$(command -v cargo 2>/dev/null || echo "")
+# 步骤身份、环境隔离与工具探测由共享运行时库提供，禁止在各门禁内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init_git_isolation "$ROOT_DIR"
+gate_resolve_runtime_bins
 
 if [[ -z "$NODE_BIN" ]]; then
     echo "✖ BLOCK  未检测到 Node.js 运行时，提交前门禁无法执行。" >&2
@@ -41,6 +38,7 @@ if [[ -z "$NPM_BIN" ]]; then
 fi
 
 AGENT_MODE=0
+FAST_MODE=0
 for arg in "$@"; do
     case "$arg" in
         --view-log|-v)
@@ -49,20 +47,19 @@ for arg in "$@"; do
         --agent|-a|--json)
             AGENT_MODE=1
             ;;
+        --fast|-f|-Fast)
+            FAST_MODE=1
+            ;;
     esac
 done
 
 STEP_LOG=$(mktemp)
-trap 'rm -f "$STEP_LOG"' EXIT
+STREAM_OUT=""
+trap 'rm -f "$STEP_LOG" ${STREAM_OUT:+"$STREAM_OUT"}' EXIT
 
 RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
-# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
-GATE_ROOT_DIR="$ROOT_DIR"
-GATE_NODE_BIN="$NODE_BIN"
 GATE_SUPPRESS="$AGENT_MODE"
-# shellcheck source=scripts/sh/lib/gate-runtime.sh
-. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
 gate_init pre-commit
 
 # 兼容既有调用点：门禁正文统一使用 log_gate 作为抑制式输出别名。
@@ -103,37 +100,39 @@ record_pre_commit_failure() {
     } > "$fail_log" 2>/dev/null || true
 
     local snapshot_json="$diag_dir/last-failure.json"
-    cat <<EOF > "$snapshot_json" 2>/dev/null || true
-{
-  "protocolVersion": "1.0.0",
-  "runId": "$RUN_ID",
-  "recordedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo 'unknown')",
-  "status": "BLOCK",
-  "gate": "pre-commit",
-  "step": "$step_name",
-  "stepId": "$step_id",
-  "failedCommand": "$verify_cmd",
-  "exitCode": 1,
-  "summary": "$summary",
-  "logFile": ".audit-logs/last-pre-commit.log",
-  "violations": [
-    {
-      "ruleId": "$rule_id",
-      "severity": "BLOCK",
-      "file": "$target_file",
-      "message": "$summary",
-      "actionableFix": "$actionable_fix",
-      "verificationCommand": "$verify_cmd"
-    }
-  ],
-  "agentDirectives": {
-    "targetFiles": ["$target_file"],
-    "remediationPriority": ["$rule_id"],
-    "verificationCommand": "$verify_cmd",
-    "fastRecheckCommand": "bash scripts/sh/pre-commit-gate.sh --agent"
-  }
-}
-EOF
+    "$NODE_BIN" -e '
+const fs = require("fs");
+const [dest, runId, step, stepId, ruleId, summary, actionableFix, verifyCmd, targetFile] = process.argv.slice(1);
+const violation = {
+  ruleId,
+  severity: "BLOCK",
+  message: summary,
+  actionableFix,
+  verificationCommand: verifyCmd,
+};
+if (targetFile) violation.file = targetFile;
+const envelope = {
+  protocolVersion: "1.0.0",
+  runId,
+  recordedAt: new Date().toISOString(),
+  status: "BLOCK",
+  gate: "pre-commit",
+  step,
+  stepId,
+  failedCommand: verifyCmd,
+  exitCode: 1,
+  summary,
+  logFile: ".audit-logs/last-pre-commit.log",
+  violations: [violation],
+  agentDirectives: {
+    targetFiles: targetFile ? [targetFile] : [],
+    remediationPriority: [ruleId],
+    verificationCommand: verifyCmd,
+    fastRecheckCommand: "bash scripts/sh/pre-commit-gate.sh --agent",
+  },
+};
+fs.writeFileSync(dest, JSON.stringify(envelope, null, 2) + "\n", "utf8");
+' "$snapshot_json" "$RUN_ID" "$step_name" "$step_id" "$rule_id" "$summary" "$actionable_fix" "$verify_cmd" "$target_file" 2>/dev/null || true
 }
 
 # 根目录物理防污染与散落脚本前置雷达
@@ -190,7 +189,9 @@ fi
 
 if [[ "$AGENT_MODE" -eq 0 ]]; then
     echo "================================================================="
-    echo "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查"
+    MODE_TAG=""
+    [[ "$FAST_MODE" -eq 1 ]] && MODE_TAG=" [快速模式 --fast]"
+    echo "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查${MODE_TAG}"
     echo "================================================================="
 fi
 
@@ -549,92 +550,131 @@ elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^fractal-git/'
     write_step_verdict "RUST-COMPILE-10" SKIP "仅文档或配置变更"
 fi
 
-# --- 暂存区增量 AST 切片质量与复杂度审查 ---
-TOUCHED_CODE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
+# --- 暂存区增量 AST 切片、代码密度、体积包络与微分边界流式统一审查 ---
+TOUCHED_CODE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js|rs|py|gd)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
+TOUCHED_AUDITABLE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js|py|gd|rs|go|sh|ps1)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
+
+STREAM_PASSED=0
+STREAM_DATA_OK=0
+S11_STATUS="BLOCK"; S11_SUMMARY=""; S11_DETAIL=""
+S12_STATUS="BLOCK"; S12_SUMMARY=""; S12_DETAIL=""
+S13_STATUS="BLOCK"; S13_SUMMARY=""; S13_DETAIL=""
+S14_STATUS="BLOCK"; S14_SUMMARY=""; S14_DETAIL=""
+
+if [[ -n "$TOUCHED_CODE" || -n "$TOUCHED_AUDITABLE" ]]; then
+    STREAM_OUT=$(mktemp)
+    STREAM_EXIT=0
+    "$NODE_BIN" scripts/common/gate-differential-bounds.js --stream >"$STREAM_OUT" 2>&1 || STREAM_EXIT=$?
+    STREAM_PARSED=$("$NODE_BIN" -e '
+const fs = require("fs");
+const raw = fs.readFileSync(process.argv[1], "utf8");
+const line = raw.split(/\r?\n/).find((l) => /^\{.*"steps":/.test(l));
+if (!line) process.exit(2);
+const data = JSON.parse(line);
+const clean = (s) => String(s || "").replace(/[\r\n\x1f]+/g, " ").trim();
+const ids = ["STAGED-SLICE-11", "STAGED-DENSITY-12", "STAGED-VOLUME-13", "STAGED-DIFF-14"];
+process.stdout.write(`META\x1f${data.passed ? "1" : "0"}\n`);
+for (const id of ids) {
+  const st = data.steps && data.steps[id] ? data.steps[id] : {};
+  process.stdout.write(`${id}\x1f${clean(st.status || "BLOCK")}\x1f${clean(st.summary || st.detail)}\x1f${clean(st.detail)}\n`);
+}
+' "$STREAM_OUT" 2>/dev/null) && STREAM_DATA_OK=1 || STREAM_DATA_OK=0
+
+    if [[ "$STREAM_DATA_OK" -eq 1 ]]; then
+        while IFS=$'\x1f' read -r key f1 f2 f3; do
+            case "$key" in
+                META) STREAM_PASSED="$f1" ;;
+                STAGED-SLICE-11) S11_STATUS="$f1"; S11_SUMMARY="$f2"; S11_DETAIL="$f3" ;;
+                STAGED-DENSITY-12) S12_STATUS="$f1"; S12_SUMMARY="$f2"; S12_DETAIL="$f3" ;;
+                STAGED-VOLUME-13) S13_STATUS="$f1"; S13_SUMMARY="$f2"; S13_DETAIL="$f3" ;;
+                STAGED-DIFF-14) S14_STATUS="$f1"; S14_SUMMARY="$f2"; S14_DETAIL="$f3" ;;
+            esac
+        done <<< "$STREAM_PARSED"
+    fi
+
+    if [[ "$STREAM_DATA_OK" -eq 0 || ( "$STREAM_EXIT" -ne 0 && "$STREAM_PASSED" -eq 1 ) ]]; then
+        if [[ "$AGENT_MODE" -eq 1 ]]; then
+            STREAM_RAW=$(cat "$STREAM_OUT" 2>/dev/null || true)
+            record_pre_commit_failure "STAGED-DIFF-14" \
+                "FGT-GAT-001" \
+                "Differential stream gate execution failed with exit code ${STREAM_EXIT}" \
+                "Run 'node scripts/common/gate-differential-bounds.js --stream' to inspect output" \
+                "bash scripts/sh/pre-commit-gate.sh --fast" \
+                "${TOUCHED_AUDITABLE%%$'\n'*}" \
+                "$STREAM_RAW"
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
+            exit 1
+        fi
+        echo "✖ BLOCK  流式质量安全门禁异常退出 (ExitCode: ${STREAM_EXIT})"
+        FAILED=1
+    fi
+fi
+
 if [[ -n "$TOUCHED_CODE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! "$NODE_BIN" scripts/common/validate-staged-slice.js --agent >/dev/null 2>&1; then
-            if [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            fi
-            exit 1
-        fi
-    else
-        write_step_banner "STAGED-SLICE-11"
-        if ! "$NODE_BIN" scripts/common/validate-staged-slice.js; then
-            write_step_verdict "STAGED-SLICE-11" BLOCK "暂存区 AST 切片审查未通过"
-            FAILED=1
-        else
-            write_step_verdict "STAGED-SLICE-11" PASS "暂存区 AST 切片复杂度合规"
-        fi
-    fi
-elif [[ "$AGENT_MODE" -eq 0 ]]; then
-    write_step_verdict "STAGED-SLICE-11" SKIP "无暂存 TS/JS 代码"
-fi
-
-TOUCHED_AUDITABLE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js|py|gd|rs|go|sh|ps1)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
-if [[ -n "$TOUCHED_AUDITABLE" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! "$NODE_BIN" scripts/common/validate-code-density.js --staged --agent >/dev/null 2>&1; then
-            if [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
-                cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            fi
-            exit 1
-        fi
-    else
-        write_step_banner "STAGED-DENSITY-12"
-        if ! "$NODE_BIN" scripts/common/validate-code-density.js --staged; then
-            write_step_verdict "STAGED-DENSITY-12" BLOCK "暂存区代码密度与接线载荷审查未通过"
-            FAILED=1
-        else
-            write_step_verdict "STAGED-DENSITY-12" PASS "暂存区代码密度与接线载荷合规"
-        fi
-    fi
-elif [[ "$AGENT_MODE" -eq 0 ]]; then
-    write_step_verdict "STAGED-DENSITY-12" SKIP "无暂存可审计代码"
-fi
-
-if [[ -n "$TOUCHED_AUDITABLE" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged --json >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "STAGED-VOLUME-13" \
-                "VOL-ELOC-001" \
-                "Staged code exceeds ELOC/LOC budgets or the 1:3 dynamic envelope." \
-                "Run 'node scripts/common/evaluate-eloc-budget.js --staged' and split or densify the offending module." \
-                "node scripts/common/evaluate-eloc-budget.js --staged" \
-                "scripts"
+        if [[ "$S11_STATUS" != "PASS" ]]; then
+            record_pre_commit_failure "STAGED-SLICE-11" "GUARD-AST-001" "${S11_SUMMARY:-STAGED-SLICE-11 审查未通过或未产出数据 (Fail-Closed)}" "${S11_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_CODE%%$'\n'*}" "$S11_DETAIL"
             cat "$ROOT_DIR/.audit-logs/last-failure.json"
             exit 1
         fi
     else
-        write_step_banner "STAGED-VOLUME-13"
-        if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged; then
-            write_step_verdict "STAGED-VOLUME-13" BLOCK "暂存区双轨体积与动态包络审查未通过"
+        write_step_banner "STAGED-SLICE-11"
+        if [[ "$S11_STATUS" != "PASS" ]]; then
+            write_step_verdict "STAGED-SLICE-11" BLOCK "${S11_DETAIL:-暂存区 AST 切片审查未通过}"
             FAILED=1
         else
-            write_step_verdict "STAGED-VOLUME-13" PASS "暂存区双轨体积与动态包络合规"
+            write_step_verdict "STAGED-SLICE-11" PASS "${S11_DETAIL:-暂存区 AST 切片复杂度合规}"
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]]; then
-    write_step_verdict "STAGED-VOLUME-13" SKIP "无暂存可审计代码"
+    write_step_verdict "STAGED-SLICE-11" SKIP "无暂存代码"
 fi
 
 if [[ -n "$TOUCHED_AUDITABLE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/gate-differential-bounds.js --agent) >"$STEP_LOG" 2>&1; then
-            cat "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || cat "$STEP_LOG"
+        if [[ "$S12_STATUS" != "PASS" ]]; then
+            record_pre_commit_failure "STAGED-DENSITY-12" "VOL-DIL-001" "${S12_SUMMARY:-STAGED-DENSITY-12 审查未通过或未产出数据 (Fail-Closed)}" "${S12_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$S12_DETAIL"
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
+            exit 1
+        fi
+        if [[ "$S13_STATUS" != "PASS" ]]; then
+            record_pre_commit_failure "STAGED-VOLUME-13" "VOL-ELOC-001" "${S13_SUMMARY:-STAGED-VOLUME-13 审查未通过或未产出数据 (Fail-Closed)}" "${S13_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$S13_DETAIL"
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
+            exit 1
+        fi
+        if [[ "$S14_STATUS" != "PASS" ]]; then
+            record_pre_commit_failure "STAGED-DIFF-14" "FGT-GAT-001" "${S14_SUMMARY:-STAGED-DIFF-14 审查未通过或未产出数据 (Fail-Closed)}" "${S14_DETAIL:-Run node scripts/common/gate-differential-bounds.js --stream}" "bash scripts/sh/pre-commit-gate.sh --fast" "${TOUCHED_AUDITABLE%%$'\n'*}" "$S14_DETAIL"
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
             exit 1
         fi
     else
-        write_step_banner "STAGED-DIFF-14"
-        if ! "$NODE_BIN" scripts/common/gate-differential-bounds.js; then
-            write_step_verdict "STAGED-DIFF-14" BLOCK "暂存区五维微分边界或准入周转未达标"
+        write_step_banner "STAGED-DENSITY-12"
+        if [[ "$S12_STATUS" != "PASS" ]]; then
+            write_step_verdict "STAGED-DENSITY-12" BLOCK "${S12_DETAIL:-暂存区代码密度与接线载荷审查未通过}"
             FAILED=1
         else
-            write_step_verdict "STAGED-DIFF-14" PASS "暂存区五维微分边界与准入周转合规"
+            write_step_verdict "STAGED-DENSITY-12" PASS "${S12_DETAIL:-暂存区代码密度与接线载荷合规}"
+        fi
+
+        write_step_banner "STAGED-VOLUME-13"
+        if [[ "$S13_STATUS" != "PASS" ]]; then
+            write_step_verdict "STAGED-VOLUME-13" BLOCK "${S13_DETAIL:-暂存区双轨体积与动态包络审查未通过}"
+            FAILED=1
+        else
+            write_step_verdict "STAGED-VOLUME-13" PASS "${S13_DETAIL:-暂存区双轨体积与动态包络合规}"
+        fi
+
+        write_step_banner "STAGED-DIFF-14"
+        if [[ "$S14_STATUS" != "PASS" ]]; then
+            write_step_verdict "STAGED-DIFF-14" BLOCK "${S14_DETAIL:-暂存区加权有效代码微分边界或准入周转未达标}"
+            FAILED=1
+        else
+            write_step_verdict "STAGED-DIFF-14" PASS "${S14_DETAIL:-暂存区加权有效代码微分边界与准入周转合规}"
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]]; then
+    write_step_verdict "STAGED-DENSITY-12" SKIP "无暂存可审计代码"
+    write_step_verdict "STAGED-VOLUME-13" SKIP "无暂存可审计代码"
     write_step_verdict "STAGED-DIFF-14" SKIP "无暂存可审计代码"
 fi
 
