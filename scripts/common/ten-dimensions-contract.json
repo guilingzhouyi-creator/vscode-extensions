@@ -1,0 +1,76 @@
+{
+  "schema": "ten-dimensions-contract/v1",
+  "description": "Single source of truth for the canonical ordered 10 engineering quality dimensions across audit dashboards, trajectory ledgers, Rust/TS parity assertions, and rule-closure gates.",
+  "dimensions": [
+    {
+      "num": 1,
+      "key": "architectureConsistency",
+      "zhName": "架构一致",
+      "enName": "Architecture Consistency",
+      "shortDesc": "分层边界解耦"
+    },
+    {
+      "num": 2,
+      "key": "semanticPurity",
+      "zhName": "语义纯度",
+      "enName": "Semantic Purity",
+      "shortDesc": "纯函数数据流"
+    },
+    {
+      "num": 3,
+      "key": "codeSecurity",
+      "zhName": "代码安全",
+      "enName": "Code Security",
+      "shortDesc": "输入安全防御"
+    },
+    {
+      "num": 4,
+      "key": "performanceEfficiency",
+      "zhName": "性能预算",
+      "enName": "Performance Efficiency",
+      "shortDesc": "零循环堆分配"
+    },
+    {
+      "num": 5,
+      "key": "standardization",
+      "zhName": "标准化",
+      "enName": "Standardization",
+      "shortDesc": "命名契约标准"
+    },
+    {
+      "num": 6,
+      "key": "modernity",
+      "zhName": "现代化",
+      "enName": "Modernity",
+      "shortDesc": "现代语法API"
+    },
+    {
+      "num": 7,
+      "key": "maintainability",
+      "zhName": "可维护性",
+      "enName": "Maintainability",
+      "shortDesc": "控制流复杂度"
+    },
+    {
+      "num": 8,
+      "key": "commentQuality",
+      "zhName": "注释质量",
+      "enName": "Comment Quality",
+      "shortDesc": "JSDoc契约完备"
+    },
+    {
+      "num": 9,
+      "key": "duplication",
+      "zhName": "重复率",
+      "enName": "Duplication",
+      "shortDesc": "DRY原则去重"
+    },
+    {
+      "num": 10,
+      "key": "techDebtRisk",
+      "zhName": "技术债风险",
+      "enName": "Tech Debt Risk",
+      "shortDesc": "零高危债务防线"
+    }
+  ]
+}

@@ -38,21 +38,43 @@ const DENSITY_FLOOR_BREACH = 'floor-breach';
 const DENSITY_TARGET_DEFICIT = 'target-deficit';
 const DENSITY_IN_BAND = 'in-band';
 
-/** Single-file add envelope in 5D ELOC: a new file, an edit, and a refactor each get their own ceiling. */
+/** Single-file add envelope in weighted ELOC: a new file, an edit, and a refactor each get their own ceiling. */
 const FILE_ADD_BANDS = Object.freeze({
     newFile: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileAddBands.newFile, rule: RULE_BOUND }),
     existingFile: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileAddBands.existingFile, rule: RULE_BOUND }),
     refactorWitness: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileAddBands.refactorWitness, rule: RULE_BOUND }),
 });
 
-/** Single-file delete envelope in 5D ELOC; the ceiling widens when a refactor witness exists. */
+/** Dedicated test-file add envelope in weighted ELOC. */
+const TEST_FILE_ADD_BANDS = Object.freeze({
+    newFile: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.testFileAddBands.newFile, rule: RULE_BOUND }),
+    existingFile: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.testFileAddBands.existingFile, rule: RULE_BOUND }),
+    refactorWitness: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.testFileAddBands.refactorWitness, rule: RULE_BOUND }),
+});
+
+/** Single-file delete envelope in weighted ELOC; the ceiling widens when a refactor witness exists. */
 const FILE_DEL_BANDS = Object.freeze({
     plain: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileDelBands.plain, rule: RULE_BOUND }),
     witnessed: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileDelBands.witnessed, rule: RULE_BOUND }),
 });
 
-/** Deleted 5D ELOC above which an existing file is treated as a refactor rather than an edit. */
+/** Deleted weighted ELOC above which an existing file is treated as a refactor rather than an edit. */
 const REFACTOR_WITNESS_MIN_DEL_ELOC = DIFF_BOUNDS_CONTRACT.expansionPolicy.refactorWitnessMinDelEloc;
+
+/** Minimum batch deleted weighted ELOC required for cross-file refactor conservation witness. */
+const CROSS_FILE_REFACTOR_MIN_DEL_ELOC = DIFF_BOUNDS_CONTRACT.expansionPolicy.crossFileRefactorMinDelEloc;
+
+/** Minimum deletion-to-addition ratio required for cross-file refactor conservation witness. */
+const CROSS_FILE_REFACTOR_DEL_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.crossFileRefactorDelRatio;
+
+/** Canonical test-file path patterns shared identically with TS and Rust. */
+const TEST_FILE_PATTERNS = Object.freeze([
+    /(^|\/)(tests?|__tests__)\//,
+    /\.(test|spec)\.[cm]?[jt]sx?$/,
+    /(^|\/)test_[^/]+\.(rs|gd|py)$/,
+    /^scripts\/common\/test-[^/]+\.js$/,
+    /^auto-refactor\/scripts\/validate-[^/]+\.js$/,
+]);
 
 /**
  * Substantive density band for added lines.
@@ -81,11 +103,13 @@ const TSPR_BAND = Object.freeze({
  */
 const DENSITY_MIN_PHYS_ADD = DIFF_BOUNDS_CONTRACT.densityBands.minPhysAddSampleWidth;
 
-/** Commit batch macro envelope in 5D ELOC, plus the empirical turnover bounds. */
+/** Commit batch macro envelope in weighted ELOC, plus the empirical turnover bounds. */
 const BATCH_BANDS = Object.freeze({
     add: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.batchBands.add, rule: RULE_BATCH }),
     del: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.batchBands.del, rule: RULE_BATCH }),
+    refactorWitnessAddCeiling: DIFF_BOUNDS_CONTRACT.batchBands.refactorWitnessAddCeiling,
     deletionTurnoverWeight: DIFF_BOUNDS_CONTRACT.batchBands.deletionTurnoverWeight,
+    testBatchWeight: DIFF_BOUNDS_CONTRACT.batchBands.testBatchWeight,
     turnoverFloor: DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverFloor,
     turnoverCap: DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverCap,
 });
@@ -180,6 +204,34 @@ function isNonExemptible(violationType) {
 }
 
 /**
+ * Reports whether a repository-relative path belongs to the test-file track.
+ *
+ * @param filePath - File path to classify.
+ * @returns True when the file matches test-track conventions.
+ */
+function isTestFilePath(filePath) {
+    if (typeof filePath !== 'string' || filePath.length === 0) return false;
+    const normalized = filePath.replace(/\\/g, '/').replace(/^(?:\.\/)+/, '');
+    return TEST_FILE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * Reports whether batch-level deletions witness cross-file refactor conservation.
+ *
+ * @param totalElocAdd - Total added weighted ELOC across the batch.
+ * @param totalElocDel - Total deleted weighted ELOC across the batch.
+ * @returns True when deletions satisfy both the absolute floor and conservation ratio.
+ */
+function hasCrossFileRefactorWitness(totalElocAdd, totalElocDel) {
+    if (typeof totalElocAdd !== 'number' || typeof totalElocDel !== 'number') return false;
+    if (!Number.isFinite(totalElocAdd) || !Number.isFinite(totalElocDel)) return false;
+    return (
+        totalElocDel >= CROSS_FILE_REFACTOR_MIN_DEL_ELOC &&
+        totalElocDel >= totalElocAdd * CROSS_FILE_REFACTOR_DEL_RATIO
+    );
+}
+
+/**
  * Lists every band declaration together with a stable name, so callers can enumerate the accepted
  * ranges without importing each constant by name.
  *
@@ -190,6 +242,9 @@ function listBands() {
         { name: 'fileAdd.newFile', band: FILE_ADD_BANDS.newFile },
         { name: 'fileAdd.existingFile', band: FILE_ADD_BANDS.existingFile },
         { name: 'fileAdd.refactorWitness', band: FILE_ADD_BANDS.refactorWitness },
+        { name: 'testFileAdd.newFile', band: TEST_FILE_ADD_BANDS.newFile },
+        { name: 'testFileAdd.existingFile', band: TEST_FILE_ADD_BANDS.existingFile },
+        { name: 'testFileAdd.refactorWitness', band: TEST_FILE_ADD_BANDS.refactorWitness },
         { name: 'fileDel.plain', band: FILE_DEL_BANDS.plain },
         { name: 'fileDel.witnessed', band: FILE_DEL_BANDS.witnessed },
         { name: 'batch.add', band: BATCH_BANDS.add },
@@ -251,8 +306,11 @@ module.exports = {
     EMPIRICAL_ADMISSION_POLICY,
     DIFF_RULES,
     FILE_ADD_BANDS,
+    TEST_FILE_ADD_BANDS,
     FILE_DEL_BANDS,
     REFACTOR_WITNESS_MIN_DEL_ELOC,
+    CROSS_FILE_REFACTOR_MIN_DEL_ELOC,
+    CROSS_FILE_REFACTOR_DEL_RATIO,
     SUBSTANTIVE_RATIO_BAND,
     TSPR_BAND,
     BATCH_BANDS,
@@ -269,6 +327,8 @@ module.exports = {
     classifyBand,
     classifyDensity,
     isNonExemptible,
+    isTestFilePath,
+    hasCrossFileRefactorWitness,
     listBands,
     findBandIncoherence,
     describeBand,

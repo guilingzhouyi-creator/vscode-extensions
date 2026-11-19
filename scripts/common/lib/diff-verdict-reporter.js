@@ -61,7 +61,7 @@ function emitAgentVerdict(verdict, acknowledged, context) {
         payload.summary =
             verdict.exemptions.length > 0
                 ? `Staged differential envelopes verified with ${verdict.exemptions.length} audited exemption(s).`
-                : 'Staged 5D ELOC differential envelopes and admission verified cleanly.';
+                : 'Staged weighted ELOC differential envelopes and admission verified cleanly.';
         if (verdict.exemptions.length > 0) {
             payload.exemptions = verdict.exemptions.map((entry) => entry.record);
         }
@@ -69,7 +69,7 @@ function emitAgentVerdict(verdict, acknowledged, context) {
         process.exit(0);
     }
 
-    payload.summary = `Staged 5D differential bounds check failed with ${verdict.violations.length} violation(s).`;
+    payload.summary = `Staged weighted differential bounds check failed with ${verdict.violations.length} violation(s).`;
     payload.violations = verdict.violations.map(toAgentViolation);
     payload.agentDirectives = {
         remediationPriority: [...new Set(verdict.violations.map((entry) => entry.ruleId))],

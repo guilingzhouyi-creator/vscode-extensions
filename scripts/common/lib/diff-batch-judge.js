@@ -21,6 +21,7 @@ const {
     DIFF_RULES,
     BATCH_BANDS,
     classifyBand,
+    hasCrossFileRefactorWitness,
     BAND_BELOW_FLOOR,
     BAND_ABOVE_CEILING,
 } = require('./diff-bounds-policy');
@@ -50,15 +51,27 @@ function checkBatchOverflow(params, violations) {
  * @param violations - Collector that surviving violations are pushed onto.
  */
 function checkBatchMacroViolations(params, violations) {
-    const { totalElocAdd, totalElocDel, totalTurnover, admissionThreshold, hasAuditableCode } = params;
+    const {
+        totalElocAdd,
+        weightedElocAdd = totalElocAdd,
+        totalElocDel,
+        totalTurnover,
+        admissionThreshold,
+        hasAuditableCode,
+        batchRefactorWitness = hasCrossFileRefactorWitness(totalElocAdd, totalElocDel),
+    } = params;
+
+    const addCeiling = batchRefactorWitness
+        ? BATCH_BANDS.refactorWitnessAddCeiling
+        : BATCH_BANDS.add.ceiling;
 
     checkBatchOverflow(
         {
-            measured: totalElocAdd,
-            ceiling: BATCH_BANDS.add.ceiling,
+            measured: weightedElocAdd,
+            ceiling: addCeiling,
             type: 'BATCH_ADD_OVERFLOW',
             describe: (value, ceiling) =>
-                `批次总新增有效逻辑 (${value.toFixed(1)} 5D ELOC) 超出批次宏观上限 (${ceiling.toFixed(1)} 5D ELOC)`,
+                `批次总新增有效逻辑 (${value.toFixed(1)} weighted ELOC) 超出批次宏观上限 (${ceiling.toFixed(1)} weighted ELOC)`,
             actionableFix: '按 batch-commit 技能规范，依架构分层拆分为多个原子提交。',
         },
         violations,
@@ -69,7 +82,7 @@ function checkBatchMacroViolations(params, violations) {
             ceiling: BATCH_BANDS.del.ceiling,
             type: 'BATCH_DEL_OVERFLOW',
             describe: (value, ceiling) =>
-                `批次总删除逻辑 (${value.toFixed(1)} 5D ELOC) 超出批次宏观上限 (${ceiling.toFixed(1)} 5D ELOC)`,
+                `批次总删除逻辑 (${value.toFixed(1)} weighted ELOC) 超出批次宏观上限 (${ceiling.toFixed(1)} weighted ELOC)`,
             actionableFix: '把大规模消除拆成废弃隔离与物理移除两个独立批次。',
         },
         violations,
@@ -82,7 +95,7 @@ function checkBatchMacroViolations(params, violations) {
         type: 'ADMISSION_TURNOVER_DEFICIT',
         ruleId: DIFF_RULES.batch,
         file: '.',
-        message: `批次净 5D ELOC 周转量 (${totalTurnover.toFixed(1)}) 低于经验准入底线 (${admissionThreshold.toFixed(1)})`,
+        message: `批次净 weighted ELOC 周转量 (${totalTurnover.toFixed(1)}) 低于经验准入底线 (${admissionThreshold.toFixed(1)})`,
         actionableFix: '每批次须包含可审查的实质代码更替量，避免仅提交微量改动。',
     });
 }

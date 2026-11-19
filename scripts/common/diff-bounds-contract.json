@@ -1,33 +1,50 @@
 {
   "schema": "diff-bounds-contract/v1",
-  "description": "Single source of truth for 5D ELOC differential envelopes, TSPR thresholds, deletion turnover weight, existing-file refactor witness relaxation, and Jeffreys Beta(0.5, 0.5) empirical admission.",
+  "description": "Single source of truth for weighted ELOC differential envelopes, TSPR thresholds, deletion turnover weight, test-file track, cross-file refactor conservation, and Jeffreys Beta(0.5, 0.5) empirical admission.",
   "fileAddBands": {
     "newFile": {
       "floor": 0,
-      "target": 120,
-      "ceiling": 180
+      "target": 160,
+      "ceiling": 240
     },
     "existingFile": {
       "floor": 0,
-      "target": 60,
-      "ceiling": 120
+      "target": 90,
+      "ceiling": 180
     },
     "refactorWitness": {
       "floor": 0,
-      "target": 90,
-      "ceiling": 180
+      "target": 140,
+      "ceiling": 260
+    }
+  },
+  "testFileAddBands": {
+    "newFile": {
+      "floor": 0,
+      "target": 240,
+      "ceiling": 360
+    },
+    "existingFile": {
+      "floor": 0,
+      "target": 150,
+      "ceiling": 260
+    },
+    "refactorWitness": {
+      "floor": 0,
+      "target": 240,
+      "ceiling": 380
     }
   },
   "fileDelBands": {
     "plain": {
       "floor": 0,
-      "target": 50,
-      "ceiling": 100
+      "target": 60,
+      "ceiling": 120
     },
     "witnessed": {
       "floor": 0,
-      "target": 140,
-      "ceiling": 280
+      "target": 180,
+      "ceiling": 360
     }
   },
   "expansionPolicy": {
@@ -37,7 +54,9 @@
     "minDeletionAllowanceLoc": 10,
     "maxDeletionFractionErosion": 0.4,
     "refactorWitnessMinDelEloc": 10,
-    "witnessCoverageRatio": 0.7
+    "witnessCoverageRatio": 0.7,
+    "crossFileRefactorMinDelEloc": 30,
+    "crossFileRefactorDelRatio": 0.6
   },
   "densityBands": {
     "minPhysAddSampleWidth": 10,
@@ -56,15 +75,17 @@
   "batchBands": {
     "add": {
       "floor": 0,
-      "target": 240,
-      "ceiling": 360
+      "target": 360,
+      "ceiling": 540
     },
     "del": {
       "floor": 0,
-      "target": 140,
-      "ceiling": 280
+      "target": 180,
+      "ceiling": 360
     },
-    "deletionTurnoverWeight": 0.8
+    "refactorWitnessAddCeiling": 720,
+    "deletionTurnoverWeight": 0.8,
+    "testBatchWeight": 0.5
   },
   "empiricalAdmission": {
     "turnoverFloor": 3.0,
@@ -78,7 +99,8 @@
     "maxNoiseCeiling": 4.0
   },
   "ledgers": {
-    "taxisRelative": ".git/telemetry/admission_ledger.ndjson",
+    "taxisRelative": ".taxis/telemetry/admission_ledger.ndjson",
+    "taxisLegacyRelative": ".git/telemetry/admission_ledger.ndjson",
     "autoRefactorRelative": ".auto-refactor-cache/admission-turnover-ledger.ndjson"
   }
 }

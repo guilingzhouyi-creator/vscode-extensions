@@ -1,0 +1,24 @@
+{
+  "schema": "quality-budget-contract/v1",
+  "description": "Single source of truth for static volume, cyclomatic complexity, nesting depth, noise ratio, wiring ratio (POR), and density tau corridor budgets.",
+  "volume": {
+    "maxEloc": 900,
+    "maxLoc": 1400,
+    "constantMaxEloc": 1800,
+    "constantMaxLoc": 2500,
+    "targetDensityRatio": 3.0,
+    "maxDilutionRatio": 3.0
+  },
+  "complexity": {
+    "maxCc": 15,
+    "maxPrivateCc": 18,
+    "maxDispatcherCc": 25,
+    "maxNestingDepth": 4,
+    "maxNoiseRatio": 4.0
+  },
+  "density": {
+    "maxPor": 0.6,
+    "tauMin": 2.5,
+    "tauMax": 22.0
+  }
+}

@@ -2,7 +2,7 @@
  * Module: Workspace Async Governance — Blackboard Lease Filter & Diff Budget Selector
  * File Path: scripts/common/lib/async-commit-lease.js
  * Architecture Role: Provides Git lock/operation detection, Taxis blackboard lease exclusion,
- *   and 5D diff-volume bounded batch selection for async-auto-commit.js.
+ *   and weighted diff-volume bounded batch selection for async-auto-commit.js.
  * Dependencies & Triggers: Node built-ins (fs, path), ./diff-bounds-policy,
  *   ./async-audit-snapshot, and ./async-audit-envelope.
  * Responsibilities:
@@ -25,7 +25,7 @@ const {
 } = require('./async-audit-snapshot');
 const { readJsonSafe } = require('./async-audit-envelope');
 
-const MAX_LINE_BUDGET_FALLBACK = BATCH_BANDS.add.ceiling || 360;
+const MAX_LINE_BUDGET_FALLBACK = BATCH_BANDS.add.ceiling;
 const DELETION_VOLUME_WEIGHT = 0.5;
 const VOLATILE_BASENAMES = new Set([
   'governance-supervisor.json',

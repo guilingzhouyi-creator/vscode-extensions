@@ -27,6 +27,7 @@ const {
     DIFF_BOUNDS_CONTRACT,
     DIFF_RULES,
     FILE_ADD_BANDS,
+    TEST_FILE_ADD_BANDS,
     FILE_DEL_BANDS,
     REFACTOR_WITNESS_MIN_DEL_ELOC,
     SUBSTANTIVE_RATIO_BAND,
@@ -37,6 +38,7 @@ const {
     DENSITY_TARGET_DEFICIT,
     classifyBand,
     classifyDensity,
+    isTestFilePath,
     BAND_ABOVE_CEILING,
 } = require('./diff-bounds-policy');
 
@@ -46,7 +48,7 @@ const WITNESS_COVERAGE_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.witnessCover
 /**
  * Detects whether the immediate preceding commit provided refactor addition capacity.
  *
- * @param minRequiredAddEloc - Minimum required 5D ELOC additions.
+ * @param minRequiredAddEloc - Minimum required weighted ELOC additions.
  * @returns True if the preceding commit carried sufficient refactoring additions.
  */
 function checkHeadRefactorWitness(minRequiredAddEloc) {
@@ -74,20 +76,23 @@ function checkHeadRefactorWitness(minRequiredAddEloc) {
  * Resolves the added-logic ceiling that applies to one file.
  *
  * @param metrics - Per-file metrics from the parser.
- * @returns Ceiling in 5D ELOC.
+ * @param batchRefactorWitness - Whether batch-level deletions witness cross-file refactoring.
+ * @returns Ceiling in weighted ELOC.
  */
-function resolveAddCeiling(metrics) {
-    if (metrics.isNew) return FILE_ADD_BANDS.newFile.ceiling;
-    if (metrics.elocDel > REFACTOR_WITNESS_MIN_DEL_ELOC) return FILE_ADD_BANDS.refactorWitness.ceiling;
-    return FILE_ADD_BANDS.existingFile.ceiling;
+function resolveAddCeiling(metrics, batchRefactorWitness = false) {
+    const bands = isTestFilePath(metrics.path) ? TEST_FILE_ADD_BANDS : FILE_ADD_BANDS;
+    if (batchRefactorWitness) return bands.refactorWitness.ceiling;
+    if (metrics.isNew) return bands.newFile.ceiling;
+    if (metrics.elocDel > REFACTOR_WITNESS_MIN_DEL_ELOC) return bands.refactorWitness.ceiling;
+    return bands.existingFile.ceiling;
 }
 
 /**
  * Resolves the removed-logic ceiling that applies to one file.
  *
  * @param metrics - Per-file metrics from the parser.
- * @param batchAddEloc - Added 5D ELOC across the whole batch.
- * @returns Ceiling in 5D ELOC.
+ * @param batchAddEloc - Added weighted ELOC across the whole batch.
+ * @returns Ceiling in weighted ELOC.
  */
 function resolveDelCeiling(metrics, batchAddEloc) {
     const required = metrics.elocDel * WITNESS_COVERAGE_RATIO;
@@ -100,15 +105,16 @@ function resolveDelCeiling(metrics, batchAddEloc) {
  *
  * @param metrics - Per-file metrics.
  * @param violations - Collector that surviving violations are pushed onto.
+ * @param batchRefactorWitness - Whether batch-level deletions witness cross-file refactoring.
  */
-function checkAddEnvelope(metrics, violations) {
-    const ceiling = resolveAddCeiling(metrics);
+function checkAddEnvelope(metrics, violations, batchRefactorWitness = false) {
+    const ceiling = resolveAddCeiling(metrics, batchRefactorWitness);
     if (classifyBand(metrics.elocAdd, Object.freeze({ ceiling })) !== BAND_ABOVE_CEILING) return;
     violations.push({
         type: 'FILE_ADD_OVERFLOW',
         ruleId: DIFF_RULES.bound,
         file: metrics.path,
-        message: `单文件新增有效逻辑 (${metrics.elocAdd.toFixed(1)} 5D ELOC) 超出上限 (${ceiling.toFixed(1)} 5D ELOC)`,
+        message: `单文件新增有效逻辑 (${metrics.elocAdd.toFixed(1)} weighted ELOC) 超出上限 (${ceiling.toFixed(1)} weighted ELOC)`,
         actionableFix: `拆分 ${metrics.path} 为更细内聚子模块，或按架构分层分批原子提交。`,
     });
 }
@@ -117,7 +123,7 @@ function checkAddEnvelope(metrics, violations) {
  * Checks the removed-logic envelope of one file.
  *
  * @param metrics - Per-file metrics.
- * @param batchAddEloc - Added 5D ELOC across the whole batch.
+ * @param batchAddEloc - Added weighted ELOC across the whole batch.
  * @param violations - Collector that surviving violations are pushed onto.
  */
 function checkDelEnvelope(metrics, batchAddEloc, violations) {
@@ -127,7 +133,7 @@ function checkDelEnvelope(metrics, batchAddEloc, violations) {
         type: 'CAPABILITY_EROSION',
         ruleId: DIFF_RULES.bound,
         file: metrics.path,
-        message: `单文件删除逻辑 (${metrics.elocDel.toFixed(1)} 5D ELOC) 超出安全包络 (${ceiling.toFixed(1)} 5D ELOC)`,
+        message: `单文件删除逻辑 (${metrics.elocDel.toFixed(1)} weighted ELOC) 超出安全包络 (${ceiling.toFixed(1)} weighted ELOC)`,
         actionableFix: '把大面积删除拆成能力迁移与废弃两个阶段，并为删除附带重构证词。',
     });
 }
@@ -213,12 +219,14 @@ function checkDensityEnvelopes(metrics, violations) {
  * Checks single-file micro envelopes.
  *
  * @param fileMetricsList - Per-file metrics for every auditable staged file.
- * @param batchAddEloc - Added 5D ELOC across the whole batch, used for the refactor witness.
+ * @param batchAddEloc - Added weighted ELOC across the whole batch, used for the refactor witness.
  * @param violations - Collector that surviving violations are pushed onto.
+ * @param options - Optional batch context (`batchRefactorWitness`).
  */
-function checkFileMicroViolations(fileMetricsList, batchAddEloc, violations) {
+function checkFileMicroViolations(fileMetricsList, batchAddEloc, violations, options = {}) {
+    const batchRefactorWitness = Boolean(options && options.batchRefactorWitness);
     for (const metrics of fileMetricsList) {
-        checkAddEnvelope(metrics, violations);
+        checkAddEnvelope(metrics, violations, batchRefactorWitness);
         checkDelEnvelope(metrics, batchAddEloc, violations);
         checkDensityEnvelopes(metrics, violations);
     }

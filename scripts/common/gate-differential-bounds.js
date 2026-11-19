@@ -1,5 +1,5 @@
 /**
- * Module: Governance Guard — Staged 5D Differential Bounds & Admission Gate
+ * Module: Governance Guard — Staged Weighted ELOC Differential Bounds & Admission Gate
  * File Path: scripts/common/gate-differential-bounds.js
  * Architecture Role: Orchestrates the staged differential check: collects measurements, delegates
  *   judgement to diff-envelope-judge.js, applies the streak and exemption policy, then hands the
@@ -25,7 +25,11 @@ const PROTOCOL_VERSION = '1.0.0';
 const STEP_ID = 'STAGED-DIFF-14';
 const GATE_NAME = 'pre-commit';
 
-const { BATCH_BANDS } = require('./lib/diff-bounds-policy');
+const {
+    BATCH_BANDS,
+    hasCrossFileRefactorWitness,
+    isTestFilePath,
+} = require('./lib/diff-bounds-policy');
 const { checkFileMicroViolations } = require('./lib/diff-envelope-judge');
 const { checkBatchMacroViolations } = require('./lib/diff-batch-judge');
 const {
@@ -49,7 +53,7 @@ const {
 /** Violation types the ledger may resolve; every other type is structural. */
 const EXEMPTIBLE_VIOLATION_TYPES = Object.freeze(['SUBSTANTIVE_TARGET_DEFICIT']);
 
-/** Weight of a deleted 5D ELOC in the net turnover, below the weight of an added one. */
+/** Weight of a deleted weighted ELOC in the net turnover, below the weight of an added one. */
 const DELETION_TURNOVER_WEIGHT = BATCH_BANDS.deletionTurnoverWeight;
 
 /** Streak at which a repeated block is announced as possibly structural. */
@@ -64,19 +68,22 @@ const ESCALATION_NOTICE_STREAK = 2;
 function measureStagedFiles(stagedList) {
     const fileMetricsList = [];
     const metricsByPath = new Map();
-    const totals = { physAdd: 0, physDel: 0, elocAdd: 0, elocDel: 0 };
+    const totals = { physAdd: 0, physDel: 0, elocAdd: 0, elocDel: 0, weightedElocAdd: 0 };
 
     for (const entry of stagedList) {
         if (!isAuditableCodeFile(entry.path)) continue;
         const isNew = entry.status.startsWith('A') || entry.status.startsWith('?');
         const metrics = evaluateFileStagedDiff(entry.path, isNew);
+        const addWeight = isTestFilePath(metrics.path) ? BATCH_BANDS.testBatchWeight : 1.0;
         fileMetricsList.push(metrics);
         metricsByPath.set(metrics.path, metrics);
         totals.physAdd += metrics.physAdd;
         totals.physDel += metrics.physDel;
         totals.elocAdd += metrics.elocAdd;
         totals.elocDel += metrics.elocDel;
+        totals.weightedElocAdd += metrics.elocAdd * addWeight;
     }
+    totals.weightedElocAdd = Math.round(totals.weightedElocAdd * 100) / 100;
     totals.turnover = totals.elocAdd + totals.elocDel * DELETION_TURNOVER_WEIGHT;
     return { fileMetricsList, metricsByPath, totals };
 }
@@ -180,7 +187,7 @@ function evaluateStagedDifferentialBounds(options = {}) {
             passed: true,
             stagedCount: 0,
             auditedCount: 0,
-            batchTotals: { physAdd: 0, physDel: 0, elocAdd: 0, elocDel: 0, turnover: 0 },
+            batchTotals: { physAdd: 0, physDel: 0, elocAdd: 0, elocDel: 0, weightedElocAdd: 0, turnover: 0 },
             admittedThreshold: BATCH_BANDS.turnoverFloor,
             violations: [],
             exemptions: [],
@@ -193,16 +200,19 @@ function evaluateStagedDifferentialBounds(options = {}) {
         ? loadRecentAdmissionSamples()
         : loadRecentTurnoverRecords();
     const admissionThreshold = calculateEmpiricalAdmissionThreshold(recentSamples);
+    const batchRefactorWitness = hasCrossFileRefactorWitness(totals.elocAdd, totals.elocDel);
 
     const violations = [];
-    checkFileMicroViolations(fileMetricsList, totals.elocAdd, violations);
+    checkFileMicroViolations(fileMetricsList, totals.elocAdd, violations, { batchRefactorWitness });
     checkBatchMacroViolations(
         {
             totalElocAdd: totals.elocAdd,
+            weightedElocAdd: totals.weightedElocAdd,
             totalElocDel: totals.elocDel,
             totalTurnover: totals.turnover,
             admissionThreshold,
             hasAuditableCode: fileMetricsList.length > 0,
+            batchRefactorWitness,
         },
         violations,
     );
