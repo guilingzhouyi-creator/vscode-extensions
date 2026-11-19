@@ -69,6 +69,16 @@ GATE_SUPPRESS=$([[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]] && echo 1 || ech
 gate_init audit-all
 
 # 1. 物理卫生八维刚性公理与全域巡检
+LOG_HYGIENE=""
+GUARDS_JSON=""
+LOG_WT=""
+LOG_WG=""
+LOG_AR=""
+LOG_AR_SELF=""
+LOG_FG=""
+SUMMARY_INPUT=""
+trap 'rm -f "${LOG_HYGIENE:-}" "${GUARDS_JSON:-}" "${LOG_WT:-}" "${LOG_WG:-}" "${LOG_AR:-}" "${LOG_AR_SELF:-}" "${LOG_FG:-}" "${SUMMARY_INPUT:-}"' EXIT
+
 write_step_banner "WORKSPACE-AUDIT-01"
 LOG_HYGIENE=$(mktemp)
 CODE_HYGIENE=0
@@ -90,56 +100,25 @@ else
     write_step_verdict "WORKSPACE-AUDIT-01" PASS "物理卫生八维、同构脚本、.gitignore、代码密度与体积合规"
 fi
 
-# 2. 单源规则注册表与目录一致性及技能集规范
+# 2. 单源规则注册表与目录一致性及技能集规范 (有界并发调度 Pillar-2 守卫)
 write_step_banner "RULE-AUDIT-02"
-CODE_CATALOG=0
-"$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only >/dev/null 2>&1 || CODE_CATALOG=$?
-CODE_FEEDBACK=0
-"$NODE_BIN" scripts/common/validate-gate-feedback.js >/dev/null 2>&1 || CODE_FEEDBACK=$?
-CODE_ORDERING=0
-"$NODE_BIN" scripts/common/validate-gate-ordering.js >/dev/null 2>&1 || CODE_ORDERING=$?
-CODE_SKILLS=0
-"$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1 || CODE_SKILLS=$?
-CODE_CLOSURE=0
-"$NODE_BIN" scripts/common/validate-rule-id-closure.js >/dev/null 2>&1 || CODE_CLOSURE=$?
-CODE_SCORING_CLOSURE=0
-"$NODE_BIN" scripts/common/validate-scoring-rule-closure.js >/dev/null 2>&1 || CODE_SCORING_CLOSURE=$?
-CODE_REACH=0
-"$NODE_BIN" scripts/common/validate-rule-reachability.js >/dev/null 2>&1 || CODE_REACH=$?
-CODE_RULE_SOURCE=0
-"$NODE_BIN" scripts/common/validate-rule-source-consistency.js >/dev/null 2>&1 || CODE_RULE_SOURCE=$?
-CODE_DOCS=0
-"$NODE_BIN" scripts/common/validate-docs-consistency.js >/dev/null 2>&1 || CODE_DOCS=$?
-CODE_LEDGER=0
-"$NODE_BIN" scripts/common/validate-trajectory-ledger.js >/dev/null 2>&1 || CODE_LEDGER=$?
-CODE_SUBAGENT=0
-"$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js >/dev/null 2>&1 || CODE_SUBAGENT=$?
-CODE_CASCADE=0
-"$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js >/dev/null 2>&1 || CODE_CASCADE=$?
-CODE_DOC_ANCHORS=0
-"$NODE_BIN" scripts/common/validate-doc-anchors.js >/dev/null 2>&1 || CODE_DOC_ANCHORS=$?
-CODE_METRIC_COVERAGE=0
-"$NODE_BIN" scripts/common/validate-metric-coverage.js >/dev/null 2>&1 || CODE_METRIC_COVERAGE=$?
-CODE_FAMILY_CONTRACT=0
-"$NODE_BIN" scripts/common/validate-family-contract.js >/dev/null 2>&1 || CODE_FAMILY_CONTRACT=$?
-CODE_DOC_REACH=0
-"$NODE_BIN" scripts/common/validate-doc-reachability.js >/dev/null 2>&1 || CODE_DOC_REACH=$?
-CODE_COMMIT_HISTORY=0
-"$NODE_BIN" scripts/common/validate-commit-history-baseline.js >/dev/null 2>&1 || CODE_COMMIT_HISTORY=$?
-CODE_DESTRUCTIVE=0
-"$NODE_BIN" scripts/common/validate-destructive-ops.js >/dev/null 2>&1 || CODE_DESTRUCTIVE=$?
-# 推送门禁已覆盖的三道守卫必须在全量审查中同样执行，否则同一工作树在两个入口得到不同判定。
-CODE_CHAINS=0
-"$NODE_BIN" scripts/common/validate-block-chains.js >/dev/null 2>&1 || CODE_CHAINS=$?
-CODE_COUNTS=0
-"$NODE_BIN" scripts/common/validate-hardcoded-counts.js >/dev/null 2>&1 || CODE_COUNTS=$?
-CODE_PARITY=0
-"$NODE_BIN" scripts/common/validate-shell-parity.js >/dev/null 2>&1 || CODE_PARITY=$?
-CODE_GATE_PROOF=0
-"$NODE_BIN" scripts/common/test-gate-guards.js >/dev/null 2>&1 || CODE_GATE_PROOF=$?
-CODE_DOC_METRICS=0
-"$NODE_BIN" scripts/common/sync-doc-metrics.js >/dev/null 2>&1 || CODE_DOC_METRICS=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_SCORING_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_CASCADE" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_DESTRUCTIVE" -ne 0 || "$CODE_CHAINS" -ne 0 || "$CODE_COUNTS" -ne 0 || "$CODE_PARITY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
+GUARDS_JSON=$(mktemp)
+GUARDS_EXIT=0
+"$NODE_BIN" scripts/common/run-workspace-guards.js --group pillar2 --json >"$GUARDS_JSON" 2>/dev/null || GUARDS_EXIT=$?
+GUARDS_ALL_PASS=$("$NODE_BIN" -e '
+const fs = require("fs");
+try {
+  const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const ok = Array.isArray(data.codes)
+    && data.codes.length > 0
+    && (data.total == null || data.codes.length === data.total)
+    && data.codes.every((c) => c === 0);
+  process.stdout.write(ok ? "1" : "0");
+} catch (_) {
+  process.stdout.write("0");
+}
+' "$GUARDS_JSON" 2>/dev/null || echo "0")
+if [[ "$GUARDS_EXIT" -ne 0 || "$GUARDS_ALL_PASS" != "1" ]]; then
     STATUS_RULES="BLOCK"
     write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、规则源一致性、文档一致性、技能集、轨迹账本或破坏性操作溯源审查未通过"
     FAILED=1
@@ -153,7 +132,6 @@ LOG_WG=$(mktemp)
 LOG_AR=$(mktemp)
 LOG_AR_SELF=$(mktemp)
 LOG_FG=$(mktemp)
-trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF" "$LOG_FG" "$LOG_HYGIENE"' EXIT
 
 # 3~6. 并行并发调度 workspace-timing、WebGames、auto-refactor 与 fractal-git 四大项目审查
 write_step_banner "EXTENSION-AUDIT-03"
@@ -316,19 +294,64 @@ if [[ -f "$ROOT_DIR/auto-refactor/scripts/lib/trajectory-ledger-redact.js" ]]; t
     SNAPSHOT_NOTE=$("$NODE_BIN" "$ROOT_DIR/auto-refactor/scripts/lib/trajectory-ledger-redact.js" --revert-timestamp 2>&1) || true
 fi
 
-# 统一合并执行报告、十维质量看板与步骤摘要生成（消除多进程重复启动）
+# 统一合并执行报告、十维质量看板与步骤摘要生成（经结构化 JSON 契约移交，消除位置参数漂移）
+SUMMARY_INPUT=$(mktemp)
+"$NODE_BIN" -e '
+const fs = require("fs");
+const [
+  outPath, guardsPath, startTime, failed, jsonMode, fastMode, agentMode,
+  commitLedger, rootDir, hygieneReportFile, statusHygiene, statusRules,
+  statusAr, statusWt, statusWg, statusFg, codeHygiene, codeIso, codeGi,
+  codeDensity, codeEloc, guardsExit
+] = process.argv.slice(1);
+let ruleCodes = [];
+let guardResults = null;
+try {
+  const g = JSON.parse(fs.readFileSync(guardsPath, "utf8"));
+  if (Array.isArray(g.codes)) ruleCodes = g.codes.map((c) => Number(c) || 0);
+  if (g.guards && typeof g.guards === "object") guardResults = g.guards;
+} catch (_) {}
+if (ruleCodes.length === 0) {
+  const fallback = Number(guardsExit) || 1;
+  ruleCodes = new Array(23).fill(fallback);
+}
+const payload = {
+  startTime: Number(startTime) || Date.now(),
+  failed: failed === "1",
+  jsonMode: jsonMode === "1",
+  agentMode: agentMode === "1",
+  fastMode: fastMode === "1",
+  commitLedger: commitLedger === "1",
+  runner: "sh",
+  rootDir,
+  hygieneReportFile,
+  statuses: {
+    hygiene: statusHygiene,
+    rules: statusRules,
+    ar: statusAr,
+    wt: statusWt,
+    wg: statusWg,
+    fg: statusFg
+  },
+  codes: {
+    hygiene: Number(codeHygiene) || 0,
+    iso: Number(codeIso) || 0,
+    gi: Number(codeGi) || 0,
+    density: Number(codeDensity) || 0,
+    eloc: Number(codeEloc) || 0,
+    catalog: Number(ruleCodes[0]) || 0
+  },
+  ruleCodes,
+  guardResults
+};
+fs.writeFileSync(outPath, JSON.stringify(payload, null, 2), "utf8");
+' "$SUMMARY_INPUT" "$GUARDS_JSON" "$START_TIME" "$FAILED" "$JSON_MODE" "$FAST_MODE" "$AGENT_MODE" \
+  "$COMMIT_LEDGER" "$ROOT_DIR" "$LOG_HYGIENE" "$STATUS_HYGIENE" "$STATUS_RULES" \
+  "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$STATUS_FG" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_GI" \
+  "$CODE_DENSITY" "$CODE_ELOC" "$GUARDS_EXIT"
+
 REPORT_EXIT=0
-"$NODE_BIN" "$ROOT_DIR/scripts/common/render-audit-all-summary.js" \
-    "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" \
-    "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" \
-    "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" \
-    "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK" "$CODE_CLOSURE" \
-    "$CODE_REACH" "$CODE_DOCS" "$CODE_LEDGER" "$CODE_DENSITY" "$CODE_ELOC" \
-    "$CODE_ORDERING" "$CODE_RULE_SOURCE" "$CODE_SUBAGENT" "$CODE_DOC_ANCHORS" \
-    "$CODE_METRIC_COVERAGE" "$CODE_FAMILY_CONTRACT" "$CODE_DOC_REACH" \
-    "$CODE_COMMIT_HISTORY" "$CODE_DESTRUCTIVE" "$CODE_CHAINS" "$CODE_COUNTS" \
-    "$CODE_PARITY" "$CODE_GATE_PROOF" "$CODE_DOC_METRICS" "$CODE_SCORING_CLOSURE" \
-    "$CODE_CASCADE" "$COMMIT_LEDGER" || REPORT_EXIT=$?
+"$NODE_BIN" "$ROOT_DIR/scripts/common/render-audit-all-summary.js" --input "$SUMMARY_INPUT" || REPORT_EXIT=$?
 
 if [[ "$REPORT_EXIT" -ne 0 ]]; then
     FAILED=1

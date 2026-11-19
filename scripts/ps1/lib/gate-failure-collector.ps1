@@ -144,45 +144,97 @@ function Save-AuditPillar1Failures {
     }
 }
 
+function Get-AuditPillar2GuardCatalog {
+    [CmdletBinding()]
+    param(
+        [string]$RepoRoot = "",
+        [string]$NodeCmd = "node"
+    )
+    $guardsScript = if ($RepoRoot) {
+        Join-Path $RepoRoot "scripts\common\run-workspace-guards.js"
+    } else {
+        Join-Path $PSScriptRoot "..\..\common\run-workspace-guards.js"
+    }
+    if (-not (Test-Path -LiteralPath $guardsScript)) {
+        return ,@()
+    }
+    $prevNativePref = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+    try {
+        $rawJson = (& $NodeCmd $guardsScript --list-json 2>$null | Out-String)
+        if ($LASTEXITCODE -ne 0 -or -not $rawJson -or -not $rawJson.Trim()) {
+            return ,@()
+        }
+        $parsed = $rawJson | ConvertFrom-Json
+        if ($null -eq $parsed) {
+            return ,@()
+        }
+        return ,@($parsed)
+    } catch {
+        return ,@()
+    } finally {
+        $PSNativeCommandUseErrorActionPreference = $prevNativePref
+    }
+}
+
+function Save-AuditPillar2FailuresFromResults {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$Results,
+        [string]$RepoRoot = "",
+        [string]$NodeCmd = "node"
+    )
+    foreach ($item in $Results) {
+        if ($null -eq $item) { continue }
+        $code = [int]$item.exitCode
+        if ($code -eq 0) { continue }
+        $stepId = [string]$item.id
+        $stepName = if ($item.PSObject.Properties['name'] -and $item.name) { [string]$item.name } else { $stepId }
+        $cmd = if ($item.PSObject.Properties['cmd'] -and $item.cmd) { [string]$item.cmd } elseif ($item.PSObject.Properties['script'] -and $item.script) { "node $($item.script)" } else { "node scripts/common/$stepId.js" }
+        $fix = if ($item.PSObject.Properties['fix'] -and $item.fix) { [string]$item.fix } else { "请根据错误输出排查并执行验证命令" }
+        $verifyCmd = if ($item.PSObject.Properties['verifyCmd'] -and $item.verifyCmd) { [string]$item.verifyCmd } else { $cmd }
+        $aasLayer = if ($item.PSObject.Properties['aasLayer'] -and $item.aasLayer) { [string]$item.aasLayer } else { "L5_GOVERNANCE" }
+        $log = if ($item.PSObject.Properties['logFile'] -and $item.logFile) { [string]$item.logFile } else { "" }
+        Save-AuditStepFailure -PillarId "rules-02" -StepId $stepId -StepName $stepName -Command $cmd -ExitCode $code -LogFile $log -AasLayer $aasLayer -ActionableFix $fix -VerificationCommand $verifyCmd -RepoRoot $RepoRoot -NodeCmd $NodeCmd
+    }
+}
+
 function Save-AuditPillar2FailuresByCodes {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [int[]]$Codes,
         [Parameter(Mandatory = $true)]
-        [string[]]$Logs
+        [AllowEmptyCollection()]
+        [AllowEmptyString()]
+        [string[]]$Logs,
+        [object[]]$Results = @(),
+        [string]$RepoRoot = "",
+        [string]$NodeCmd = "node"
     )
-    $meta = @(
-        @{ id = "generate-rule-catalog"; name = "单源规则注册表生成"; cmd = "node scripts/common/generate-rule-catalog.js --check-only"; fix = "运行 node scripts/common/generate-rule-catalog.js 重新同步规则" },
-        @{ id = "validate-gate-feedback"; name = "门禁反馈契约审查"; cmd = "node scripts/common/validate-gate-feedback.js"; fix = "修正门禁输出词法并注册步骤" },
-        @{ id = "validate-gate-ordering"; name = "门禁步骤执行拓扑排序"; cmd = "node scripts/common/validate-gate-ordering.js"; fix = "按照 gate-step-registry.json 调整调用顺序" },
-        @{ id = "validate-skills"; name = "技能集规范与插件同构审查"; cmd = "node scripts/common/validate-skills.js"; fix = "运行 node scripts/common/sync-skills.js 同步技能" },
-        @{ id = "validate-rule-id-closure"; name = "规则标识双向闭包审查"; cmd = "node scripts/common/validate-rule-id-closure.js"; fix = "在 rule-catalog.json 中登记调用的规则 ID" },
-        @{ id = "validate-scoring-rule-closure"; name = "评分规则闭包审查"; cmd = "node scripts/common/validate-scoring-rule-closure.js"; fix = "对齐打分规则与 SSOT 注册表" },
-        @{ id = "validate-rule-reachability"; name = "规则可达性静态追踪"; cmd = "node scripts/common/validate-rule-reachability.js"; fix = "检查并恢复丢失的规则检测逻辑" },
-        @{ id = "validate-rule-source-consistency"; name = "规则源文件一致性审查"; cmd = "node scripts/common/validate-rule-source-consistency.js"; fix = "同步 rule-sources/ 与 rule-catalog.json" },
-        @{ id = "validate-docs-consistency"; name = "文档计数与脚本引用一致性"; cmd = "node scripts/common/validate-docs-consistency.js"; fix = "同步文档指标或运行 sync-doc-metrics.js" },
-        @{ id = "validate-trajectory-ledger"; name = "长期轨迹账本物理约束"; cmd = "node scripts/common/validate-trajectory-ledger.js"; fix = "清理或重置不合规的轨迹账本行" },
-        @{ id = "validate-subagent-catalog"; name = "SubAgent 预置名册与调度一致性"; cmd = "node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js"; fix = "检查 subagent-catalog.json 与智能体模板" },
-        @{ id = "validate-cascade-coherence"; name = "级联调度自洽性校验"; cmd = "node .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js"; fix = "检查子智能体调度拓扑" },
-        @{ id = "validate-doc-anchors"; name = "文档代码锚点有效性审查"; cmd = "node scripts/common/validate-doc-anchors.js"; fix = "修复文档中的代码行锚点死链" },
-        @{ id = "validate-metric-coverage"; name = "指标覆盖率审查"; cmd = "node scripts/common/validate-metric-coverage.js"; fix = "补充缺失的十维指标追踪" },
-        @{ id = "validate-family-contract"; name = "规则族契约审查"; cmd = "node scripts/common/validate-family-contract.js"; fix = "修正规则命名与前缀拓扑" },
-        @{ id = "validate-doc-reachability"; name = "文档链接可达性审查"; cmd = "node scripts/common/validate-doc-reachability.js"; fix = "修复文档中的内部相对死链" },
-        @{ id = "validate-commit-history-baseline"; name = "提交历史基线校验"; cmd = "node scripts/common/validate-commit-history-baseline.js"; fix = "检查基线提交哈希是否变动" },
-        @{ id = "validate-destructive-ops"; name = "破坏性删除操作白名单溯源"; cmd = "node scripts/common/validate-destructive-ops.js"; fix = "对递归删除调用添加三步守卫" },
-        @{ id = "validate-block-chains"; name = "拦截链路完整性校验"; cmd = "node scripts/common/validate-block-chains.js"; fix = "确保门禁脚本具备阻断退出路径" },
-        @{ id = "validate-hardcoded-counts"; name = "硬编码计数守卫"; cmd = "node scripts/common/validate-hardcoded-counts.js"; fix = "移除硬编码计数值，改为从 SSOT 动态读取" },
-        @{ id = "validate-shell-parity"; name = "终端命令面对齐守卫"; cmd = "node scripts/common/validate-shell-parity.js"; fix = "对齐 PowerShell 与 GNU 命令别名" },
-        @{ id = "test-gate-guards"; name = "门禁反向探针自证"; cmd = "node scripts/common/test-gate-guards.js"; fix = "排查守卫逻辑，确保探针能够触发失败" },
-        @{ id = "sync-doc-metrics"; name = "文档数字真源同步校验"; cmd = "node scripts/common/sync-doc-metrics.js"; fix = "运行 node scripts/common/sync-doc-metrics.js 进行同步" }
-    )
+    if ($null -ne $Results -and $Results.Count -gt 0) {
+        Save-AuditPillar2FailuresFromResults -Results $Results -RepoRoot $RepoRoot -NodeCmd $NodeCmd
+        return
+    }
+    $meta = Get-AuditPillar2GuardCatalog -RepoRoot $RepoRoot -NodeCmd $NodeCmd
     for ($i = 0; $i -lt $Codes.Count; $i++) {
         $c = $Codes[$i]
-        if ($c -ne 0 -and $i -lt $meta.Count) {
+        if ($c -eq 0) { continue }
+        $log = if ($i -lt $Logs.Count) { $Logs[$i] } else { "" }
+        if ($i -lt $meta.Count -and $null -ne $meta[$i]) {
             $m = $meta[$i]
-            $log = if ($i -lt $Logs.Count) { $Logs[$i] } else { "" }
-            Save-AuditStepFailure -PillarId "rules-02" -StepId ([string]$m.id) -StepName ([string]$m.name) -Command ([string]$m.cmd) -ExitCode $c -LogFile $log -AasLayer "L5_GOVERNANCE" -ActionableFix ([string]$m.fix) -VerificationCommand ([string]$m.cmd)
+            $stepId = [string]$m.id
+            $stepName = if ($m.PSObject.Properties['name'] -and $m.name) { [string]$m.name } else { $stepId }
+            $cmd = if ($m.PSObject.Properties['cmd'] -and $m.cmd) { [string]$m.cmd } else { "node scripts/common/$stepId.js" }
+            $fix = if ($m.PSObject.Properties['fix'] -and $m.fix) { [string]$m.fix } else { "请根据错误输出排查并执行验证命令" }
+            $verifyCmd = if ($m.PSObject.Properties['verifyCmd'] -and $m.verifyCmd) { [string]$m.verifyCmd } else { $cmd }
+            $aasLayer = if ($m.PSObject.Properties['aasLayer'] -and $m.aasLayer) { [string]$m.aasLayer } else { "L5_GOVERNANCE" }
+            Save-AuditStepFailure -PillarId "rules-02" -StepId $stepId -StepName $stepName -Command $cmd -ExitCode $c -LogFile $log -AasLayer $aasLayer -ActionableFix $fix -VerificationCommand $verifyCmd -RepoRoot $RepoRoot -NodeCmd $NodeCmd
+        } else {
+            Save-AuditStepFailure -PillarId "rules-02" -StepId "pillar2-guard-$i" -StepName "Pillar-2 治理守卫 #$i" -Command "node scripts/common/run-workspace-guards.js --group pillar2" -ExitCode $c -LogFile $log -AasLayer "L5_GOVERNANCE" -ActionableFix "运行 node scripts/common/run-workspace-guards.js --group pillar2 排查失败守卫" -VerificationCommand "node scripts/common/run-workspace-guards.js --group pillar2" -RepoRoot $RepoRoot -NodeCmd $NodeCmd
         }
     }
 }

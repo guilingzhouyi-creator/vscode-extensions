@@ -2,10 +2,10 @@
  * Module: Unified Workspace Audit Summary & Dashboard Renderer
  * File Path: scripts/common/render-audit-all-summary.js
  * Architecture Role: Aggregates 6-pillar gate verdicts, live subproject audit telemetry,
- *   10-dimensional quality vectors, and polyglot balance indices for scripts/sh/audit-all.sh.
+ *   10-dimensional quality vectors, and polyglot balance indices for audit-all.sh and audit-all.ps1.
  * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path, child_process) and
  *   scripts/common/{evaluate-polyglot-balance,evaluate-workspace-quant,record-workspace-audit,record-workspace-trajectory}.js;
- *   invoked at the conclusion of scripts/sh/audit-all.sh.
+ *   invoked at the conclusion of scripts/sh/audit-all.sh and scripts/ps1/audit-all.ps1.
  * Responsibilities:
  *   1. Ingest live subproject reports (auto-refactor, workspace-timing, WebGames, fractal-git) with zero fabricated fallback scores.
  *   2. Fuse cross-project CAI autonomy rates and compute damped 6-pillar workspace health scores.
@@ -20,12 +20,13 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync, execSync } = require('child_process');
 const { buildEloc5dSummary, renderEloc5dMarkdown } = require('./lib/workspace-eloc-rollup');
+const { PILLAR2_GUARDS } = require('./run-workspace-guards');
 
 const SCORE_FLOOR = 15.0;
 const THEORETICAL_SCORE_CEILING = 99.75;
 const TARGET_WIDTH = 71;
 
-const DIM_DEFINITIONS = Object.freeze([
+const TEN_DIM_SPECS = Object.freeze([
   { num: ' 1.', name: '架构一致', key: 'architectureConsistency', desc: '分层边界解耦', labelEn: '架构一致 (Architecture Consistency)' },
   { num: ' 2.', name: '语义纯度', key: 'semanticPurity', desc: '纯函数数据流', labelEn: '语义纯度 (Semantic Purity)' },
   { num: ' 3.', name: '代码安全', key: 'codeSecurity', desc: '输入安全防御', labelEn: '代码安全 (Code Security)' },
@@ -37,6 +38,51 @@ const DIM_DEFINITIONS = Object.freeze([
   { num: ' 9.', name: '重复率', key: 'duplication', desc: 'DRY原则去重', labelEn: '重复率 (Duplication)' },
   { num: '10.', name: '技术债风险', key: 'techDebtRisk', desc: '零高危债务防线', labelEn: '技术债风险 (Tech Debt Risk)' },
 ]);
+
+/**
+ * Formats a dimension ordinal string into fixed 3-character box prefix (e.g. ' 1.' or '10.').
+ *
+ * @param {string|number} rawNum - Ordinal number or label.
+ * @param {number} idx - Zero-based dimension index.
+ * @returns {string} Padded ordinal string.
+ */
+function normalizeDimNum(rawNum, idx) {
+  const base = String(rawNum != null ? rawNum : `${idx + 1}.`).trim();
+  const withDot = base.endsWith('.') ? base : `${base}.`;
+  return withDot.length < 3 ? ` ${withDot}` : withDot;
+}
+
+/**
+ * Loads the 10-dimension specification from `ten-dimensions-contract.json` with safe fallback.
+ *
+ * @returns {ReadonlyArray<object>} Frozen 10-dimension descriptor list.
+ */
+function loadDimDefinitions() {
+  let contract = null;
+  try {
+    contract = require('./ten-dimensions-contract.json');
+  } catch (_) {
+    contract = null;
+  }
+  if (!contract || !Array.isArray(contract.dimensions) || contract.dimensions.length !== 10) {
+    return TEN_DIM_SPECS;
+  }
+  return Object.freeze(
+    contract.dimensions.map((d, idx) => {
+      const zhName = d.name || d.zhName || TEN_DIM_SPECS[idx].name;
+      const enName = d.enName || '';
+      return {
+        num: normalizeDimNum(d.num, idx),
+        name: zhName,
+        key: d.key || TEN_DIM_SPECS[idx].key,
+        desc: d.desc || d.shortDesc || TEN_DIM_SPECS[idx].desc,
+        labelEn: d.labelEn || (enName ? `${zhName} (${enName})` : TEN_DIM_SPECS[idx].labelEn),
+      };
+    }),
+  );
+}
+
+const DIM_DEFINITIONS = loadDimDefinitions();
 
 /**
  * Safely reads and parses a UTF-8 JSON file on disk.
@@ -68,6 +114,129 @@ function argInt(argv, idx) {
   return Number(argv[idx]) || 0;
 }
 
+const STATUS_FIELD_MAP = Object.freeze([
+  ['statusHygiene', 'hygiene'],
+  ['statusRules', 'rules'],
+  ['statusAr', 'ar'],
+  ['statusWt', 'wt'],
+  ['statusWg', 'wg'],
+  ['statusFg', 'fg'],
+]);
+
+const CODE_FIELD_MAP = Object.freeze([
+  ['codeHygiene', 'hygiene'],
+  ['codeIso', 'iso'],
+  ['codeGi', 'gi'],
+  ['codeDensity', 'density'],
+  ['codeEloc', 'eloc'],
+]);
+
+/**
+ * Resolves ordered Pillar-2 exit codes from structured `--input` JSON payload.
+ *
+ * @param {object} payload - Parsed JSON payload from `--input`.
+ * @returns {number[]} Ordered guard exit codes.
+ */
+function resolveRuleCodesFromPayload(payload) {
+  if (Array.isArray(payload.ruleCodes) && payload.ruleCodes.length > 0) {
+    return payload.ruleCodes.map((c) => Number(c) || 0);
+  }
+  if (payload.guardResults && typeof payload.guardResults === 'object') {
+    return PILLAR2_GUARDS.map((guard) => {
+      const entry = payload.guardResults[guard.id];
+      const raw = entry && typeof entry === 'object' ? entry.exitCode : entry;
+      return Number(raw) || 0;
+    });
+  }
+  const codes = payload.codes || {};
+  return ['catalog', 'skills']
+    .filter((key) => codes[key] !== undefined && codes[key] !== null)
+    .map((key) => Number(codes[key]) || 0);
+}
+
+/**
+ * Normalizes pillar status verdicts from `--input` JSON payload.
+ *
+ * @param {object} payload - Parsed JSON payload.
+ * @returns {object} Legacy status fields.
+ */
+function resolveStatusesFromPayload(payload) {
+  const src = payload.statuses || {};
+  const out = {};
+  for (const [legacyKey, key] of STATUS_FIELD_MAP) {
+    out[legacyKey] = src[key] || payload[legacyKey] || 'PASS';
+  }
+  return out;
+}
+
+/**
+ * Normalizes Pillar-1 and catalog exit codes from `--input` JSON payload.
+ *
+ * @param {object} payload - Parsed JSON payload.
+ * @param {number[]} ruleCodes - Resolved Pillar-2 exit codes.
+ * @returns {object} Normalized numeric exit codes.
+ */
+function resolveCodesFromPayload(payload, ruleCodes) {
+  const src = payload.codes || {};
+  const out = {};
+  for (const [legacyKey, key] of CODE_FIELD_MAP) {
+    const raw = src[key] !== undefined ? src[key] : payload[legacyKey];
+    out[legacyKey] = Number(raw) || 0;
+  }
+  const catalogRaw = src.catalog !== undefined
+    ? src.catalog
+    : (payload.codeCatalog !== undefined ? payload.codeCatalog : ruleCodes[0]);
+  out.codeCatalog = Number(catalogRaw) || 0;
+  return out;
+}
+
+/**
+ * Parses structured `--input` JSON payload into internal runner state.
+ *
+ * @param {object} payload - Parsed JSON payload from audit-all runner.
+ * @returns {object} Structured audit runner state and step exit codes.
+ */
+function parseInputJsonPayload(payload) {
+  const ruleCodes = resolveRuleCodesFromPayload(payload);
+  return {
+    startTime: Number(payload.startTime) || Date.now(),
+    failed: Boolean(payload.failed),
+    jsonMode: Boolean(payload.jsonMode),
+    fastMode: Boolean(payload.fastMode),
+    agentMode: Boolean(payload.agentMode),
+    commitLedger: Boolean(payload.commitLedger),
+    runner: payload.runner === 'ps1' ? 'ps1' : 'sh',
+    rootDir: payload.rootDir || process.cwd(),
+    hygieneReportFile: payload.hygieneReportFile || '',
+    ...resolveStatusesFromPayload(payload),
+    ...resolveCodesFromPayload(payload, ruleCodes),
+    ruleCodes,
+  };
+}
+
+/**
+ * Loads runner state from `--input <jsonFile>` or falls back to legacy positional arguments.
+ *
+ * @param {string[]} cliArgs - Raw CLI arguments excluding node executable and script path.
+ * @returns {object} Structured audit runner state and step exit codes.
+ */
+function loadRunnerState(cliArgs) {
+  const inputIdx = cliArgs.indexOf('--input');
+  if (inputIdx === -1) {
+    return parseCliInputs([process.argv[0], ...cliArgs]);
+  }
+  const inputPath = cliArgs[inputIdx + 1];
+  if (!inputPath || inputPath.startsWith('--')) {
+    throw new Error('--input requires a JSON file path');
+  }
+  const absPath = path.resolve(inputPath);
+  const parsed = JSON.parse(fs.readFileSync(absPath, 'utf8'));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Invalid JSON object in --input file: ${inputPath}`);
+  }
+  return parseInputJsonPayload(parsed);
+}
+
 /**
  * Parses positional CLI arguments forwarded from scripts/sh/audit-all.sh.
  *
@@ -96,6 +265,7 @@ function parseCliInputs(argv) {
     codeDensity: argInt(argv, 24),
     codeEloc: argInt(argv, 25),
     commitLedger: argv[42] === '1',
+    runner: argv[43] === 'ps1' ? 'ps1' : 'sh',
     ruleCodes: RULE_CODE_INDICES.map((idx) => argInt(argv, idx)),
   };
 }
@@ -706,9 +876,10 @@ function enrichAndPersistAuditSummary(rootDir, summary, commitLedger) {
  * Builds the AAS v1.0 envelope for `--agent` CLI consumers.
  *
  * @param {object} summary - Workspace audit summary.
+ * @param {string} [runner='sh'] - Invoking runner platform ('sh' or 'ps1').
  * @returns {object} AAS v1.0 JSON envelope.
  */
-function buildAgentEnvelope(summary) {
+function buildAgentEnvelope(summary, runner = 'sh') {
   const pj = summary.projects;
   const failedSubsystems = [];
   if (pj.hygiene !== 'PASS') failedSubsystems.push('hygiene');
@@ -717,6 +888,9 @@ function buildAgentEnvelope(summary) {
   if (pj.workspaceTiming !== 'PASS') failedSubsystems.push('workspace-timing');
   if (pj.webGames !== 'PASS') failedSubsystems.push('WebGames');
   if (pj.fractalGit !== 'PASS') failedSubsystems.push('fractal-git');
+  const verifyCmd = runner === 'ps1'
+    ? 'pwsh -File scripts/ps1/audit-all.ps1 -Fast'
+    : 'bash scripts/sh/audit-all.sh --fast';
 
   return {
     schema: 'aas-v1',
@@ -743,10 +917,68 @@ function buildAgentEnvelope(summary) {
     agentDirectives: {
       targetFiles: [],
       remediationPriority: failedSubsystems,
-      verificationCommand: 'bash scripts/sh/audit-all.sh --fast',
-      fastRecheckCommand: 'bash scripts/sh/audit-all.sh --fast',
+      verificationCommand: verifyCmd,
+      fastRecheckCommand: verifyCmd,
     },
   };
+}
+
+/**
+ * Computes damped Pillar-2 rules and catalog consistency score.
+ *
+ * @param {object} state - Normalized runner state.
+ * @param {number} catalogRuleCount - Observed rule catalog count.
+ * @param {boolean} catalogCountConsistent - Whether catalog matches rule-sources.
+ * @returns {number} Bounded rules score.
+ */
+function computeRulesCatalogScore(state, catalogRuleCount, catalogCountConsistent) {
+  const rulesPassedCount = state.ruleCodes.filter((c) => c === 0).length;
+  const ruleStepTotal = Math.max(1, state.ruleCodes.length);
+  const stepPosterior = (rulesPassedCount + 0.5) / (ruleStepTotal + 1.0);
+  const catalogPosterior =
+    catalogCountConsistent && catalogRuleCount > 0
+      ? (catalogRuleCount + 0.5) / (catalogRuleCount + 1.0)
+      : 0.5;
+  const rawRulesScore = THEORETICAL_SCORE_CEILING * (0.7 * stepPosterior + 0.3 * catalogPosterior);
+  return state.statusRules === 'PASS' && catalogCountConsistent
+    ? Math.max(SCORE_FLOOR, Math.min(THEORETICAL_SCORE_CEILING, Number(rawRulesScore.toFixed(1))))
+    : Math.max(SCORE_FLOOR, Number((rawRulesScore - 60.0).toFixed(1)));
+}
+
+/**
+ * Resolves the short HEAD revision hash with a zeroed fallback.
+ *
+ * @param {string} rootDir - Repository root directory.
+ * @returns {string} 8-char short commit hash.
+ */
+function resolveGitRevision(rootDir) {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: rootDir, encoding: 'utf8' }).trim().slice(0, 8);
+  } catch (_) {
+    return '00000000';
+  }
+}
+
+/**
+ * Emits final JSON, AAS agent envelope, or terminal dashboard output and exits.
+ *
+ * @param {object} state - Normalized runner state.
+ * @param {object} summary - Aggregated audit summary object.
+ * @param {string} elapsedSec - Elapsed wall-clock seconds string.
+ */
+function emitAuditOutput(state, summary, elapsedSec) {
+  const exitCode = state.failed ? 1 : 0;
+  if (state.jsonMode) {
+    console.log(JSON.stringify(summary, null, 2));
+    process.exit(exitCode);
+  }
+  if (state.agentMode) {
+    console.log(JSON.stringify(buildAgentEnvelope(summary, state.runner), null, 2));
+    process.exit(exitCode);
+  }
+  renderConsoleDashboard(summary, elapsedSec);
+  appendGithubStepSummary(process.env.GITHUB_STEP_SUMMARY, summary, elapsedSec);
+  process.exit(exitCode);
 }
 
 /**
@@ -755,8 +987,13 @@ function buildAgentEnvelope(summary) {
  * @returns {void}
  */
 function main() {
-  const argv = [process.argv[0], ...process.argv.slice(2)];
-  const state = parseCliInputs(argv);
+  let state;
+  try {
+    state = loadRunnerState(process.argv.slice(2));
+  } catch (err) {
+    console.error(`✖ BLOCK render-audit-all-summary: ${err && err.message ? err.message : String(err)}`);
+    process.exit(1);
+  }
   const elapsedSec = ((Date.now() - state.startTime) / 1000).toFixed(2);
 
   const arBase = loadAutoRefactorBaseline(state.rootDir);
@@ -767,18 +1004,7 @@ function main() {
   const { polyglotIndex, polyglotBreakdown } = samplePolyglotMetrics(state.rootDir, state.fastMode);
 
   const catalogCountConsistent = state.codeCatalog === 0;
-  const rulesPassedCount = state.ruleCodes.filter((c) => c === 0).length;
-  const ruleStepTotal = Math.max(1, state.ruleCodes.length);
-  const stepPosterior = (rulesPassedCount + 0.5) / (ruleStepTotal + 1.0);
-  const catalogPosterior =
-    catalogCountConsistent && catalogRuleCount > 0
-      ? (catalogRuleCount + 0.5) / (catalogRuleCount + 1.0)
-      : 0.5;
-  const rawRulesScore = THEORETICAL_SCORE_CEILING * (0.7 * stepPosterior + 0.3 * catalogPosterior);
-  const scoreRules =
-    state.statusRules === 'PASS' && catalogCountConsistent
-      ? Math.max(SCORE_FLOOR, Math.min(THEORETICAL_SCORE_CEILING, Number(rawRulesScore.toFixed(1))))
-      : Math.max(SCORE_FLOOR, Number((rawRulesScore - 60.0).toFixed(1)));
+  const scoreRules = computeRulesCatalogScore(state, catalogRuleCount, catalogCountConsistent);
 
   let baseAr = arBase.compositeScore !== null ? Number(arBase.compositeScore) : null;
   if (baseAr === null) {
@@ -821,12 +1047,7 @@ function main() {
     failed: state.failed,
   });
 
-  let gitRevision = '00000000';
-  try {
-    gitRevision = execSync('git rev-parse --short HEAD', { cwd: state.rootDir, encoding: 'utf8' }).trim().slice(0, 8);
-  } catch (_) {
-    gitRevision = '00000000';
-  }
+  const gitRevision = resolveGitRevision(state.rootDir);
 
   const summary = {
     protocolVersion: '1.0.0',
@@ -870,19 +1091,7 @@ function main() {
   };
 
   enrichAndPersistAuditSummary(state.rootDir, summary, state.commitLedger);
-
-  if (state.jsonMode) {
-    console.log(JSON.stringify(summary, null, 2));
-    process.exit(state.failed ? 1 : 0);
-  }
-  if (state.agentMode) {
-    console.log(JSON.stringify(buildAgentEnvelope(summary), null, 2));
-    process.exit(state.failed ? 1 : 0);
-  }
-
-  renderConsoleDashboard(summary, elapsedSec);
-  appendGithubStepSummary(process.env.GITHUB_STEP_SUMMARY, summary, elapsedSec);
-  process.exit(state.failed ? 1 : 0);
+  emitAuditOutput(state, summary, elapsedSec);
 }
 
 if (require.main === module) {
@@ -891,6 +1100,9 @@ if (require.main === module) {
 
 module.exports = {
   DIM_DEFINITIONS,
+  loadDimDefinitions,
+  parseInputJsonPayload,
+  loadRunnerState,
   computeDynamicDimensions,
   getGradeTag,
   strWidth,
