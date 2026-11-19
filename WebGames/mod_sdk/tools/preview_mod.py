@@ -21,6 +21,17 @@ import argparse
 import json
 import re
 import sys
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from preview_mod_reports import (
+    build_simulation_branches,
+    emit_overview_result,
+    emit_simulation_result,
+)
+
 PARAM_REGEX: re.Pattern[str] = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 BUILTIN_ORIGINS: list[dict[str, Any]] = [
@@ -75,7 +86,12 @@ BUILTIN_TRAITS_META: dict[str, tuple[str, int]] = {
 }
 
 BASE_ATTRIBUTES: dict[str, int] = {
-    "STR": 4, "CON": 3, "INT": 4, "AGI": 4, "SPR": 3, "VIT": 3,
+    "STR": 4,
+    "CON": 3,
+    "INT": 4,
+    "AGI": 4,
+    "SPR": 3,
+    "VIT": 3,
 }
 
 
@@ -139,45 +155,45 @@ def _normalize_list_items(raw_val: Any, id_key: str) -> list[dict[str, Any]]:
 
 
 def _extract_routing_rules(routing_rules_data: Any) -> list[dict[str, Any]]:
-    """从配置数据中提取扁平规则列表。"""
+    """从配置数据中提取规范扁平规则列表。"""
     if isinstance(routing_rules_data, list):
         return [r for r in routing_rules_data if isinstance(r, dict)]
     if not isinstance(routing_rules_data, dict):
         return []
-    for key in ("routing_rules", "rules", "prologue_routing_rules"):
-        val = routing_rules_data.get(key)
-        if isinstance(val, list):
-            return [r for r in val if isinstance(r, dict)]
+    val = routing_rules_data.get("prologue_routing_rules")
+    if isinstance(val, list):
+        return [r for r in val if isinstance(r, dict)]
     return []
 
 
-def _match_rule_target(rules: list[dict[str, Any]], race_id: str, origin_id: str) -> str | None:
+def _match_rule_target(
+    rules: list[dict[str, Any]], race_id: str, origin_id: str
+) -> str | None:
     """按优先级匹配路由规则目标 DAG。"""
     race_upper = race_id.upper()
     for r in rules:
-        cond = r.get("match_condition", r) if isinstance(r.get("match_condition"), dict) else r
-        if cond.get("race_id", "").upper() == race_upper and cond.get("origin_id", "") == origin_id:
+        if (
+            str(r.get("race_id", "")).upper() == race_upper
+            and str(r.get("origin_id", "")) == origin_id
+        ):
             target = r.get("target_dag_id")
             if isinstance(target, str) and target.strip():
                 return target.strip()
 
     for r in rules:
-        cond = r.get("match_condition", r) if isinstance(r.get("match_condition"), dict) else r
-        if cond.get("origin_id", "") == origin_id and not cond.get("race_id"):
+        if str(r.get("origin_id", "")) == origin_id and not r.get("race_id"):
             target = r.get("target_dag_id")
             if isinstance(target, str) and target.strip():
                 return target.strip()
 
     for r in rules:
-        cond = r.get("match_condition", r) if isinstance(r.get("match_condition"), dict) else r
-        if cond.get("race_id", "").upper() == race_upper and not cond.get("origin_id"):
+        if str(r.get("race_id", "")).upper() == race_upper and not r.get("origin_id"):
             target = r.get("target_dag_id")
             if isinstance(target, str) and target.strip():
                 return target.strip()
 
     for r in rules:
-        cond = r.get("match_condition", r) if isinstance(r.get("match_condition"), dict) else r
-        if cond.get("is_default") is True:
+        if r.get("is_default") is True:
             target = r.get("target_dag_id")
             if isinstance(target, str) and target.strip():
                 return target.strip()
@@ -196,7 +212,7 @@ def _resolve_target_dag(
     race_id: str,
 ) -> tuple[str, str]:
     """四级序章 DAG 路由解算契约。
-    
+
     优先级:
     1. custom_routing_rules (destinies.json)
     2. selected_origin.prologue_dag_id
@@ -217,13 +233,21 @@ def _resolve_target_dag(
     # Level 2: prologue_dag_id in origin (仅当身世出自 MOD custom_origins 时优先于 routing_rules.json)
     custom_origin_ids: set[str] = set()
     if isinstance(destinies_data, dict):
-        for custom_orig in _normalize_list_items(destinies_data.get("custom_origins"), "origin_id"):
-            cid = str(custom_orig.get("origin_id") or custom_orig.get("id") or "").strip()
+        for custom_orig in _normalize_list_items(
+            destinies_data.get("custom_origins"), "origin_id"
+        ):
+            cid = str(
+                custom_orig.get("origin_id") or custom_orig.get("id") or ""
+            ).strip()
             if cid:
                 custom_origin_ids.add(cid)
 
     origin_dag = selected_origin.get("prologue_dag_id")
-    if origin_id in custom_origin_ids and isinstance(origin_dag, str) and origin_dag.strip():
+    if (
+        origin_id in custom_origin_ids
+        and isinstance(origin_dag, str)
+        and origin_dag.strip()
+    ):
         return origin_dag.strip(), "origin_prologue_dag_id"
 
     # Level 3: routing_rules.json
@@ -240,7 +264,9 @@ def _resolve_target_dag(
     return "", "unresolved"
 
 
-def _build_simulation_graph(dag_data: dict[str, Any]) -> tuple[str | None, set[str], dict[str, list[str]]]:
+def _build_simulation_graph(
+    dag_data: dict[str, Any],
+) -> tuple[str | None, set[str], dict[str, list[str]]]:
     """构建用于演习路径遍历的因果有向无环图 (DAG) 拓扑结构。
 
     Args:
@@ -307,7 +333,9 @@ def _find_all_paths(
     visited.remove(current)
 
 
-def _resolve_node_raw_text(node_data: dict[str, Any], i18n_catalog: dict[str, str]) -> tuple[str, str]:
+def _resolve_node_raw_text(
+    node_data: dict[str, Any], i18n_catalog: dict[str, str]
+) -> tuple[str, str]:
     """解析节点文案及来源 ('i18n' 或 'inline_text')。"""
     nkey = str(node_data.get("narrative_key") or "")
     if nkey and nkey in i18n_catalog:
@@ -328,6 +356,7 @@ def _resolve_node_raw_text(node_data: dict[str, Any], i18n_catalog: dict[str, st
 
 def _hydrate_text(template: str, context: dict[str, Any]) -> str:
     """替换文案模板中的占位符参数（兼容大小写键名）。"""
+
     def _repl(match: re.Match[str]) -> str:
         key = match.group(1)
         if key in context:
@@ -337,6 +366,7 @@ def _hydrate_text(template: str, context: dict[str, Any]) -> str:
         if key.upper() in context:
             return str(context[key.upper()])
         return f"{{{key}}}"
+
     return PARAM_REGEX.sub(_repl, template)
 
 
@@ -363,7 +393,9 @@ def _resolve_trait_meta(
     return tid_str, tid_str, 0
 
 
-def _compute_preview_attributes(bonuses: dict[str, Any]) -> tuple[dict[str, int], str, int]:
+def _compute_preview_attributes(
+    bonuses: dict[str, Any],
+) -> tuple[dict[str, int], str, int]:
     """计算叠加身世加成后的六维属性字典、摘要字符串与净加成值。"""
     final_attrs: dict[str, int] = {}
     parts: list[str] = []
@@ -403,7 +435,11 @@ def _format_kit_summary(
     selected_kit = _find_matching_kit(custom_kits, preferred_kit_id)
     if selected_kit is None:
         total_gold = origin_gold if origin_gold > 0 else 50
-        return f"KIT_HUMAN_DEFAULT (内置标准行囊) | 初始金币: {total_gold}", total_gold, None
+        return (
+            f"KIT_HUMAN_DEFAULT (内置标准行囊) | 初始金币: {total_gold}",
+            total_gold,
+            None,
+        )
 
     kid = str(selected_kit.get("kit_id") or "CUSTOM_KIT")
     kname = str(selected_kit.get("name") or kid)
@@ -416,7 +452,11 @@ def _format_kit_summary(
         if isinstance(it, dict)
     ]
     items_joined = ", ".join(item_strs) if item_strs else "无附加物品"
-    return f"{kid} ({kname}) | 初始金币: {total_gold} | 物品: [{items_joined}]", total_gold, selected_kit
+    return (
+        f"{kid} ({kname}) | 初始金币: {total_gold} | 物品: [{items_joined}]",
+        total_gold,
+        selected_kit,
+    )
 
 
 def _select_origin(
@@ -427,7 +467,9 @@ def _select_origin(
     """根据命令行入参或默认策略选定演习身世。"""
     custom_origins: list[dict[str, Any]] = []
     if isinstance(destinies_data, dict):
-        custom_origins = _normalize_list_items(destinies_data.get("custom_origins"), "origin_id")
+        custom_origins = _normalize_list_items(
+            destinies_data.get("custom_origins"), "origin_id"
+        )
 
     if custom_origins and not preferred_origin_id:
         for orig in custom_origins:
@@ -539,7 +581,9 @@ def simulate_mod(
     manifest_data = _load_json_file(mod_dir / "pack.json")
     if not isinstance(manifest_data, dict):
         if as_json:
-            print(json.dumps({"error": "pack.json 不存在或格式非法"}, ensure_ascii=False))
+            print(
+                json.dumps({"error": "pack.json 不存在或格式非法"}, ensure_ascii=False)
+            )
         else:
             print("❌ 错误: pack.json 不存在或格式非法", file=sys.stderr)
         return 1
@@ -548,13 +592,23 @@ def simulate_mod(
     routing_data = _load_json_file(mod_dir / "routing_rules.json")
 
     selected_origin = _select_origin(destinies_data, origin_id, race_id)
-    target_dag_id, routing_source = _resolve_target_dag(routing_data, destinies_data, selected_origin, race_id)
+    target_dag_id, routing_source = _resolve_target_dag(
+        routing_data, destinies_data, selected_origin, race_id
+    )
 
     dag_path = mod_dir / "dag_graphs" / f"{target_dag_id}.json"
     dag_data = _load_json_file(dag_path)
     if not isinstance(dag_data, dict):
         if as_json:
-            print(json.dumps({"error": f"目标 DAG 图元文件不存在: {dag_path}", "target_dag_id": target_dag_id}, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {
+                        "error": f"目标 DAG 图元文件不存在: {dag_path}",
+                        "target_dag_id": target_dag_id,
+                    },
+                    ensure_ascii=False,
+                )
+            )
         else:
             print(f"❌ 错误: 目标 DAG 图元文件不存在: {dag_path}", file=sys.stderr)
         return 1
@@ -562,7 +616,11 @@ def simulate_mod(
     entry_id, terminals, adj = _build_simulation_graph(dag_data)
     if not entry_id:
         if as_json:
-            print(json.dumps({"error": "DAG 缺少 START_ENTRY 入口节点"}, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {"error": "DAG 缺少 START_ENTRY 入口节点"}, ensure_ascii=False
+                )
+            )
         else:
             print("❌ 错误: DAG 缺少 START_ENTRY 入口节点", file=sys.stderr)
         return 1
@@ -571,117 +629,78 @@ def simulate_mod(
     all_paths: list[list[str]] = []
     _find_all_paths(entry_id, terminals, adj, [], set(), all_paths)
 
-    custom_traits = _normalize_list_items(destinies_data.get("custom_traits"), "trait_id") if isinstance(destinies_data, dict) else []
-    custom_kits = _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id") if isinstance(destinies_data, dict) else []
-    raw_presets = destinies_data.get("paired_presets") if isinstance(destinies_data, dict) else []
-    paired_presets = [p for p in raw_presets if isinstance(p, dict)] if isinstance(raw_presets, list) else []
+    custom_traits = (
+        _normalize_list_items(destinies_data.get("custom_traits"), "trait_id")
+        if isinstance(destinies_data, dict)
+        else []
+    )
+    custom_kits = (
+        _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id")
+        if isinstance(destinies_data, dict)
+        else []
+    )
+    raw_presets = (
+        destinies_data.get("paired_presets") if isinstance(destinies_data, dict) else []
+    )
+    paired_presets = (
+        [p for p in raw_presets if isinstance(p, dict)]
+        if isinstance(raw_presets, list)
+        else []
+    )
 
-    sample_pair = paired_presets[0] if paired_presets else {
-        "positive": "PRIMORDIAL_RESONANCE",
-        "negative": "HEART_CORE_FISSURE",
-    }
-    pos_id, pos_name, pos_cost = _resolve_trait_meta(sample_pair.get("positive"), custom_traits)
-    neg_id, neg_name, neg_cost = _resolve_trait_meta(sample_pair.get("negative"), custom_traits)
+    sample_pair = (
+        paired_presets[0]
+        if paired_presets
+        else {
+            "positive": "PRIMORDIAL_RESONANCE",
+            "negative": "HEART_CORE_FISSURE",
+        }
+    )
+    pos_id, pos_name, pos_cost = _resolve_trait_meta(
+        sample_pair.get("positive"), custom_traits
+    )
+    neg_id, neg_name, neg_cost = _resolve_trait_meta(
+        sample_pair.get("negative"), custom_traits
+    )
     trait_summary = f"{pos_name} / {neg_name}"
 
     bonuses = selected_origin.get("attribute_bonus", {})
-    final_attrs, attr_summary, net_bonus = _compute_preview_attributes(bonuses if isinstance(bonuses, dict) else {})
+    final_attrs, attr_summary, net_bonus = _compute_preview_attributes(
+        bonuses if isinstance(bonuses, dict) else {}
+    )
     pref_kit_id = str(selected_origin.get("starter_kit_id") or "")
     origin_gold = int(selected_origin.get("initial_gold", 0))
-    kit_summary, merged_gold, selected_kit = _format_kit_summary(custom_kits, pref_kit_id, origin_gold)
+    kit_summary, merged_gold, selected_kit = _format_kit_summary(
+        custom_kits, pref_kit_id, origin_gold
+    )
 
-    context = _build_simulation_context(race_id, player_name, selected_origin, selected_kit, merged_gold, trait_summary)
+    context = _build_simulation_context(
+        race_id, player_name, selected_origin, selected_kit, merged_gold, trait_summary
+    )
 
     nodes = dag_data.get("nodes", {})
-    branches_payload: list[dict[str, Any]] = []
-
-    for b_idx, path_nodes in enumerate(all_paths, start=1):
-        steps_payload: list[dict[str, Any]] = []
-        for step_num, nid in enumerate(path_nodes, start=1):
-            nd = nodes.get(nid, {})
-            ntype = nd.get("node_type", "UNKNOWN")
-            nkey = nd.get("narrative_key", "")
-            bg_asset = nd.get("background_asset") or nd.get("bg_asset")
-            bgm_asset = nd.get("bgm_asset") or nd.get("bgm")
-            raw_text, text_source = _resolve_node_raw_text(nd, i18n_catalog)
-            hydrated_text = _hydrate_text(raw_text, context)
-            mutations = nd.get("mutations_on_complete", [])
-            steps_payload.append({
-                "step": step_num,
-                "node_id": nid,
-                "node_type": ntype,
-                "narrative_key": nkey,
-                "background_asset": bg_asset,
-                "bgm_asset": bgm_asset,
-                "text_source": text_source,
-                "raw_text": raw_text,
-                "hydrated_text": hydrated_text,
-                "mutations_on_complete": mutations,
-            })
-        branches_payload.append({
-            "branch_index": b_idx,
-            "path_nodes": path_nodes,
-            "steps": steps_payload,
-        })
-
-    if as_json:
-        payload = {
-            "mode": "simulate",
-            "pack_id": manifest_data.get("pack_id"),
-            "pack_name": manifest_data.get("pack_name"),
-            "target_dag_id": target_dag_id,
-            "routing_source": routing_source,
-            "selected_origin_id": selected_origin.get("origin_id"),
-            "selected_origin": selected_origin,
-            "character_preview": {
-                "player_name": player_name,
-                "race_id": race_id.upper(),
-                "origin_id": selected_origin.get("origin_id"),
-                "origin_name": selected_origin.get("name"),
-                "birth_region": selected_origin.get("birth_region"),
-                "attributes": final_attrs,
-                "net_bonus": net_bonus,
-                "trait_summary": trait_summary,
-                "starter_kit_summary": kit_summary,
-                "initial_gold": merged_gold,
-            },
-            "branch_count": len(all_paths),
-            "branches": branches_payload,
-        }
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return 0
-
-    print("==============================================================================")
-    print("🎭 纯净世界引擎 MOD 剧情无头演习推演引擎")
-    print(f"  • MOD 名称   : {manifest_data.get('pack_name')} ({manifest_data.get('pack_id')})")
-    print(f"  • 激活图元   : {target_dag_id} (路由来源: {routing_source})")
-    print(f"  • 选定身世   : {selected_origin.get('origin_id')} ({selected_origin.get('name')})")
-    print(f"  • 模拟角色   : {player_name} (种族: {race_id.upper()}, 等级: {context['level']})")
-    print(f"  • 六维面板   : {attr_summary} (净加成: {net_bonus:+d})")
-    print(f"  • 因果天赋   : {trait_summary} (净点数: {pos_cost + neg_cost:+d})")
-    print(f"  • 初始装备   : {kit_summary}")
-    print(f"  • 可达分支总数: {len(all_paths)} 条")
-    print("==============================================================================")
-
-    for branch in branches_payload:
-        b_idx = branch["branch_index"]
-        print(f"\n🎬 ----------------- [分支 {b_idx}/{len(all_paths)}] -----------------")
-        for step in branch["steps"]:
-            print(f"  [{step['step']}] 节点: {step['node_id']} ({step['node_type']}) [来源: {step['text_source']}]")
-            if step.get("background_asset") or step.get("bgm_asset"):
-                bg_info = step.get("background_asset") or "无"
-                bgm_info = step.get("bgm_asset") or "无"
-                print(f"      视听绑定: 背景: {bg_info} | BGM: {bgm_info}")
-            print(f"      叙事键 : {step['narrative_key']}")
-            print(f"      填充台词: \"{step['hydrated_text']}\"")
-            if step["mutations_on_complete"]:
-                print(f"      状态变更: {json.dumps(step['mutations_on_complete'], ensure_ascii=False)}")
-        print("  🏁 分支终态: 剧情顺利达成 TERMINAL_EXIT。")
-
-    print("\n==============================================================================")
-    print("🎉 无头推演演习圆满完成！所有分支均可顺利抵达终态。")
-    print("==============================================================================")
-    return 0
+    branches_payload = build_simulation_branches(
+        all_paths, nodes, i18n_catalog, context, _resolve_node_raw_text, _hydrate_text
+    )
+    return emit_simulation_result(
+        manifest_data,
+        target_dag_id,
+        routing_source,
+        selected_origin,
+        player_name,
+        race_id,
+        final_attrs,
+        attr_summary,
+        net_bonus,
+        trait_summary,
+        pos_cost + neg_cost,
+        kit_summary,
+        merged_gold,
+        int(context["level"]),
+        all_paths,
+        branches_payload,
+        as_json,
+    )
 
 
 def preview_overview(
@@ -690,17 +709,7 @@ def preview_overview(
     origin_id: str | None = None,
     as_json: bool = False,
 ) -> int:
-    """提取并展示 MOD 资产、清单配置与四级路由概览。
-
-    Args:
-        mod_dir: 模组工程根目录。
-        race_id: 角色种族标识符 (默认 HUMAN)。
-        origin_id: 可选出身标识符。
-        as_json: 是否以结构化 JSON 格式导出摘要。
-
-    Returns:
-        退出状态码: 0=概览成功, 1=加载失败。
-    """
+    """提取并展示 MOD 资产、清单配置与四级路由概览。"""
     manifest_data = _load_json_file(mod_dir / "pack.json")
     if not isinstance(manifest_data, dict):
         if as_json:
@@ -716,57 +725,20 @@ def preview_overview(
     routing_data = _load_json_file(mod_dir / "routing_rules.json")
 
     selected_origin = _select_origin(destinies_data, origin_id, race_id)
-    target_dag_id, routing_source = _resolve_target_dag(routing_data, destinies_data, selected_origin, race_id)
-
-    if as_json:
-        c_origins = _normalize_list_items(destinies_data.get("custom_origins"), "origin_id") if isinstance(destinies_data, dict) else []
-        c_traits = _normalize_list_items(destinies_data.get("custom_traits"), "trait_id") if isinstance(destinies_data, dict) else []
-        c_kits = _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id") if isinstance(destinies_data, dict) else []
-        payload = {
-            "mode": "overview",
-            "pack_id": manifest_data.get("pack_id"),
-            "pack_name": manifest_data.get("pack_name"),
-            "version": manifest_data.get("version"),
-            "author": manifest_data.get("author"),
-            "engine_api_version": manifest_data.get("engine_api_version"),
-            "priority": manifest_data.get("priority"),
-            "semantic_tags": manifest_data.get("semantic_tags"),
-            "target_dag_id": target_dag_id,
-            "routing_source": routing_source,
-            "selected_origin_id": selected_origin.get("origin_id"),
-            "dag_files": [f.stem for f in dag_files],
-            "i18n_key_count": len(i18n_catalog),
-            "destinies_counts": {
-                "origins": len(c_origins),
-                "traits": len(c_traits),
-                "starter_kits": len(c_kits),
-            },
-        }
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return 0
-
-    print("==============================================================================")
-    print(f"📖 MOD 静态概览预览: {manifest_data.get('pack_name', '未知模组')}")
-    print("------------------------------------------------------------------------------")
-    print(f"  • 标识符     : {manifest_data.get('pack_id')}")
-    print(f"  • 版本       : {manifest_data.get('version')}")
-    print(f"  • 作者       : {manifest_data.get('author')}")
-    print(f"  • API 版本   : {manifest_data.get('engine_api_version')}")
-    print(f"  • 加载优先级 : {manifest_data.get('priority')}")
-    print(f"  • 语义标签   : {manifest_data.get('semantic_tags')}")
-    print(f"  • 路由目标   : {target_dag_id} (来源: {routing_source})")
-    print(f"  • 选定身世   : {selected_origin.get('origin_id')} ({selected_origin.get('name')})")
-    print(f"  • 包含图元数 : {len(dag_files)} 份 ({', '.join(f.stem for f in dag_files)})")
-    print(f"  • 本地化词条 : {len(i18n_catalog)} 条")
-    if isinstance(destinies_data, dict):
-        c_origins = _normalize_list_items(destinies_data.get("custom_origins"), "origin_id")
-        c_traits = _normalize_list_items(destinies_data.get("custom_traits"), "trait_id")
-        c_kits = _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id")
-        print(f"  • 命途扩展   : 身世 {len(c_origins)} 项 / 天赋 {len(c_traits)} 项 / 套件 {len(c_kits)} 套")
-    print("------------------------------------------------------------------------------")
-    print("💡 提示: 传入 '--simulate' 参数可启动无头剧情推演与占位符动态填充。")
-    print("==============================================================================")
-    return 0
+    target_dag_id, routing_source = _resolve_target_dag(
+        routing_data, destinies_data, selected_origin, race_id
+    )
+    return emit_overview_result(
+        manifest_data,
+        destinies_data,
+        target_dag_id,
+        routing_source,
+        selected_origin,
+        dag_files,
+        i18n_catalog,
+        _normalize_list_items,
+        as_json,
+    )
 
 
 def main() -> None:
@@ -777,18 +749,41 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("mod_dir", help="待演习的 MOD 根目录路径")
-    parser.add_argument("--simulate", action="store_true", dest="simulate", help="启动全分支剧情推演与文本占位符填充")
-    parser.add_argument("--race", default="HUMAN", dest="race_id", help="模拟角色的种族 (默认: HUMAN)")
-    parser.add_argument("--name", default="阿尔温", dest="player_name", help="模拟角色的名称 (默认: 阿尔温)")
-    parser.add_argument("--origin", default=None, dest="origin_id", help="指定演习选定的创角身世 ID")
-    parser.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 演习报告")
+    parser.add_argument(
+        "--simulate",
+        action="store_true",
+        dest="simulate",
+        help="启动全分支剧情推演与文本占位符填充",
+    )
+    parser.add_argument(
+        "--race", default="HUMAN", dest="race_id", help="模拟角色的种族 (默认: HUMAN)"
+    )
+    parser.add_argument(
+        "--name",
+        default="阿尔温",
+        dest="player_name",
+        help="模拟角色的名称 (默认: 阿尔温)",
+    )
+    parser.add_argument(
+        "--origin", default=None, dest="origin_id", help="指定演习选定的创角身世 ID"
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="输出机器可读的结构化 JSON 演习报告",
+    )
 
     args = parser.parse_args()
     target_dir = Path(args.mod_dir)
 
     if not target_dir.is_dir():
         if args.as_json:
-            print(json.dumps({"error": f"目标目录不存在: {target_dir}"}, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {"error": f"目标目录不存在: {target_dir}"}, ensure_ascii=False
+                )
+            )
         else:
             print(f"❌ 错误: 目标目录不存在: {target_dir}", file=sys.stderr)
         sys.exit(1)
