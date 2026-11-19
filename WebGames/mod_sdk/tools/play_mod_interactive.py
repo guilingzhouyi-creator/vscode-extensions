@@ -21,11 +21,14 @@ from play_mod_common import (
     SCHEMA_VERSION,
     SCHEMA_VERSION_ACTION,
     SCHEMA_VERSION_OBSERVATION,
+    SessionConfig,
     hydrate,
     parse_dag_topology,
     prepare_session,
     resolve_node_text,
 )
+
+
 @dataclass(slots=True)
 class ObservationPayloadContext:
     """观测包构建载荷参数对象 (GOV-DAT-001)。"""
@@ -63,13 +66,8 @@ class InteractivePlayConfig:
     seed: str = "kalarmod"
 
 
-def build_observation_payload(
-    ctx: ObservationPayloadContext | None = None,
-    **kwargs: Any,
-) -> dict[str, Any]:
+def build_observation_payload(ctx: ObservationPayloadContext) -> dict[str, Any]:
     """构造符合 kalar.mod_sdk.observation.v1 标准契约的单步观测包字典。"""
-    if ctx is None:
-        ctx = ObservationPayloadContext(**kwargs)
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION_OBSERVATION,
         "session_id": ctx.session_id,
@@ -172,21 +170,23 @@ def handle_interactive_rollback(
     history_stack = s_ctx["history_stack"]
     if not history_stack:
         err_obs = build_observation_payload(
-            session_id=session_id,
-            step_index=s_ctx["step_index"],
-            current_node_id=s_ctx["curr"],
-            node_type=s_ctx["ntype"],
-            narrative_key=s_ctx["nkey"],
-            text_source=s_ctx["text_source"],
-            raw_text=s_ctx["raw_text"],
-            hydrated_text=s_ctx["hydrated_text"],
-            available_choices=s_ctx["choices"],
-            character_snapshot=s_ctx["current_char"],
-            applied_mutations=[],
-            history_depth=0,
-            is_terminal=s_ctx["is_term"],
-            error_code="ERR_ROLLBACK_EMPTY_STACK",
-            error_message="历史栈为空，已处于起始节点，无法继续回滚",
+            ObservationPayloadContext(
+                session_id=session_id,
+                step_index=s_ctx["step_index"],
+                current_node_id=s_ctx["curr"],
+                node_type=s_ctx["ntype"],
+                narrative_key=s_ctx["nkey"],
+                text_source=s_ctx["text_source"],
+                raw_text=s_ctx["raw_text"],
+                hydrated_text=s_ctx["hydrated_text"],
+                available_choices=s_ctx["choices"],
+                character_snapshot=s_ctx["current_char"],
+                applied_mutations=[],
+                history_depth=0,
+                is_terminal=s_ctx["is_term"],
+                error_code="ERR_ROLLBACK_EMPTY_STACK",
+                error_message="历史栈为空，已处于起始节点，无法继续回滚",
+            )
         )
         emit_json_line(err_obs)
         return
@@ -210,19 +210,21 @@ def handle_interactive_rollback(
     s_ctx["is_term"] = curr in terminals or s_ctx["ntype"] == "TERMINAL_EXIT"
 
     rollback_obs = build_observation_payload(
-        session_id=session_id,
-        step_index=s_ctx["step_index"],
-        current_node_id=curr,
-        node_type=s_ctx["ntype"],
-        narrative_key=s_ctx["nkey"],
-        text_source=s_ctx["text_source"],
-        raw_text=s_ctx["raw_text"],
-        hydrated_text=s_ctx["hydrated_text"],
-        available_choices=s_ctx["choices"],
-        character_snapshot=s_ctx["current_char"],
-        applied_mutations=[],
-        history_depth=len(history_stack),
-        is_terminal=s_ctx["is_term"],
+        ObservationPayloadContext(
+            session_id=session_id,
+            step_index=s_ctx["step_index"],
+            current_node_id=curr,
+            node_type=s_ctx["ntype"],
+            narrative_key=s_ctx["nkey"],
+            text_source=s_ctx["text_source"],
+            raw_text=s_ctx["raw_text"],
+            hydrated_text=s_ctx["hydrated_text"],
+            available_choices=s_ctx["choices"],
+            character_snapshot=s_ctx["current_char"],
+            applied_mutations=[],
+            history_depth=len(history_stack),
+            is_terminal=s_ctx["is_term"],
+        )
     )
     emit_json_line(rollback_obs)
 
@@ -244,21 +246,23 @@ def handle_interactive_choose(
 
     if not target_node:
         err_obs = build_observation_payload(
-            session_id=session_id,
-            step_index=s_ctx["step_index"],
-            current_node_id=s_ctx["curr"],
-            node_type=s_ctx["ntype"],
-            narrative_key=s_ctx["nkey"],
-            text_source=s_ctx["text_source"],
-            raw_text=s_ctx["raw_text"],
-            hydrated_text=s_ctx["hydrated_text"],
-            available_choices=choices,
-            character_snapshot=s_ctx["current_char"],
-            applied_mutations=[],
-            history_depth=len(history_stack),
-            is_terminal=s_ctx["is_term"],
-            error_code="ERR_INVALID_CHOICE",
-            error_message=f"分支目标 '{choice_raw}' 不合法，可选分支列表: {choices}",
+            ObservationPayloadContext(
+                session_id=session_id,
+                step_index=s_ctx["step_index"],
+                current_node_id=s_ctx["curr"],
+                node_type=s_ctx["ntype"],
+                narrative_key=s_ctx["nkey"],
+                text_source=s_ctx["text_source"],
+                raw_text=s_ctx["raw_text"],
+                hydrated_text=s_ctx["hydrated_text"],
+                available_choices=choices,
+                character_snapshot=s_ctx["current_char"],
+                applied_mutations=[],
+                history_depth=len(history_stack),
+                is_terminal=s_ctx["is_term"],
+                error_code="ERR_INVALID_CHOICE",
+                error_message=f"分支目标 '{choice_raw}' 不合法，可选分支列表: {choices}",
+            )
         )
         emit_json_line(err_obs)
         return False
@@ -321,65 +325,65 @@ def handle_interactive_choose(
     is_term = target_node in terminals or ntype == "TERMINAL_EXIT"
     s_ctx["is_term"] = is_term
     step_obs = build_observation_payload(
-        session_id=session_id,
-        step_index=s_ctx["step_index"],
-        current_node_id=target_node,
-        node_type=ntype,
-        narrative_key=nkey,
-        text_source=text_source,
-        raw_text=raw_text,
-        hydrated_text=hydrated_text,
-        available_choices=nxt_choices,
-        character_snapshot=s_ctx["current_char"],
-        applied_mutations=mutations,
-        history_depth=len(history_stack),
-        is_terminal=is_term,
+        ObservationPayloadContext(
+            session_id=session_id,
+            step_index=s_ctx["step_index"],
+            current_node_id=target_node,
+            node_type=ntype,
+            narrative_key=nkey,
+            text_source=text_source,
+            raw_text=raw_text,
+            hydrated_text=hydrated_text,
+            available_choices=nxt_choices,
+            character_snapshot=s_ctx["current_char"],
+            applied_mutations=mutations,
+            history_depth=len(history_stack),
+            is_terminal=is_term,
+        )
     )
     emit_json_line(step_obs)
     return is_term
 
 
-def play_mod_interactive(
-    cfg: InteractivePlayConfig | None = None,
-    **kwargs: Any,
-) -> tuple[dict[str, Any], bool]:
+def play_mod_interactive(cfg: InteractivePlayConfig) -> tuple[dict[str, Any], bool]:
     """启动基于 stdio 的 Agent 长程交互式单步推演会话。"""
-    if cfg is None:
-        cfg = InteractivePlayConfig(**kwargs)
-
     session_id = f"SESSION_{hashlib.sha256(f'{cfg.seed}:{cfg.player_name}'.encode('utf-8')).hexdigest()[:12]}"
 
     bundle, fail_transcript = prepare_session(
-        mod_paths=cfg.mod_paths,
-        player_name=cfg.player_name,
-        race_id=cfg.race_id,
-        gender=cfg.gender,
-        origin_id_param=cfg.origin_id_param,
-        trait_pair_param=cfg.trait_pair_param,
-        reroll_nonce=cfg.reroll_nonce,
-        seed=cfg.seed,
-        choice_strategy="interactive",
+        SessionConfig(
+            mod_paths=cfg.mod_paths,
+            player_name=cfg.player_name,
+            race_id=cfg.race_id,
+            gender=cfg.gender,
+            origin_id_param=cfg.origin_id_param,
+            trait_pair_param=cfg.trait_pair_param,
+            reroll_nonce=cfg.reroll_nonce,
+            seed=cfg.seed,
+            choice_strategy="interactive",
+        )
     )
     if bundle is None:
         err_msg = str(
             fail_transcript.get("final_state", {}).get("error", "预检或初始化失败")
         )
         err_obs = build_observation_payload(
-            session_id=session_id,
-            step_index=0,
-            current_node_id=None,
-            node_type="UNKNOWN",
-            narrative_key="",
-            text_source="system",
-            raw_text="",
-            hydrated_text=f"MOD 启动失败: {err_msg}",
-            available_choices=[],
-            character_snapshot={},
-            applied_mutations=[],
-            history_depth=0,
-            is_terminal=True,
-            error_code="ERR_PRECHECK_FAILED",
-            error_message=err_msg,
+            ObservationPayloadContext(
+                session_id=session_id,
+                step_index=0,
+                current_node_id=None,
+                node_type="UNKNOWN",
+                narrative_key="",
+                text_source="system",
+                raw_text="",
+                hydrated_text=f"MOD 启动失败: {err_msg}",
+                available_choices=[],
+                character_snapshot={},
+                applied_mutations=[],
+                history_depth=0,
+                is_terminal=True,
+                error_code="ERR_PRECHECK_FAILED",
+                error_message=err_msg,
+            )
         )
         emit_json_line(err_obs)
         return fail_transcript, False
@@ -406,21 +410,23 @@ def play_mod_interactive(
             "final_state": {"reached_terminal": False, "error": "DAG 缺少入口节点"},
         }
         err_obs = build_observation_payload(
-            session_id=session_id,
-            step_index=0,
-            current_node_id=None,
-            node_type="UNKNOWN",
-            narrative_key="",
-            text_source="system",
-            raw_text="",
-            hydrated_text="DAG 缺少入口节点",
-            available_choices=[],
-            character_snapshot=current_char,
-            applied_mutations=[],
-            history_depth=0,
-            is_terminal=True,
-            error_code="ERR_DAG_NO_ENTRY",
-            error_message="DAG 缺少入口节点 (START_ENTRY)",
+            ObservationPayloadContext(
+                session_id=session_id,
+                step_index=0,
+                current_node_id=None,
+                node_type="UNKNOWN",
+                narrative_key="",
+                text_source="system",
+                raw_text="",
+                hydrated_text="DAG 缺少入口节点",
+                available_choices=[],
+                character_snapshot=current_char,
+                applied_mutations=[],
+                history_depth=0,
+                is_terminal=True,
+                error_code="ERR_DAG_NO_ENTRY",
+                error_message="DAG 缺少入口节点 (START_ENTRY)",
+            )
         )
         emit_json_line(err_obs)
         return fail_transcript, False
@@ -470,19 +476,21 @@ def play_mod_interactive(
     }
 
     step_0_obs = build_observation_payload(
-        session_id=session_id,
-        step_index=0,
-        current_node_id=curr,
-        node_type=ntype,
-        narrative_key=nkey,
-        text_source=text_source,
-        raw_text=raw_text,
-        hydrated_text=hydrated_text,
-        available_choices=choices,
-        character_snapshot=current_char,
-        applied_mutations=mutations,
-        history_depth=0,
-        is_terminal=is_term,
+        ObservationPayloadContext(
+            session_id=session_id,
+            step_index=0,
+            current_node_id=curr,
+            node_type=ntype,
+            narrative_key=nkey,
+            text_source=text_source,
+            raw_text=raw_text,
+            hydrated_text=hydrated_text,
+            available_choices=choices,
+            character_snapshot=current_char,
+            applied_mutations=mutations,
+            history_depth=0,
+            is_terminal=is_term,
+        )
     )
     emit_json_line(step_0_obs)
 
@@ -494,21 +502,23 @@ def play_mod_interactive(
         action_dict, parse_err = parse_action_input(line)
         if parse_err:
             err_obs = build_observation_payload(
-                session_id=session_id,
-                step_index=s_ctx["step_index"],
-                current_node_id=s_ctx["curr"],
-                node_type=s_ctx["ntype"],
-                narrative_key=s_ctx["nkey"],
-                text_source=s_ctx["text_source"],
-                raw_text=s_ctx["raw_text"],
-                hydrated_text=s_ctx["hydrated_text"],
-                available_choices=s_ctx["choices"],
-                character_snapshot=s_ctx["current_char"],
-                applied_mutations=[],
-                history_depth=len(s_ctx["history_stack"]),
-                is_terminal=s_ctx["is_term"],
-                error_code="ERR_ACTION_INVALID",
-                error_message=parse_err,
+                ObservationPayloadContext(
+                    session_id=session_id,
+                    step_index=s_ctx["step_index"],
+                    current_node_id=s_ctx["curr"],
+                    node_type=s_ctx["ntype"],
+                    narrative_key=s_ctx["nkey"],
+                    text_source=s_ctx["text_source"],
+                    raw_text=s_ctx["raw_text"],
+                    hydrated_text=s_ctx["hydrated_text"],
+                    available_choices=s_ctx["choices"],
+                    character_snapshot=s_ctx["current_char"],
+                    applied_mutations=[],
+                    history_depth=len(s_ctx["history_stack"]),
+                    is_terminal=s_ctx["is_term"],
+                    error_code="ERR_ACTION_INVALID",
+                    error_message=parse_err,
+                )
             )
             emit_json_line(err_obs)
             continue
@@ -519,21 +529,23 @@ def play_mod_interactive(
         req_session_id = action_dict.get("session_id")
         if req_session_id and str(req_session_id) != session_id:
             err_obs = build_observation_payload(
-                session_id=session_id,
-                step_index=s_ctx["step_index"],
-                current_node_id=s_ctx["curr"],
-                node_type=s_ctx["ntype"],
-                narrative_key=s_ctx["nkey"],
-                text_source=s_ctx["text_source"],
-                raw_text=s_ctx["raw_text"],
-                hydrated_text=s_ctx["hydrated_text"],
-                available_choices=s_ctx["choices"],
-                character_snapshot=s_ctx["current_char"],
-                applied_mutations=[],
-                history_depth=len(s_ctx["history_stack"]),
-                is_terminal=s_ctx["is_term"],
-                error_code="ERR_SESSION_MISMATCH",
-                error_message=f"会话 ID 不匹配: 传入 '{req_session_id}', 当前 '{session_id}'",
+                ObservationPayloadContext(
+                    session_id=session_id,
+                    step_index=s_ctx["step_index"],
+                    current_node_id=s_ctx["curr"],
+                    node_type=s_ctx["ntype"],
+                    narrative_key=s_ctx["nkey"],
+                    text_source=s_ctx["text_source"],
+                    raw_text=s_ctx["raw_text"],
+                    hydrated_text=s_ctx["hydrated_text"],
+                    available_choices=s_ctx["choices"],
+                    character_snapshot=s_ctx["current_char"],
+                    applied_mutations=[],
+                    history_depth=len(s_ctx["history_stack"]),
+                    is_terminal=s_ctx["is_term"],
+                    error_code="ERR_SESSION_MISMATCH",
+                    error_message=f"会话 ID 不匹配: 传入 '{req_session_id}', 当前 '{session_id}'",
+                )
             )
             emit_json_line(err_obs)
             continue
@@ -558,21 +570,23 @@ def play_mod_interactive(
             continue
 
         err_obs = build_observation_payload(
-            session_id=session_id,
-            step_index=s_ctx["step_index"],
-            current_node_id=s_ctx["curr"],
-            node_type=s_ctx["ntype"],
-            narrative_key=s_ctx["nkey"],
-            text_source=s_ctx["text_source"],
-            raw_text=s_ctx["raw_text"],
-            hydrated_text=s_ctx["hydrated_text"],
-            available_choices=s_ctx["choices"],
-            character_snapshot=s_ctx["current_char"],
-            applied_mutations=[],
-            history_depth=len(s_ctx["history_stack"]),
-            is_terminal=s_ctx["is_term"],
-            error_code="ERR_UNKNOWN_ACTION_TYPE",
-            error_message=f"不支持的动作类型: '{act_type}'，仅支持 choose, rollback, quit",
+            ObservationPayloadContext(
+                session_id=session_id,
+                step_index=s_ctx["step_index"],
+                current_node_id=s_ctx["curr"],
+                node_type=s_ctx["ntype"],
+                narrative_key=s_ctx["nkey"],
+                text_source=s_ctx["text_source"],
+                raw_text=s_ctx["raw_text"],
+                hydrated_text=s_ctx["hydrated_text"],
+                available_choices=s_ctx["choices"],
+                character_snapshot=s_ctx["current_char"],
+                applied_mutations=[],
+                history_depth=len(s_ctx["history_stack"]),
+                is_terminal=s_ctx["is_term"],
+                error_code="ERR_UNKNOWN_ACTION_TYPE",
+                error_message=f"不支持的动作类型: '{act_type}'，仅支持 choose, rollback, quit",
+            )
         )
         emit_json_line(err_obs)
 
@@ -594,11 +608,7 @@ def play_mod_interactive(
         "applied_mutations": all_applied,
         "gold": s_ctx["current_char"].get("gold", 0),
         "location": s_ctx["current_char"].get("birth_region", "FRONTIER_REALM"),
-        "equipment": [
-            s_ctx["current_char"].get(
-                "initial_equipment", "STARTER_WEAPON"
-            )
-        ],
+        "equipment": [s_ctx["current_char"].get("initial_equipment", "STARTER_WEAPON")],
     }
     is_success = reached_term and bundle["is_valid"]
     transcript = {
