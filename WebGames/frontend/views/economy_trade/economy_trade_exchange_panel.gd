@@ -111,17 +111,10 @@ func on_exchange_confirm_pressed() -> void:
 # Tab 7: 资源水池 (RESOURCE_POOL) 与共享进度条行池化构建
 # ==============================================================================
 
-## 初始化资源水池 Tab：Mock 模式填充示例资源池，实网模式保持空态等待快照
+## 初始化资源水池 Tab
 func init_resource_pool_tab() -> void:
 	if _view == null:
 		return
-	if ServiceLocator.get_mode() == "mock":
-		_view.resource_pools = [
-			{"name": "ui.fe05.commodity.wood", "current": 1200, "max": 2000, "rate": 15}, {"name": "ui.fe05.commodity.iron_ore", "current": 800, "max": 1500, "rate": 8},
-			{"name": "ui.fe05.commodity.mana_crystal", "current": 45, "max": 100, "rate": 2}, {"name": "ui.fe05.commodity.herbs", "current": 320, "max": 500, "rate": 5}
-		]
-	else:
-		_view.resource_pools = []
 	populate_resource_pools()
 
 ## 填充资源池行（名称/存量条/存量/速率，池化复用已有行节点）

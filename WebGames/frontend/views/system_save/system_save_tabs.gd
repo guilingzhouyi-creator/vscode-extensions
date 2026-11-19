@@ -99,9 +99,9 @@ func init_replay() -> void:
 	if _view == null:
 		return
 	_view.replay_entries = [
-		{ "id": "R001", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "SANDBOX_ARENA", "level": 45, "duration_sec": 180, "frames": 10800, "date": "2026-08-31 22:00" },
-		{ "id": "R002", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "SANDBOX_BASTION", "level": 40, "duration_sec": 240, "frames": 14400, "date": "2026-08-30 15:30" },
-		{ "id": "R003", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "TRAINING_GROUND", "level": 45, "duration_sec": 60, "frames": 3600, "date": "2026-08-29 10:00" },
+		{"id": "R001", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "SANDBOX_ARENA", "level": 45, "duration_sec": 180, "frames": 10800, "date": "2026-08-31 22:00"},
+		{"id": "R002", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "SANDBOX_BASTION", "level": 40, "duration_sec": 240, "frames": 14400, "date": "2026-08-30 15:30"},
+		{"id": "R003", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "TRAINING_GROUND", "level": 45, "duration_sec": 60, "frames": 3600, "date": "2026-08-29 10:00"},
 	]
 	refresh_replay_list()
 	refresh_replay_detail()
@@ -205,10 +205,6 @@ func _on_replay_slider_changed(progress_ratio: float) -> void:
 # Tab 2: GM 沙盒 (GM_SANDBOX)
 # ==============================================================================
 
-## 初始化开发指令沙盒分页状态
-func init_gm_sandbox() -> void:
-	refresh_gm_permission()
-
 ## 刷新当前开发指令权限等级文案
 func refresh_gm_permission() -> void:
 	if _view == null:
@@ -267,13 +263,8 @@ func _on_gm_input_submitted(submitted_text: String) -> void:
 func init_cdkey() -> void:
 	if _view == null:
 		return
-	if ServiceLocator.get_mode() == "mock":
-		_view.cdkey_history = [
-			{ "code": "WELCOME2026", "reward_key": "ui.fe16.mock.cdkey.gold_10000", "time": "2026-08-28 10:00", "success": true },
-			{ "code": "SUMMER_GIFT", "reward_key": "ui.fe16.mock.cdkey.summer_outfit", "time": "2026-08-15 14:30", "success": true },
-		]
-	else:
-		_view.cdkey_history = []
+	var save_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("system_save")
+	_view.cdkey_history = FrontendSnapshot.read_array(save_snapshot, "cdkey_history") if save_snapshot.has("cdkey_history") else []
 	refresh_cdkey_history()
 
 ## 刷新兑换码历史列表控件
@@ -300,14 +291,14 @@ func redeem_cdkey() -> void:
 	var timestamp_text := str(redeem_table.get("redeemed_at", Time.get_datetime_string_from_system(false, true)))
 	if not is_redeem_succeeded:
 		UIIntermediary.resolve(_view.label_cdkey_result, "ui.fe16.cdkey.error_empty")
-		_view.cdkey_history.append({ "code": cdkey_code, "reward_key": "", "time": timestamp_text, "success": false })
+		_view.cdkey_history.append({"code": cdkey_code, "reward_key": "", "time": timestamp_text, "success": false})
 		refresh_cdkey_history()
 		return
 	var reward_text := UIIntermediary.text("ui.fe16.mock.cdkey.gold_5000")
 	UIIntermediary.resolve(_view.label_cdkey_result, "ui.fe16.cdkey.success_msg")
 	UIIntermediary.resolve(_view.label_reward_title, "ui.fe16.cdkey.reward_title", {"reward": reward_text})
 	UIIntermediary.resolve(_view.label_reward_description, "ui.fe16.cdkey.reward_desc", {"code": cdkey_code})
-	_view.cdkey_history.append({ "code": cdkey_code, "reward_key": "ui.fe16.mock.cdkey.gold_5000", "time": timestamp_text, "success": true })
+	_view.cdkey_history.append({"code": cdkey_code, "reward_key": "ui.fe16.mock.cdkey.gold_5000", "time": timestamp_text, "success": true})
 	refresh_cdkey_history()
 	_view.line_edit_cdkey_input.clear()
 

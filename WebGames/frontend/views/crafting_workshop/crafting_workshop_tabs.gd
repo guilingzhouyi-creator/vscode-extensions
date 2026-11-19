@@ -378,17 +378,6 @@ func _on_recipe_range_changed(start_index: int, end_index: int) -> void:
 				typed_row.bound_data = recipe
 
 ## 获取默认材料库存条目（供视图初始化与离线演示使用）
-func get_default_materials() -> Array:
-	return [
-		{"name": "ui.fe12.mock.material.iron_ore", "rarity": "COMMON", "category": "ore", "qty": 12, "desc": "ui.fe12.mock.material.iron_ore", "source": "ui.fe12.mat_category.ore"},
-		{"name": "ui.fe12.mock.material.mithril_ingot", "rarity": "RARE", "category": "ore", "qty": 5, "desc": "ui.fe12.mock.material.mithril_ingot", "source": "ui.fe12.mat_category.ore"},
-		{"name": "ui.fe12.mock.material.leather", "rarity": "COMMON", "category": "leather", "qty": 8, "desc": "ui.fe12.mock.material.leather", "source": "ui.fe12.mat_category.leather"},
-		{"name": "ui.fe12.mock.material.thread", "rarity": "COMMON", "category": "leather", "qty": 10, "desc": "ui.fe12.mock.material.thread", "source": "ui.fe12.mat_category.leather"},
-		{"name": "ui.fe12.mock.material.wood", "rarity": "COMMON", "category": "herb", "qty": 9, "desc": "ui.fe12.mock.material.wood", "source": "ui.fe12.mat_category.herb"},
-		{"name": "ui.fe12.mock.material.mana_shard", "rarity": "EPIC", "category": "gem", "qty": 6, "desc": "ui.fe12.mock.material.mana_shard", "source": "ui.fe12.mat_category.gem"},
-		{"name": "ui.fe12.mock.material.dragon_scale", "rarity": "LEGENDARY", "category": "relic", "qty": 4, "desc": "ui.fe12.mock.material.dragon_scale", "source": "ui.fe12.mat_category.relic"},
-	]
-
 ## 获取当前分类过滤配方
 func _get_filtered_recipes() -> Array:
 	if _view == null:

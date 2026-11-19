@@ -127,9 +127,9 @@ func select_forge_item(item_payload: Dictionary) -> void:
 	_refresh_forge_detail()
 
 ## 选中分解物品并注入预计产出材料清单
-func select_salvage_item(item_payload: Dictionary, mock_yield: Array) -> void:
+func select_salvage_item(item_payload: Dictionary, expected_yield: Array) -> void:
 	selected_salvage_item = item_payload.duplicate()
-	estimated_salvage_materials = mock_yield.duplicate()
+	estimated_salvage_materials = expected_yield.duplicate()
 	_refresh_dismantle_detail()
 
 # ==============================================================================
@@ -139,7 +139,7 @@ func select_salvage_item(item_payload: Dictionary, mock_yield: Array) -> void:
 func _ready() -> void:
 	var tabs: Variant = _get_tabs()
 	_apply_theme()
-	_load_mock_data()
+	_load_domain_snapshot()
 	_init_header_text()
 	_init_tab_titles()
 	_init_forge_tab()
@@ -156,31 +156,13 @@ func _apply_theme() -> void:
 		theme = theme_manager.theme
 
 # ==============================================================================
-# Mock 数据加载
+# 领域快照加载
 # ==============================================================================
 
-func _load_mock_data() -> void:
-	var forge_recipes: Array = [
-		{"name": "ui.fe12.mock.forge.mithril_sword", "rarity": RARITY_RARE, "category": CATEGORY_WEAPON, "materials": [ {"name": "ui.fe12.mock.material.mithril_ingot", "qty": 3}, {"name": "ui.fe12.mock.material.iron_ore", "qty": 2}], "enhancement_level": 0, "learned": true},
-		{"name": "ui.fe12.mock.forge.leather_armor", "rarity": RARITY_COMMON, "category": CATEGORY_ARMOR, "materials": [ {"name": "ui.fe12.mock.material.leather", "qty": 4}, {"name": "ui.fe12.mock.material.thread", "qty": 2}], "enhancement_level": 2, "learned": true},
-		{"name": "ui.fe12.mock.forge.wind_bow", "rarity": RARITY_RARE, "category": CATEGORY_WEAPON, "materials": [ {"name": "ui.fe12.mock.material.wood", "qty": 5}, {"name": "ui.fe12.mock.material.thread", "qty": 1}], "enhancement_level": 0, "learned": false},
-		{"name": "ui.fe12.mock.forge.arcane_staff", "rarity": "EPIC", "category": CATEGORY_WEAPON, "materials": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 6}, {"name": "ui.fe12.mock.material.wood", "qty": 3}], "enhancement_level": 0, "learned": true},
-		{"name": "ui.fe12.mock.forge.dragon_armor", "rarity": "LEGENDARY", "category": CATEGORY_ARMOR, "materials": [ {"name": "ui.fe12.mock.material.dragon_scale", "qty": 8}, {"name": "ui.fe12.mock.material.mithril_ingot", "qty": 4}], "enhancement_level": 0, "learned": false},
-	]
-	var recipe_catalog: Array = forge_recipes.duplicate(true)
-	var dismantle_items: Array = [
-		{"name": "ui.fe12.mock.dismantle.old_sword", "rarity": RARITY_COMMON, "category": CATEGORY_WEAPON, "qty": 2, "yield": [ {"name": "ui.fe12.mock.material.iron_ore", "qty": 3}]},
-		{"name": "ui.fe12.mock.dismantle.old_leather", "rarity": RARITY_COMMON, "category": CATEGORY_ARMOR, "qty": 1, "yield": [ {"name": "ui.fe12.mock.material.leather", "qty": 2}]},
-		{"name": "ui.fe12.mock.dismantle.broken_staff", "rarity": RARITY_RARE, "category": CATEGORY_WEAPON, "qty": 1, "yield": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 2}, {"name": "ui.fe12.mock.material.wood", "qty": 2}]},
-		{"name": "ui.fe12.mock.dismantle.excess_mithril", "rarity": RARITY_RARE, "category": CATEGORY_MATERIAL, "qty": 5, "yield": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 1}]},
-	]
-	var materials: Array = _get_tabs().get_default_materials()
-	apply_snapshot({
-		"forge_recipes": forge_recipes,
-		"recipe_catalog": recipe_catalog,
-		"dismantle_items": dismantle_items,
-		"materials": materials,
-	})
+func _load_domain_snapshot() -> void:
+	var crafting_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("crafting")
+	if not crafting_snapshot.is_empty():
+		apply_snapshot(crafting_snapshot)
 
 func _render_from_snapshot() -> void:
 	if snapshot.has("forge_recipes"):
@@ -397,7 +379,7 @@ func _on_dismantle_confirm_pressed() -> void:
 		return
 	var dismantle_quantity: int = int(_spin_dismantle_quantity.value)
 	ServiceLocator.get_instance().crafting().dispatch_crafting_action("DISMANTLE_ITEM", {
-		"item_id": str(selected_salvage_item.get("id", selected_salvage_item.get("item_id", ""))),
+		"item_id": str(selected_salvage_item.get("item_id", "")),
 		"quantity": dismantle_quantity,
 		"refund_gold": dismantle_quantity * 25,
 	})

@@ -137,17 +137,6 @@ func _init_auction_tab() -> void:
 	_view.option_auction_category.clear()
 	for key in _view.auction_category_keys:
 		_view.option_auction_category.add_item(UIIntermediary.text(key))
-	if ServiceLocator.get_mode() == "mock":
-		_view.auction_items = [
-			{"name": "ui.fe05.mock.auction.mithril_ingot", "category": "ui.fe05.auction.cat_material", "current_bid": 8500, "buyout": 12000, "seller": "ui.fe05.mock.seller.iron_forge"}, {"name": "ui.fe05.mock.auction.ancient_scroll", "category": "ui.fe05.auction.cat_scroll", "current_bid": 15000, "buyout": 25000, "seller": "ui.fe05.mock.seller.arcane_academy"},
-			{"name": "ui.fe05.mock.auction.dragon_scale", "category": "ui.fe05.auction.cat_material", "current_bid": 22000, "buyout": 35000, "seller": "ui.fe05.mock.seller.dragon_slayer"}, {"name": "ui.fe05.mock.auction.wind_bow", "category": "ui.fe05.auction.cat_weapon", "current_bid": 6800, "buyout": 10000, "seller": "ui.fe05.mock.seller.ranger_camp"}
-		]
-		_view.auction_my_listings = [
-			{"name": "ui.fe05.mock.listing.iron_ore", "ask_price": 900, "status": "ui.fe05.auction.status_selling", "expires": "ui.fe05.mock.listing.expires_2d"}, {"name": "ui.fe05.mock.listing.old_leather", "ask_price": 300, "status": "ui.fe05.auction.status_sold", "expires": "ui.fe05.mock.listing.expires_none"}
-		]
-	else:
-		_view.auction_items = []
-		_view.auction_my_listings = []
 	_populate_auction_list()
 	_populate_auction_my_list()
 
@@ -225,17 +214,10 @@ func _on_auction_action_pressed(toast_key: String) -> void:
 # Tab 4: 商队物流 (LOGISTICS) 初始化与信号
 # ==============================================================================
 
-## 初始化商队物流 Tab：Mock 模式填充示例商队，实网模式保持空列表等待快照
+## 初始化商队物流 Tab
 func _init_logistics_tab() -> void:
 	if _view == null:
 		return
-	if ServiceLocator.get_mode() == "mock":
-		_view.caravan_entries = [
-			{"name": "ui.fe05.mock.caravan.silver_grove", "route": "ui.fe05.mock.route.silver_to_valan", "status": "ui.fe05.logistics.status_transit", "cargo": "ui.fe05.mock.cargo.herbs", "freight": 500, "escort": "ui.fe05.logistics.escort_done"},
-			{"name": "ui.fe05.mock.caravan.iron_freight", "route": "ui.fe05.mock.route.iron_to_valan", "status": "ui.fe05.logistics.status_waiting", "cargo": "ui.fe05.mock.cargo.iron_ore", "freight": 800, "escort": "ui.fe05.logistics.escort_pending"}, {"name": "ui.fe05.mock.caravan.dragon_expedition", "route": "ui.fe05.mock.route.dragon_to_iron", "status": "ui.fe05.logistics.status_escort", "cargo": "ui.fe05.mock.cargo.mana_stone", "freight": 2000, "escort": "ui.fe05.logistics.escort_mercenary"}
-		]
-	else:
-		_view.caravan_entries = []
 	_populate_caravan_list()
 
 ## 填充商队列表并默认选中首项、更新物流状态

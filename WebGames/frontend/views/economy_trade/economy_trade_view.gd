@@ -132,22 +132,6 @@ func _get_tabs():
 # ==============================================================================
 
 ## 注入钱包快照（经统一快照入口）
-func set_wallet_snapshot(gold: int, silver: int, copper: int, crystals: int) -> void:
-	apply_snapshot({
-		"wallet_gold": gold,
-		"wallet_silver": silver,
-		"wallet_copper": copper,
-		"wallet_crystals": crystals,
-	})
-
-## 注入商铺货架快照（经统一快照入口）
-func set_shop_shelves_snapshot(title: String, shelves: Array) -> void:
-	apply_snapshot({"shop_title": title, "shop_shelves": shelves})
-
-## 注入 7 日物价走势快照（经统一快照入口）
-func set_price_trend_snapshot(history: Array) -> void:
-	apply_snapshot({"price_trend": history})
-
 ## 统一快照渲染映射：钱包/货架/走势 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("wallet_gold"):
@@ -162,7 +146,8 @@ func _render_from_snapshot() -> void:
 		_refresh_shop_display()
 	if snapshot.has("price_trend"):
 		price_trend_history = FrontendSnapshot.read_array(snapshot, "price_trend")
-		_refresh_price_trend_display()
+		if is_inside_tree():
+			_get_tabs()._refresh_price_trend_display()
 
 ## 钱包总价值换算为铜币基准（换算规则经 domain_boundary 服务）
 func calculate_total_copper_value() -> int:
@@ -176,7 +161,7 @@ func calculate_total_copper_value() -> int:
 func _ready() -> void:
 	var tabs: Variant = _get_tabs()
 	_apply_theme()
-	_load_mock_snapshot()
+	_load_domain_snapshot()
 	tabs._init_tab_titles()
 	tabs._init_static_text()
 	_init_wallet_tab()
@@ -202,7 +187,7 @@ func _apply_theme() -> void:
 # ==============================================================================
 
 ## 从 domain_boundary 快照服务加载经济域快照（钱包/商铺/走势）
-func _load_mock_snapshot() -> void:
+func _load_domain_snapshot() -> void:
 	var economy_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("economy")
 	if economy_snapshot.is_empty():
 		return
@@ -214,6 +199,10 @@ func _load_mock_snapshot() -> void:
 	shop_title = str(economy_snapshot.get("shop_title", shop_title))
 	shop_shelves = FrontendSnapshot.read_array(economy_snapshot, "shop_items")
 	price_trend_history = FrontendSnapshot.read_array(economy_snapshot, "price_trend")
+	auction_items = FrontendSnapshot.read_array(economy_snapshot, "auction_items")
+	auction_my_listings = FrontendSnapshot.read_array(economy_snapshot, "auction_my_listings")
+	caravan_entries = FrontendSnapshot.read_array(economy_snapshot, "caravan_entries")
+	resource_pools = FrontendSnapshot.read_array(economy_snapshot, "resource_pools")
 
 
 # ==============================================================================
@@ -279,17 +268,11 @@ func _refresh_shop_mode() -> void:
 	else:
 		UIIntermediary.resolve(_shop_confirm_button, "ui.fe05.shop.confirm_sell")
 
-## 填充商店货架列表（Mock 模式回退默认货架清单，实网模式保持快照驱动）
+## 填充商店货架列表（由快照统一驱动）
 func _populate_shop_list() -> void:
 	if _shop_item_list == null:
 		return
 	_shop_item_list.clear()
-	if shop_shelves.is_empty() and ServiceLocator.get_mode() == "mock":
-		shop_shelves = [
-			{"id": "IRON_SWORD", "name": "ui.fe05.mock.shop.iron_sword", "price_copper": 5000, "stock": 12},
-			{"id": "HEALTH_POTION", "name": "ui.fe05.mock.shop.health_potion", "price_copper": 800, "stock": 45},
-			{"id": "MANA_CRYSTAL_S", "name": "ui.fe05.mock.shop.mana_crystal_s", "price_copper": 12000, "stock": 3},
-		]
 	for shelf_entry in shop_shelves:
 		var item_name := UIIntermediary.text(str(shelf_entry.get("name", "ui.fe05.unknown")))
 		var display_text := UIIntermediary.text("ui.fe05.shop.item_display", {
@@ -329,12 +312,6 @@ func _refresh_shop_display() -> void:
 	_resolve_shop_title()
 	_populate_shop_list()
 	_refresh_shop_total()
-
-## 刷新物价走势：委托子面板控制器渲染（树内守卫）
-func _refresh_price_trend_display() -> void:
-	if not is_inside_tree():
-		return
-	_get_tabs()._refresh_price_trend_display()
 
 # ==============================================================================
 # 商店 Tab 信号处理
@@ -415,8 +392,8 @@ func _on_tab_changed(tab_index: int) -> void:
 		_refresh_wallet_display()
 	elif tab_index == 1:
 		_refresh_shop_display()
-	elif tab_index == 4:
-		_refresh_price_trend_display()
+	elif tab_index == 4 and is_inside_tree():
+		_get_tabs()._refresh_price_trend_display()
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_pressed() -> void:

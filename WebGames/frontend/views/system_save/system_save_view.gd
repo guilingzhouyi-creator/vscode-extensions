@@ -140,14 +140,11 @@ func _ready() -> void:
 	# 2. 初始化存档槽位
 	_init_save_slots()
 
-	# 3. 初始化确定性回放
-	_init_replay()
-
-	# 4. 初始化 GM 沙盒
-	_init_gm_sandbox()
-
-	# 5. 初始化 CDK 兑换
-	_init_cdkey()
+	# 3. 初始化确定性回放、GM 沙盒、CDK 兑换
+	var tabs: Variant = _get_tabs()
+	tabs.init_replay()
+	tabs.refresh_gm_permission()
+	tabs.init_cdkey()
 
 	# 6. 初始化静态文案（i18n 注入）
 	_init_static_text()
@@ -207,17 +204,11 @@ func _init_static_text() -> void:
 # Tab 1: 存档槽位
 # ==============================================================================
 
-## 初始化存档槽位：Mock 模式预设 6 槽示例数据，实网模式构建空槽等待真实存档读取
+## 初始化存档槽位：从 snapshot_data 读取或构建 6 个标准空槽
 func _init_save_slots() -> void:
-	if ServiceLocator.get_mode() == "mock":
-		save_slots = [
-			{"slot_id": "SLOT_01", "char_name_key": "ui.fe16.mock.char.artoria", "level": 45, "playtime_sec": 86400, "save_date": "2026-08-31 23:15", "empty": false},
-			{"slot_id": "SLOT_02", "char_name_key": "ui.fe16.mock.char.meriel", "level": 32, "playtime_sec": 43200, "save_date": "2026-08-30 18:42", "empty": false},
-			{"slot_id": "SLOT_03", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-			{"slot_id": "SLOT_04", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-			{"slot_id": "SLOT_05", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-			{"slot_id": "SLOT_06", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-		]
+	var save_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("system_save")
+	if not save_snapshot.is_empty():
+		apply_snapshot(save_snapshot)
 	else:
 		save_slots = []
 		for slot_number in range(1, 7):
@@ -243,36 +234,6 @@ func _refresh_save_slot_list() -> void:
 # ==============================================================================
 # Tab 1~3 委托给 SystemSaveTabs
 # ==============================================================================
-
-func _init_replay() -> void:
-	_get_tabs().init_replay()
-
-func _refresh_replay_list() -> void:
-	_get_tabs().refresh_replay_list()
-
-func _refresh_replay_detail() -> void:
-	_get_tabs().refresh_replay_detail()
-
-func _refresh_replay_progress() -> void:
-	_get_tabs().refresh_replay_progress()
-
-func _init_gm_sandbox() -> void:
-	_get_tabs().init_gm_sandbox()
-
-func _refresh_gm_permission() -> void:
-	_get_tabs().refresh_gm_permission()
-
-func _append_gm_output(text: String) -> void:
-	_get_tabs().append_gm_output(text)
-
-func _execute_gm_command(command: String) -> void:
-	_get_tabs().execute_gm_command(command)
-
-func _init_cdkey() -> void:
-	_get_tabs().init_cdkey()
-
-func _refresh_cdkey_history() -> void:
-	_get_tabs().refresh_cdkey_history()
 
 # ==============================================================================
 # 信号绑定
@@ -377,14 +338,13 @@ func _on_cloud_sync_pressed() -> void:
 # ==============================================================================
 
 ## 外部接口：注入存档槽位快照（经统一快照入口更新视图）
-func set_save_slots_snapshot(slot_entries: Array) -> void:
-	apply_snapshot({"save_slots": slot_entries})
-
 ## 统一快照渲染映射：存档槽位 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("save_slots"):
 		save_slots = FrontendSnapshot.read_array(snapshot, "save_slots")
 		_refresh_save_slot_list()
+	if snapshot.has("cdkey_history"):
+		cdkey_history = FrontendSnapshot.read_array(snapshot, "cdkey_history")
 
 ## 外部接口：按 slot_id 选中槽位并刷新详情（未命中返回失败）
 func select_slot(slot_id: String) -> Dictionary:
