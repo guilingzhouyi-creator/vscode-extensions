@@ -19,6 +19,11 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const {
+  buildSingleStepFailureEnvelope,
+  writeSingleStepFailureEnvelope,
+  runEnvelopeCli,
+} = require('./lib/gate-envelope-cli');
 
 const PROTOCOL_VERSION = '1.0.0';
 const AUDIT_FAILURE_SNAPSHOT_NAME = 'audit-failure-latest.json';
@@ -333,6 +338,8 @@ module.exports = {
   buildFailureLogHeader,
   buildFailureEnvelope,
   writeDiagnosticLogFile,
+  buildSingleStepFailureEnvelope,
+  writeSingleStepFailureEnvelope,
 };
 
 if (require.main === module) {
@@ -348,5 +355,14 @@ if (require.main === module) {
     const rawPath = args[3] || '';
     const ok = writeDiagnosticLogFile(dest, headerParams, rawPath);
     process.exit(ok ? 0 : 1);
+  }
+  if (args[0] === '--write-envelope') {
+    try {
+      runEnvelopeCli(args.slice(1));
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`✖ [Gate-Envelope] ${err.message}\n`);
+      process.exit(1);
+    }
   }
 }

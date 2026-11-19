@@ -18,77 +18,92 @@
         {
           "id": "STAGED-HYGIENE-01",
           "title": "暂存区流式物理卫生与安全审查",
-          "ruleId": "HYG-EMP-001"
+          "ruleId": "HYG-EMP-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "RULE-REGISTRY-02",
           "title": "单源规则注册表元数据一致性",
-          "ruleId": "RCFG-RULE-DRIFT"
+          "ruleId": "RCFG-RULE-DRIFT",
+          "timeoutSeconds": 30
         },
         {
           "id": "SKILLS-SPEC-03",
           "title": "技能集规范与插件同构校验",
-          "ruleId": "GUARD-SSOT-001"
+          "ruleId": "GUARD-SSOT-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "EXTENSION-COMPILE-04",
           "title": "workspace-timing 增量编译",
-          "ruleId": "L0-COMPILE"
+          "ruleId": "L0-COMPILE",
+          "timeoutSeconds": 120
         },
         {
           "id": "EXTENSION-TESTS-05",
           "title": "workspace-timing 增量快速单测",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 120
         },
         {
           "id": "EXTENSION-DOCS-06",
           "title": "workspace-timing 文档布局与变更日志真实性",
-          "ruleId": "L3-DOC-LAYOUT"
+          "ruleId": "L3-DOC-LAYOUT",
+          "timeoutSeconds": 30
         },
         {
           "id": "ENGINE-COMPILE-07",
           "title": "auto-refactor 增量编译",
-          "ruleId": "L0-COMPILE"
+          "ruleId": "L0-COMPILE",
+          "timeoutSeconds": 120
         },
         {
           "id": "ENGINE-TESTS-08",
           "title": "auto-refactor 增量影响单元测试",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 180
         },
         {
           "id": "DOMAIN-CONFIG-09",
           "title": "WebGames 配置架构审查",
-          "ruleId": "ADV-CFG-001"
+          "ruleId": "ADV-CFG-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "RUST-COMPILE-10",
           "title": "fractal-git 增量编译与语法校验",
-          "ruleId": "L0-COMPILE"
+          "ruleId": "L0-COMPILE",
+          "timeoutSeconds": 180
         },
         {
           "id": "STAGED-SLICE-11",
           "title": "暂存区 AST 切片复杂度审查",
-          "ruleId": "GUARD-AST-001"
+          "ruleId": "GUARD-AST-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "STAGED-DENSITY-12",
           "title": "暂存区五维流形代码密度与接线载荷审查",
-          "ruleId": "VOL-DIL-001"
+          "ruleId": "VOL-DIL-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "STAGED-VOLUME-13",
           "title": "暂存区双轨体积与动态包络审查",
-          "ruleId": "VOL-ELOC-001"
+          "ruleId": "VOL-ELOC-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "STAGED-DIFF-14",
           "title": "暂存区五维有效代码微分边界与准入周转审查",
-          "ruleId": "FGT-GAT-001"
+          "ruleId": "FGT-GAT-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "COMMIT-MSG-COVERAGE-15",
           "title": "提交信息规则覆盖清单双向闭包",
-          "ruleId": "FGT-MSG-002"
+          "ruleId": "FGT-MSG-002",
+          "timeoutSeconds": 30
         }
       ]
     },
@@ -161,227 +176,272 @@
         {
           "id": "WORKSPACE-PHYSICAL-01",
           "title": "物理卫生八维全域巡检",
-          "ruleId": "HYG-EMP-001"
+          "ruleId": "HYG-EMP-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "WORKSPACE-GITIGNORE-02",
           "title": ".gitignore 治理",
-          "ruleId": "GUARD-HYG-001"
+          "ruleId": "GUARD-HYG-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "WORKSPACE-DENSITY-03",
           "title": "五维流形代码密度与相空间包络审查",
-          "ruleId": "VOL-DIL-001"
+          "ruleId": "VOL-DIL-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "RULE-CATALOG-04",
           "title": "单源规则目录同步",
-          "ruleId": "RCFG-RULE-DRIFT"
+          "ruleId": "RCFG-RULE-DRIFT",
+          "timeoutSeconds": 30
         },
         {
           "id": "RULE-CLOSURE-05",
           "title": "规则标识引用闭包",
-          "ruleId": "RCFG-RULE-DRIFT"
+          "ruleId": "RCFG-RULE-DRIFT",
+          "timeoutSeconds": 30
         },
         {
           "id": "DOCS-CONSISTENCY-06",
           "title": "文档计数与脚本引用一致性",
-          "ruleId": "RCFG-RULE-DRIFT"
+          "ruleId": "RCFG-RULE-DRIFT",
+          "timeoutSeconds": 30
         },
         {
           "id": "RULE-REACHABILITY-07",
           "title": "规则可达性",
-          "ruleId": "RCFG-RULE-DRIFT"
+          "ruleId": "RCFG-RULE-DRIFT",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-RUST-08",
           "title": "auto-refactor Rust 引擎编译",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-BUILD-09",
           "title": "auto-refactor 构建",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 90
         },
         {
           "id": "ENGINE-FACADE-10",
           "title": "auto-refactor 门面实质承载",
-          "ruleId": "ARCH-FAC-001"
+          "ruleId": "ARCH-FAC-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-SELF-11",
           "title": "auto-refactor 引擎自审",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-TESTS-12",
           "title": "auto-refactor 全量回归套件",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 180
         },
         {
           "id": "ENGINE-BASELINE-13",
           "title": "auto-refactor 质量基线",
-          "ruleId": "GUARD-BASE-001"
+          "ruleId": "GUARD-BASE-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "EXTENSION-TESTS-14",
           "title": "workspace-timing 快速单元测试",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "EXTENSION-REVIEW-15",
           "title": "workspace-timing 六层审查门禁",
-          "ruleId": "RCFG-MATRIX"
+          "ruleId": "RCFG-MATRIX",
+          "timeoutSeconds": 60
         },
         {
           "id": "LEDGER-CONSTRAINT-16",
           "title": "长期轨迹账本物理约束",
-          "ruleId": "GOV-TRJ-001"
+          "ruleId": "GOV-TRJ-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "DOMAIN-AUDIT-17",
           "title": "WebGames 全域质量门禁",
-          "ruleId": "ADV-CFG-001"
+          "ruleId": "ADV-CFG-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "DOMAIN-MERMAID-18",
           "title": "WebGames 文档 Mermaid 真解析",
-          "ruleId": "ADV-CFG-001"
+          "ruleId": "ADV-CFG-001",
+          "timeoutSeconds": 120
         },
         {
           "id": "RUST-TAXIS-19",
           "title": "fractal-git 内核子系统回归套件",
-          "ruleId": "GUARD-SYS-001"
+          "ruleId": "GUARD-SYS-001",
+          "timeoutSeconds": 300
         },
         {
           "id": "COMMIT-CONTRACT-20",
           "title": "提交信息词法与债务走廊契约自测",
-          "ruleId": "CMG-STY-001"
+          "ruleId": "CMG-STY-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "COMMIT-HISTORY-21",
           "title": "待推送提交历史风格与禁词审查",
-          "ruleId": "CMG-STY-001"
+          "ruleId": "CMG-STY-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "CHANGE-ENTROPY-22",
           "title": "推送集变更熵与跨域扩散审查",
-          "ruleId": "GUARD-ENT-001"
+          "ruleId": "GUARD-ENT-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "FEEDBACK-VOCABULARY-23",
           "title": "反馈词表语义化与四态状态词闭包",
-          "ruleId": "GUARD-FBK-001"
+          "ruleId": "GUARD-FBK-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "GATE-ORDERING-24",
           "ruleId": "GUARD-ORD-001",
-          "title": "门禁助手定义先于调用与判定词表闭包"
+          "title": "门禁助手定义先于调用与判定词表闭包",
+          "timeoutSeconds": 30
         },
         {
           "id": "GATE-PROOF-25",
           "ruleId": "GUARD-ORD-001",
-          "title": "门禁守卫检出能力自证"
+          "title": "门禁守卫检出能力自证",
+          "timeoutSeconds": 60
         },
         {
           "id": "GATE-COVERAGE-26",
           "ruleId": "GUARD-STEP-001",
-          "title": "步骤判定覆盖与横幅唯一性"
+          "title": "步骤判定覆盖与横幅唯一性",
+          "timeoutSeconds": 30
         },
         {
           "id": "GATE-COUNT-27",
           "ruleId": "GUARD-COUNT-001",
-          "title": "面向操作者的规模计数真实性"
+          "title": "面向操作者的规模计数真实性",
+          "timeoutSeconds": 30
         },
         {
           "id": "GATE-CHAIN-28",
           "ruleId": "GUARD-CHAIN-001",
-          "title": "PowerShell 块链分支合法性"
+          "title": "PowerShell 块链分支合法性",
+          "timeoutSeconds": 30
         },
         {
           "id": "DOC-METRICS-29",
           "ruleId": "GUARD-DOC-001",
-          "title": "治理文档规模数字真源渲染"
+          "title": "治理文档规模数字真源渲染",
+          "timeoutSeconds": 30
         },
         {
           "id": "SHELL-PARITY-30",
           "ruleId": "GUARD-SHELL-001",
-          "title": "Linux 命令面与 AGENTS.md 承诺一致性"
+          "title": "Linux 命令面与 AGENTS.md 承诺一致性",
+          "timeoutSeconds": 60
         },
         {
           "id": "SUBAGENT-CATALOG-31",
           "ruleId": "RCFG-RULE-DRIFT",
-          "title": "SubAgent 注册表与专员模板同构性"
+          "title": "SubAgent 注册表与专员模板同构性",
+          "timeoutSeconds": 60
         },
         {
           "id": "DOC-ANCHORS-32",
           "ruleId": "GUARD-DOC-001",
-          "title": "跨文档引用按名解析而非按位置"
+          "title": "跨文档引用按名解析而非按位置",
+          "timeoutSeconds": 60
         },
         {
           "id": "METRIC-COVERAGE-33",
           "ruleId": "GUARD-DOC-001",
-          "title": "文档指标声明集与渲染集相等"
+          "title": "文档指标声明集与渲染集相等",
+          "timeoutSeconds": 60
         },
         {
           "id": "FAMILY-CONTRACT-34",
           "ruleId": "RCFG-RULE-DRIFT",
-          "title": "规则族三源一致与层值合法性"
+          "title": "规则族三源一致与层值合法性",
+          "timeoutSeconds": 60
         },
         {
           "id": "DOC-REACH-35",
           "ruleId": "GUARD-DOC-001",
-          "title": "规范文档具备入链可达性"
+          "title": "规范文档具备入链可达性",
+          "timeoutSeconds": 60
         },
         {
           "id": "COMMIT-HISTORY-BASELINE-36",
           "title": "提交历史冻结清单合规",
-          "ruleId": "GUARD-MSG-002"
+          "ruleId": "GUARD-MSG-002",
+          "timeoutSeconds": 60
         },
         {
           "id": "RULE-SOURCE-37",
           "title": "规则源跨目录严重级一致性",
-          "ruleId": "RCFG-RULE-DRIFT"
+          "ruleId": "RCFG-RULE-DRIFT",
+          "timeoutSeconds": 30
         },
         {
           "id": "DESTRUCTIVE-OPS-38",
           "title": "破坏性删除目标溯源与只读自动变量遮蔽",
-          "ruleId": "GUARD-DESTR-001"
+          "ruleId": "GUARD-DESTR-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "REF-SAFETY-39",
           "title": "推送 ref 删除与非快进安全性",
-          "ruleId": "GUARD-DESTR-001"
+          "ruleId": "GUARD-DESTR-001",
+          "timeoutSeconds": 30
         },
         {
           "id": "RECEIPT-AUDIT-40",
           "title": "逐提交门禁收据审计与绕过留痕",
-          "ruleId": "GUARD-HOOK-001"
+          "ruleId": "GUARD-HOOK-001",
+          "timeoutSeconds": 60
         },
         {
           "id": "CASCADE-COHERENCE-41",
           "ruleId": "RCFG-RULE-DRIFT",
-          "title": "技能注册表、原型、专员模板与 DSH 策略四方闭合"
+          "title": "技能注册表、原型、专员模板与 DSH 策略四方闭合",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-FORMAT-42",
           "ruleId": "HYG-EOL-001",
-          "title": "auto-refactor Prettier 格式校验"
+          "title": "auto-refactor Prettier 格式校验",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-LINT-43",
           "ruleId": "GUARD-SYS-001",
-          "title": "auto-refactor ESLint 结构与契约检查"
+          "title": "auto-refactor ESLint 结构与契约检查",
+          "timeoutSeconds": 120
         },
         {
           "id": "ENGINE-COMMENTS-44",
           "ruleId": "CMT-DOC-001",
-          "title": "auto-refactor 注释密度与六字段头棘轮"
+          "title": "auto-refactor 注释密度与六字段头棘轮",
+          "timeoutSeconds": 60
         },
         {
           "id": "ENGINE-REDUNDANCY-45",
           "ruleId": "HYG-DED-001",
-          "title": "auto-refactor 冗余打桩与空壳门面治理"
+          "title": "auto-refactor 冗余打桩与空壳门面治理",
+          "timeoutSeconds": 60
         }
       ]
     },

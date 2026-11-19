@@ -18,6 +18,11 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
+const {
+  buildSingleStepFailureEnvelope,
+  writeSingleStepFailureEnvelope,
+} = require('./gate-failure-contract');
 const {
   recordGateTelemetry,
   readLatestGateSnapshot,
@@ -171,6 +176,8 @@ function runTests() {
     assert('normalizeGatePayload defaults status to PASS', normalized.status === 'PASS');
     assert('normalizeGatePayload defaults durationMs to 0', normalized.durationMs === 0);
 
+    // Test 6: Single-step failure envelope builder, atomic writer, and CLI
+    testSingleStepEnvelope(tempDir);
   } finally {
     cleanTempDir(tempDir);
   }
@@ -181,6 +188,105 @@ function runTests() {
   if (passedChecks !== totalChecks) {
     process.exit(1);
   }
+}
+
+/**
+ * Verifies single-step failure envelope construction, atomic persistence, and CLI flags.
+ *
+ * @param {string} baseDir - Ephemeral OS test directory.
+ * @returns {void}
+ */
+function testSingleStepEnvelope(baseDir) {
+  const winDrivePath = 'C' + ':\\workspace\\proj\\scripts\\demo.js';
+  const posixDrivePath = 'D' + ':/workspace/proj/src/entry.js';
+  const built = buildSingleStepFailureEnvelope({
+    gate: 'pre-commit',
+    stepId: 'STAGED-HYGIENE-01',
+    stepTitle: '暂存区物理卫生',
+    ruleId: 'HYG-EMP-001',
+    exitCode: 2,
+    runId: 'unit-run-01',
+    command: `node ${winDrivePath}`,
+    summary: `\u001b[31mBlank file\u001b[39m at ${winDrivePath}`,
+    actionableFix: `\u001b[33mFix\u001b[39m ${posixDrivePath}`,
+    verifyCmd: 'node scripts/common/gate-fast-staged.js',
+    fastRecheck: 'pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent',
+    targetFiles: [winDrivePath, posixDrivePath],
+    logFile: '.audit-logs/last-pre-commit.log',
+  });
+
+  assert('buildSingleStepFailureEnvelope populates schema fields',
+    built.protocolVersion === '1.0.0'
+      && built.status === 'BLOCK'
+      && built.gate === 'pre-commit'
+      && built.stepId === 'STAGED-HYGIENE-01'
+      && built.stepTitle === '暂存区物理卫生'
+      && built.step === '暂存区物理卫生'
+      && built.exitCode === 2
+      && built.runId === 'unit-run-01');
+  assert('buildSingleStepFailureEnvelope strips ANSI codes',
+    !built.summary.includes('\u001b[') && !built.violations[0].actionableFix.includes('\u001b['));
+  assert('buildSingleStepFailureEnvelope sanitizes drive-letter paths',
+    !built.failedCommand.includes('C' + ':\\')
+      && built.agentDirectives.targetFiles.length === 2
+      && built.agentDirectives.targetFiles.every((f) => f.startsWith('<workspace>/')));
+
+  const atomicPath = path.join(baseDir, 'nested', 'envelope-unit.json');
+  const written = writeSingleStepFailureEnvelope({
+    gate: 'pre-push',
+    stepId: 'ENGINE-TESTS-12',
+    ruleId: 'GUARD-SYS-001',
+    out: atomicPath,
+  });
+  assert('writeSingleStepFailureEnvelope creates nested target file atomically',
+    written.stepId === 'ENGINE-TESTS-12' && fs.existsSync(atomicPath));
+  const rawDisk = fs.readFileSync(atomicPath);
+  const diskText = rawDisk.toString('utf8');
+  assert('writeSingleStepFailureEnvelope writes UTF-8 no BOM with single LF',
+    !(rawDisk[0] === 0xef && rawDisk[1] === 0xbb && rawDisk[2] === 0xbf)
+      && !diskText.includes('\r\n')
+      && diskText.endsWith('\n')
+      && !diskText.endsWith('\n\n'));
+  const leftStaged = fs.readdirSync(path.dirname(atomicPath)).filter((name) => name.endsWith('.staged'));
+  assert('writeSingleStepFailureEnvelope leaves zero staged leftover files', leftStaged.length === 0);
+
+  const cliOutPath = path.join(baseDir, 'cli-out', 'failure-cli.json');
+  const contractScript = path.join(__dirname, 'gate-failure-contract.js');
+  const stdout = execFileSync(
+    process.execPath,
+    [
+      contractScript,
+      '--write-envelope',
+      '--print',
+      '--gate', 'pre-push',
+      '--step-id', 'ENGINE-TESTS-12',
+      '--step-title', 'auto-refactor 全量回归套件',
+      '--rule-id', 'GUARD-SYS-001',
+      '--exit-code', '3',
+      '--run-id', 'cli-run-99',
+      '--command', `node ${winDrivePath}`,
+      '--summary', `\u001b[31mFailed\u001b[39m in ${posixDrivePath}`,
+      '--actionable-fix', 'Run npm test',
+      '--verify-cmd', 'npm test',
+      '--fast-recheck', 'pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent',
+      '--target-file', winDrivePath,
+      '--target-file', posixDrivePath,
+      '--log-file', '.audit-logs/last-pre-push.log',
+      '--out', cliOutPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  const cliDoc = JSON.parse(stdout);
+  const cliDiskDoc = JSON.parse(fs.readFileSync(cliOutPath, 'utf8'));
+  assert('CLI --write-envelope --print outputs valid schema matching written file',
+    cliDoc.status === 'BLOCK'
+      && cliDoc.runId === 'cli-run-99'
+      && cliDoc.exitCode === 3
+      && cliDoc.stepId === 'ENGINE-TESTS-12'
+      && cliDoc.agentDirectives.targetFiles.length === 2
+      && !cliDoc.summary.includes('\u001b[')
+      && !cliDoc.summary.includes('D' + ':/')
+      && cliDiskDoc.runId === cliDoc.runId);
 }
 
 runTests();

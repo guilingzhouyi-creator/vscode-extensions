@@ -74,6 +74,7 @@ function getEntry(entryId) {
     ordinal: offset + 1,
     title: step.title,
     ruleId: step.ruleId,
+    timeoutSeconds: step.timeoutSeconds ?? null,
   }));
   return { id: entryId, title: entry.title, scripts: entry.scripts || {}, steps };
 }
@@ -108,56 +109,96 @@ function collectRuleDefects(registeredIds) {
 }
 
 /**
+ * Validates optional step timeoutSeconds metadata.
+ *
+ * @param {object} step - Raw step object from registry JSON.
+ * @returns {boolean} True when timeoutSeconds is omitted or a positive integer.
+ */
+function validateStepTimeout(step) {
+  if (!step || step.timeoutSeconds === undefined) return true;
+  return Number.isInteger(step.timeoutSeconds) && step.timeoutSeconds > 0;
+}
+
+/**
+ * Validates all steps inside a single registry entry.
+ *
+ * @param {string} entryId - Entry point identifier.
+ * @param {Array<object>} rawSteps - Raw step objects declared by the entry.
+ * @param {Set<string>} seen - Global step id uniqueness tracker.
+ * @param {Set<string>} catalogIds - Registered rule identifiers.
+ * @param {string[]} errors - Mutable audit error collector.
+ * @returns {void}
+ */
+function auditEntrySteps(entryId, rawSteps, seen, catalogIds, errors) {
+  rawSteps.forEach((step, offset) => {
+    const ordinal = offset + 1;
+    if (seen.has(step.id)) errors.push(`${entryId}/${step.id}: step id duplicated across entries`);
+    seen.add(step.id);
+    if (!STEP_ID_PATTERN.test(step.id)) {
+      errors.push(`${entryId}/${step.id}: id must end with a two-digit ordinal`);
+      return;
+    }
+    const declared = Number(step.id.slice(-2));
+    if (declared !== ordinal) {
+      errors.push(`${entryId}/${step.id}: id suffix ${declared} disagrees with position ${ordinal}`);
+    }
+    if (!step.title || !step.title.trim()) errors.push(`${entryId}/${step.id}: title is empty`);
+    if (!catalogIds.has(step.ruleId)) {
+      errors.push(`${entryId}/${step.id}: rule '${step.ruleId}' is not registered in rule-catalog.json`);
+    }
+    if (!validateStepTimeout(step)) {
+      errors.push(`${entryId}/${step.id}: timeoutSeconds must be a positive integer`);
+    }
+  });
+}
+
+/**
+ * Audits a parsed registry document against a catalog rule id set.
+ *
+ * @param {object} doc - Parsed registry document.
+ * @param {Set<string>} catalogIds - Registered rule identifiers.
+ * @returns {{ valid: boolean, errors: string[] }} Audit result.
+ */
+function auditRegistryDoc(doc, catalogIds) {
+  const errors = [];
+  const seen = new Set();
+  const entries = (doc && doc.entries) || {};
+  for (const [entryId, entry] of Object.entries(entries)) {
+    const rawSteps = (entry && entry.steps) || [];
+    if (rawSteps.length === 0) errors.push(`${entryId}: entry declares no steps`);
+    auditEntrySteps(entryId, rawSteps, seen, catalogIds, errors);
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/**
  * Audits registry integrity without throwing (GUARD-STEP-001).
  *
  * Covers the invariants a human cannot eyeball: unique step ids across all entries, ordinals
- * that match the identifier suffix, canonical identifier shape, and rule attributions that
- * resolve against the SSOT catalog.
+ * that match the identifier suffix, canonical identifier shape, optional timeout bounds,
+ * and rule attributions that resolve against the SSOT catalog.
  *
  * @returns {{ valid: boolean, errors: string[] }} Audit result.
  */
 function auditRegistry() {
-  const errors = [];
-  const seen = new Set();
   let catalogIds;
   try {
     catalogIds = new Set(JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8')).rules.map((rule) => rule.id));
   } catch (err) {
     return { valid: false, errors: [`Rule catalog unreadable: ${err.message}`] };
   }
-
-  for (const entryId of listEntryIds()) {
-    const entry = getEntry(entryId);
-    if (entry.steps.length === 0) errors.push(`${entryId}: entry declares no steps`);
-    for (const step of entry.steps) {
-      if (seen.has(step.id)) errors.push(`${entryId}/${step.id}: step id duplicated across entries`);
-      seen.add(step.id);
-      if (!STEP_ID_PATTERN.test(step.id)) {
-        errors.push(`${entryId}/${step.id}: id must end with a two-digit ordinal`);
-        continue;
-      }
-      const declared = Number(step.id.slice(-2));
-      if (declared !== step.ordinal) {
-        errors.push(`${entryId}/${step.id}: id suffix ${declared} disagrees with position ${step.ordinal}`);
-      }
-      if (!step.title || !step.title.trim()) errors.push(`${entryId}/${step.id}: title is empty`);
-      if (!catalogIds.has(step.ruleId)) {
-        errors.push(`${entryId}/${step.id}: rule '${step.ruleId}' is not registered in rule-catalog.json`);
-      }
-    }
-  }
-  return { valid: errors.length === 0, errors };
+  return auditRegistryDoc(loadRegistry(), catalogIds);
 }
 
 /**
  * Renders one entry as tab-separated rows for shell consumers.
  *
  * @param {string} entryId - Entry point id.
- * @returns {string} One line per step: `ordinal<TAB>id<TAB>ruleId<TAB>title`.
+ * @returns {string} One line per step: `ordinal<TAB>id<TAB>ruleId<TAB>title<TAB>timeoutSeconds`.
  */
 function toTsv(entryId) {
   return getEntry(entryId)
-    .steps.map((step) => [step.ordinal, step.id, step.ruleId, step.title].join(TSV_SEPARATOR))
+    .steps.map((step) => [step.ordinal, step.id, step.ruleId, step.title, step.timeoutSeconds ?? ''].join(TSV_SEPARATOR))
     .join('\n');
 }
 
@@ -233,6 +274,8 @@ module.exports = Object.freeze({
   listEntryIds,
   getEntry,
   getStep,
+  validateStepTimeout,
+  auditRegistryDoc,
   auditRegistry,
   collectRuleDefects,
   toTsv,
