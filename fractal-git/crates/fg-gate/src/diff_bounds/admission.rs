@@ -20,10 +20,10 @@ pub const STANDARD_DEVIATION_DISCOUNT_FACTOR: f64 = 0.5;
 /// Maximum cyclomatic complexity noise index (CC / ELOC) before full damping applies.
 pub const MAX_NOISE_CEILING: f64 = 4.0;
 
-/// Historical trajectory outcome paired with measured net 5D ELOC semantic turnover.
+/// Historical trajectory outcome paired with measured net weighted ELOC semantic turnover.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AdmissionSample {
-    /// Net 5D semantic turnover recorded for the historical commit/run.
+    /// Net weighted semantic turnover recorded for the historical commit/run.
     pub turnover: f64,
     /// Whether the trajectory sample satisfied gate admission.
     pub passed: bool,
@@ -118,7 +118,7 @@ pub fn calculate_empirical_admission_threshold(recent_turnovers: &[f64]) -> f64 
 pub struct AdmissionViolation {
     /// Governance rule identifier triggering the block.
     pub rule_id: &'static str,
-    /// Measured batch net 5D ELOC turnover.
+    /// Measured batch net weighted ELOC turnover.
     pub actual_turnover: f64,
     /// Required empirical admission turnover floor.
     pub required_threshold: f64,
@@ -151,7 +151,7 @@ pub fn verify_admission_turnover_samples(
             turnover: format!("{:.1}", batch_turnover),
             threshold: format!("{:.1}", required_threshold),
             message: format!(
-                "Commit batch net 5D ELOC turnover ({:.1}) is below empirical admission threshold ({:.1}). Substantive technical turnover required.",
+                "Commit batch net weighted ELOC turnover ({:.1}) is below empirical admission threshold ({:.1}). Substantive technical turnover required.",
                 batch_turnover, required_threshold
             ),
         });
