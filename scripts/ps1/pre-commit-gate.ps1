@@ -404,125 +404,39 @@ $okCov = Invoke-PreCommitCheck -StepId "COMMIT-MSG-COVERAGE-15" -RuleId "FGT-MSG
 Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status $(if ($okCov) { "PASS" } else { "BLOCK" }) -Detail $(if ($okCov) { "覆盖清单双向闭包成立" } else { "提交信息规则覆盖清单双向闭包不成立" })
 
 # --- 项目增量编译与语法验证 (精准增量触发) ---
-# 横幅由各步骤自身的触发分支渲染：入口处再打印一次会让同一标识出现两条横幅。
 $hasWtCompile = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(src/.+\.ts|tsconfig.*\.json)" }
 $hasArCompile = $stagedFiles | Where-Object { $_ -match "^auto-refactor/(src/.+\.ts|tsconfig.*\.json|crates/.+\.(rs|toml)|crates/Cargo\.(toml|lock))" }
-# Crate sources are invisible to `tsc`: a staged `.rs` file can break `cargo check` while the
-# TypeScript build stays green, so they need their own trigger and their own step branch.
 $hasArCrates = @($stagedFiles | Where-Object { $_ -match "^auto-refactor/crates/.+(\.rs|\.toml)$" })
 $hasWgAudit = $stagedFiles | Where-Object { $_ -match "^WebGames/(config/|scripts/py/audit_config\.py)" }
 $hasFgCompile = $stagedFiles | Where-Object { $_ -match "^fractal-git/(crates/.+\.rs|src/.+\.rs|Cargo\.(toml|lock))" }
 
 if ($hasWtCompile) {
-    if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-COMPILE-04" }
-    if ($Agent) {
-        $childRes = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "compile") -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -TimeoutSeconds 120
-        $out = $childRes.Output
-        if ($childRes.ExitCode -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "EXTENSION-COMPILE-04" `
-                -RuleId "L0-COMPILE" `
-                -Summary "TypeScript compilation failed in workspace-timing." `
-                -ActionableFix "Run 'npm run compile' in workspace-timing and resolve compiler errors." `
-                -VerifyCmd "npm --prefix workspace-timing run compile" `
-                -TargetFiles @("workspace-timing/src") `
-                -Details ($out -join "`n")
-            Write-Output $json
-            exit 1
-        }
-    } else {
-        $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "compile" -WorkingDirectory (Join-Path $repoRoot "workspace-timing")
-        if ($process.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "EXTENSION-COMPILE-04" -Status "BLOCK" -Detail "workspace-timing 编译失败"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "EXTENSION-COMPILE-04" -Status "PASS" -Detail "workspace-timing 增量编译通过"
-        }
-    }
+    $wtDir = Join-Path $repoRoot "workspace-timing"
+    Write-StepBanner -StepId "EXTENSION-COMPILE-04"
+    $okWt = Invoke-PreCommitCheck -StepId "EXTENSION-COMPILE-04" -RuleId "L0-COMPILE" -FilePath $npmCmd -ArgumentList @("run", "compile") -WorkingDirectory $wtDir -Summary "TypeScript compilation failed in workspace-timing." -ActionableFix "Run 'npm run compile' in workspace-timing and resolve compiler errors." -VerifyCmd "npm --prefix workspace-timing run compile" -TargetFiles @("workspace-timing/src") -DefaultTimeout 120
+    Write-StepVerdict -StepId "EXTENSION-COMPILE-04" -Status $(if ($okWt) { "PASS" } else { "BLOCK" }) -Detail $(if ($okWt) { "workspace-timing 增量编译通过" } else { "workspace-timing 编译失败" })
 
     if (-not $failed) {
-        if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-TESTS-05" }
-        if ($Agent) {
-            $childFast = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -TimeoutSeconds 120
-            $outFast = $childFast.Output
-            if ($childFast.ExitCode -ne 0) {
-                $json = Write-PreCommitFailure `
-                    -StepId "EXTENSION-TESTS-05" `
-                    -RuleId "GUARD-SYS-001" `
-                    -Summary "Unit tests failed in workspace-timing." `
-                    -ActionableFix "Run 'npm run test:fast' in workspace-timing and resolve failing tests." `
-                    -VerifyCmd "npm --prefix workspace-timing run test:fast" `
-                    -TargetFiles @("workspace-timing/src") `
-                    -Details ($outFast -join "`n")
-                Write-Output $json
-                exit 1
-            }
-        } else {
-            $pFast = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory (Join-Path $repoRoot "workspace-timing")
-            if ($pFast.ExitCode -ne 0) {
-                Write-StepVerdict -StepId "EXTENSION-TESTS-05" -Status "BLOCK" -Detail "workspace-timing 快速单测未通过"
-                $failed = $true
-            } else {
-                Write-StepVerdict -StepId "EXTENSION-TESTS-05" -Status "PASS" -Detail "快速单元测试通过"
-            }
-        }
+        Write-StepBanner -StepId "EXTENSION-TESTS-05"
+        $okWtTest = Invoke-PreCommitCheck -StepId "EXTENSION-TESTS-05" -RuleId "GUARD-SYS-001" -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $wtDir -Summary "Unit tests failed in workspace-timing." -ActionableFix "Run 'npm run test:fast' in workspace-timing and resolve failing tests." -VerifyCmd "npm --prefix workspace-timing run test:fast" -TargetFiles @("workspace-timing/src") -DefaultTimeout 120
+        Write-StepVerdict -StepId "EXTENSION-TESTS-05" -Status $(if ($okWtTest) { "PASS" } else { "BLOCK" }) -Detail $(if ($okWtTest) { "快速单元测试通过" } else { "workspace-timing 快速单测未通过" })
     }
-} elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^workspace-timing/" })) {
+} elseif (-not $isMachineMode -and ($stagedFiles | Where-Object { $_ -match "^workspace-timing/" })) {
     Write-StepVerdict -StepId "EXTENSION-COMPILE-04" -Status "SKIP" -Detail "仅文档或配置变更"
 }
 
-$hasWtDoc = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)" }
-if ($hasWtDoc) {
-    if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-DOCS-06" }
-    if ($Agent) {
-        $wtLayoutDir = Join-Path $repoRoot "workspace-timing"
-        $out = @()
-        $layoutExit = 0
-        if (-not (Test-Path (Join-Path $wtLayoutDir "scripts/dist/audit/text-layout.js"))) {
-            $buildRes = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "scripts:build") -WorkingDirectory $wtLayoutDir -TimeoutSeconds 120
-            $out += $buildRes.Output
-            $layoutExit = $buildRes.ExitCode
-        }
-        if ($layoutExit -eq 0) {
-            $runRes = Invoke-ChildProcess -FilePath $nodeCmd -ArgumentList @("scripts/dist/audit/text-layout.js") -WorkingDirectory $wtLayoutDir -TimeoutSeconds 60
-            $out += $runRes.Output
-            $layoutExit = $runRes.ExitCode
-        }
-        if ($layoutExit -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "EXTENSION-DOCS-06" `
-                -RuleId "L3-DOC-LAYOUT" `
-                -Summary "workspace-timing text layout or changelog authenticity check failed." `
-                -ActionableFix "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." `
-                -VerifyCmd "node workspace-timing/scripts/dist/audit/text-layout.js" `
-                -TargetFiles @("workspace-timing/CHANGELOG.md") `
-                -Details ($out -join "`n")
-            Write-Output $json
-            exit 1
-        }
-    } else {
-        $wtLayoutDir = Join-Path $repoRoot "workspace-timing"
-        $wtLayoutArtifact = Join-Path $wtLayoutDir "scripts/dist/audit/text-layout.js"
-        $wtLayoutReady = $true
-        if (-not (Test-Path $wtLayoutArtifact)) {
-            Write-GateHost "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..." -ForegroundColor Cyan
-            $buildProc = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "scripts:build" -WorkingDirectory $wtLayoutDir
-            if ($buildProc.ExitCode -ne 0) {
-                Write-StepVerdict -StepId "EXTENSION-DOCS-06" -Status "BLOCK" -Detail "审查脚本构建失败"
-                $failed = $true
-                $wtLayoutReady = $false
-            }
-        }
-        if ($wtLayoutReady) {
-            $docProc = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/dist/audit/text-layout.js" -WorkingDirectory $wtLayoutDir
-            if ($docProc.ExitCode -ne 0) {
-                Write-StepVerdict -StepId "EXTENSION-DOCS-06" -Status "BLOCK" -Detail "文档文本布局或变更日志真实性核验未通过"
-                $failed = $true
-            } else {
-                Write-StepVerdict -StepId "EXTENSION-DOCS-06" -Status "PASS" -Detail "文档布局与变更日志真实性合规"
-            }
-        }
+if ($stagedFiles | Where-Object { $_ -match "^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)" }) {
+    $wtLayoutDir = Join-Path $repoRoot "workspace-timing"
+    Write-StepBanner -StepId "EXTENSION-DOCS-06"
+    $okDoc = $true
+    if (-not (Test-Path (Join-Path $wtLayoutDir "scripts/dist/audit/text-layout.js"))) {
+        Write-GateHost "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..." -ForegroundColor Cyan
+        $okDoc = Invoke-PreCommitCheck -StepId "EXTENSION-DOCS-06" -RuleId "L3-DOC-LAYOUT" -FilePath $npmCmd -ArgumentList @("run", "scripts:build") -WorkingDirectory $wtLayoutDir -Summary "workspace-timing scripts:build failed; text-layout artifact is unavailable." -ActionableFix "Run 'npm run scripts:build' in workspace-timing and resolve compiler errors." -VerifyCmd "npm --prefix workspace-timing run scripts:build" -TargetFiles @("workspace-timing/scripts/audit/text-layout.ts") -DefaultTimeout 30
     }
+    if ($okDoc) {
+        $okDoc = Invoke-PreCommitCheck -StepId "EXTENSION-DOCS-06" -RuleId "L3-DOC-LAYOUT" -FilePath $nodeCmd -ArgumentList @("scripts/dist/audit/text-layout.js") -WorkingDirectory $wtLayoutDir -Summary "workspace-timing text layout or changelog authenticity check failed." -ActionableFix "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." -VerifyCmd "node workspace-timing/scripts/dist/audit/text-layout.js" -TargetFiles @("workspace-timing/CHANGELOG.md") -DefaultTimeout 30
+    }
+    Write-StepVerdict -StepId "EXTENSION-DOCS-06" -Status $(if ($okDoc) { "PASS" } else { "BLOCK" }) -Detail $(if ($okDoc) { "文档布局与变更日志真实性合规" } else { "文档文本布局或变更日志真实性核验未通过" })
 }
 
 if ($hasArCompile) {
