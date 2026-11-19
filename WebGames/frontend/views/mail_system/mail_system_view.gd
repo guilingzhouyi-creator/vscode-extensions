@@ -69,9 +69,6 @@ var _tabs: Variant = null
 # ==============================================================================
 
 ## 兼容快照注入入口：更新收件箱邮件集合。
-func set_mailbox_snapshot(mail_entries: Array) -> void:
-	apply_snapshot({"mails": mail_entries})
-
 ## 统一快照渲染映射：容量/邮件列表 → 视图状态，随后切就绪态
 func _render_from_snapshot() -> void:
 	if snapshot.has("capacity"):
@@ -107,7 +104,7 @@ func _ready() -> void:
 	if theme_manager.theme != null:
 		theme = theme_manager.theme
 
-	_load_mock_data()
+	_load_domain_snapshot()
 	_tabs.setup_category_tabs()
 
 	_init_mail_list()
@@ -118,8 +115,9 @@ func _ready() -> void:
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
 
-func _load_mock_data() -> void:
-	var mail_list: Array = _tabs.mock_mails if (_tabs != null and ServiceLocator.get_mode() == "mock") else []
+func _load_domain_snapshot() -> void:
+	var mail_snapshot: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("mail")
+	var mail_list: Array = mail_snapshot.get("mails", []) if mail_snapshot.get("mails") is Array else []
 	apply_snapshot({
 		"capacity": ServiceLocator.get_instance().mail().get_max_capacity(),
 		"mails": mail_list,

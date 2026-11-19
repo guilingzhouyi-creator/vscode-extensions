@@ -83,26 +83,7 @@ var _library_categories: Array = [
 ]
 
 # --- 魔典数据（12，每分类2本） ---
-var _grimoires: Array = [
-	# 攻击招式 (0)
-	{"id": "GRIM_001", "key": "g001", "rarity": RARITY_COMMON, "category": 0, "learned": true},
-	{"id": "GRIM_002", "key": "g002", "rarity": "rare", "category": 0, "learned": false},
-	# 防御招式 (1)
-	{"id": "GRIM_003", "key": "g003", "rarity": RARITY_COMMON, "category": 1, "learned": true},
-	{"id": "GRIM_004", "key": "g004", "rarity": "rare", "category": 1, "learned": false},
-	# 辅助招式 (2)
-	{"id": "GRIM_005", "key": "g005", "rarity": RARITY_COMMON, "category": 2, "learned": true},
-	{"id": "GRIM_006", "key": "g006", "rarity": RARITY_COMMON, "category": 2, "learned": false},
-	# 控制招式 (3)
-	{"id": "GRIM_007", "key": "g007", "rarity": "rare", "category": 3, "learned": false},
-	{"id": "GRIM_008", "key": "g008", "rarity": RARITY_COMMON, "category": 3, "learned": false},
-	# 位移招式 (4)
-	{"id": "GRIM_009", "key": "g009", "rarity": RARITY_COMMON, "category": 4, "learned": true},
-	{"id": "GRIM_010", "key": "g010", "rarity": RARITY_COMMON, "category": 4, "learned": false},
-	# 被动招式 (5)
-	{"id": "GRIM_011", "key": "g011", "rarity": RARITY_COMMON, "category": 5, "learned": true},
-	{"id": "GRIM_012", "key": "g012", "rarity": "rare", "category": 5, "learned": false},
-]
+var _grimoires: Array = []
 
 # --- AST 节点类型（7） ---
 var _ast_node_types: Array = [
@@ -137,11 +118,10 @@ var _selected_ast_node_index: int = -1
 # ==============================================================================
 
 ## 注入书库快照（经统一快照入口，不触碰节点）
-func set_authored_books_snapshot(books: Array) -> void:
-	apply_snapshot({"authored_books": books})
-
 ## 统一快照渲染映射：已著书籍 → 视图状态
 func _render_from_snapshot() -> void:
+	if snapshot.has("grimoires"):
+		_grimoires = FrontendSnapshot.read_array(snapshot, "grimoires")
 	if snapshot.has("authored_books"):
 		authored_books = FrontendSnapshot.read_array(snapshot, "authored_books")
 
@@ -167,7 +147,8 @@ func _ready() -> void:
 	theme = theme_manager.theme
 
 	# 2. 初始化所有静态文案
-	_init_static_text()
+	var tabs: Variant = _get_tabs()
+	tabs.init_static_text()
 
 	# 3. 设置 Tab 标题
 	KTabBar.init_titles(_main_tab_container, PackedStringArray([
@@ -179,19 +160,18 @@ func _ready() -> void:
 	]))
 
 	# 4. 初始化 Tab 0: LIBRARY 魔典书库
+	var grimoire_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("grimoire")
+	if not grimoire_snapshot.is_empty():
+		apply_snapshot(grimoire_snapshot)
 	_init_library_tab()
 
 	# 5. 初始化 Tab 1: AST_EDITOR AST编辑器
 	_init_ast_tab()
 
-	# 6. 初始化 Tab 2: AUTHORING 著书
-	_init_authoring_tab()
-
-	# 7. 初始化 Tab 3: ROYALTY 版税
-	_init_royalty_tab()
-
-	# 8. 初始化 Tab 4: DECOMPILE 反编译
-	_init_decompile_tab()
+	# 6. 初始化 Tab 2~4: 著书 / 版税 / 反编译
+	tabs.init_authoring_tab()
+	tabs.init_royalty_tab()
+	tabs.init_decompile_tab()
 
 	# 9. 绑定本地 UI 交互反馈信号
 	_connect_signals()
@@ -200,12 +180,8 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 # ==============================================================================
-# 静态文案初始化（非 @onready 节点通过路径访问）
+# 信号绑定
 # ==============================================================================
-
-## 初始化全部静态文案：顶栏/五 Tab 分区标签/按钮（非 @onready 节点按路径访问，i18n 全驱动）
-func _init_static_text() -> void:
-	_get_tabs().init_static_text()
 
 func _connect_signals() -> void:
 	# --- Library ---
@@ -220,16 +196,17 @@ func _connect_signals() -> void:
 	connect_managed(_ast_test_button.pressed, _on_ast_test_pressed)
 
 	# --- Authoring ---
-	connect_managed(_authoring_royalty_mode_option.item_selected, func(_selected_index): _refresh_authoring_estimate())
-	connect_managed(_authoring_submit_button.pressed, _on_auth_submit_pressed)
+	var tabs: Variant = _get_tabs()
+	connect_managed(_authoring_royalty_mode_option.item_selected, func(_selected_index): tabs.refresh_authoring_estimate())
+	connect_managed(_authoring_submit_button.pressed, tabs.on_auth_submit_pressed)
 
 	# --- Royalty ---
-	connect_managed(_royalty_book_list.item_selected, _on_roy_book_selected)
-	connect_managed(_royalty_claim_button.pressed, _on_roy_claim_pressed)
+	connect_managed(_royalty_book_list.item_selected, tabs.on_roy_book_selected)
+	connect_managed(_royalty_claim_button.pressed, tabs.on_roy_claim_pressed)
 
 	# --- Decompile ---
-	connect_managed(_decompile_target_option.item_selected, func(_selected_index): _refresh_decompile_detail())
-	connect_managed(_decompile_confirm_button.pressed, _on_dec_decompile_pressed)
+	connect_managed(_decompile_target_option.item_selected, func(_selected_index): tabs.refresh_decompile_detail())
+	connect_managed(_decompile_confirm_button.pressed, tabs.on_dec_decompile_pressed)
 
 	# --- 返回 ---
 	connect_managed(_back_button.pressed, _on_back_pressed)
@@ -308,7 +285,7 @@ func _on_lib_learn_pressed() -> void:
 	var grimoire: Dictionary = _filtered_grimoires[_selected_grimoire_index]
 	if bool(grimoire.get("learned", false)):
 		return
-	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("LEARN_GRIMOIRE", {"grimoire_id": str(grimoire.get("id", ""))})
+	ServiceLocator.get_instance().grimoire().dispatch_grimoire_action("LEARN_GRIMOIRE", {"book_id": str(grimoire.get("id", ""))})
 	grimoire["learned"] = true
 	_refresh_library_detail()
 	_refresh_grimoire_list()
@@ -371,46 +348,6 @@ func _on_ast_test_pressed() -> void:
 		UIIntermediary.text("ui.fe13.ast.test_toast"),
 		NavTypes.ToastLevel.INFO
 	)
-
-# ==============================================================================
-# Tab 2, 3, 4 委托给 GrimoireAuthoringTabs
-# ==============================================================================
-
-func _init_authoring_tab() -> void:
-	_get_tabs().init_authoring_tab()
-
-func _refresh_authoring_estimate() -> void:
-	_get_tabs().refresh_authoring_estimate()
-
-func _on_auth_submit_pressed() -> void:
-	_get_tabs().on_auth_submit_pressed()
-
-func _init_royalty_tab() -> void:
-	_get_tabs().init_royalty_tab()
-
-func _refresh_royalty_detail() -> void:
-	_get_tabs().refresh_royalty_detail()
-
-func _refresh_royalty_summary() -> void:
-	_get_tabs().refresh_royalty_summary()
-
-func _refresh_royalty_chart() -> void:
-	_get_tabs().refresh_royalty_chart()
-
-func _on_roy_book_selected(book_index: int) -> void:
-	_get_tabs().on_roy_book_selected(book_index)
-
-func _on_roy_claim_pressed() -> void:
-	_get_tabs().on_roy_claim_pressed()
-
-func _init_decompile_tab() -> void:
-	_get_tabs().init_decompile_tab()
-
-func _refresh_decompile_detail() -> void:
-	_get_tabs().refresh_decompile_detail()
-
-func _on_dec_decompile_pressed() -> void:
-	_get_tabs().on_dec_decompile_pressed()
 
 # ==============================================================================
 # 返回

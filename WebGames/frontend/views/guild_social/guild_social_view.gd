@@ -151,15 +151,6 @@ var trade_confirmed: bool = false
 # ==============================================================================
 
 ## 兼容测试快照注入：经统一快照入口更新公会名称、等级、资金、成员与科技列表。
-func set_guild_snapshot(guild_name_text: String, level_value: int, gold_amount: int, member_entries: Array, tech_entries: Array) -> void:
-	apply_snapshot({
-		"guild_name": guild_name_text,
-		"guild_level": level_value,
-		"guild_funds": gold_amount,
-		"members": member_entries,
-		"techs": tech_entries,
-	})
-
 ## 统一快照渲染映射：公会信息/成员/科技树 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("guild_name"):
@@ -192,7 +183,7 @@ func _get_tabs():
 
 func _ready() -> void:
 	_apply_theme()
-	_load_mock_snapshot()
+	_load_domain_snapshot()
 	_init_tab_titles()
 	_init_static_text()
 	_init_guild_info_tab()
@@ -218,29 +209,44 @@ func _apply_theme() -> void:
 # Mock 数据加载（经 domain_boundary 快照服务读取，不接后端）
 # ==============================================================================
 
-## 加载初始预览快照：公会信息/成员/好友/NPC 对话/交易库存/聊天预填
-func _load_mock_snapshot() -> void:
-	if ServiceLocator.get_mode() == "mock":
-		guild_name = "ui.fe09.mock.guild_name"
-		guild_level = 7
-		guild_leader = "ui.fe09.mock.guild_leader"
-		guild_funds = 128500
-		guild_announcement = "ui.fe09.mock.guild_announcement"
-		_guild_members = ServiceLocator.get_instance().guild().generate_roster(15)
-		_get_tabs().init_mock_data()
-	else:
-		guild_name = ""
-		guild_level = 0
-		guild_leader = ""
-		guild_funds = 0
-		guild_announcement = ""
-		_guild_members = []
-		var guild_reply := ServiceLocator.get_instance().guild().dispatch_guild_action("GET_GUILD_STATE", {})
-		var guild_table: Dictionary = guild_reply.get("data", guild_reply) as Dictionary
-		if guild_table.has("guild_name"):
-			guild_name = str(guild_table.get("guild_name", ""))
-		if guild_table.get("members") is Array:
-			_guild_members = (guild_table.get("members") as Array).duplicate(true)
+## 加载初始预览快照：经 domain_boundary 快照服务与公会行动服务统一装配
+func _load_domain_snapshot() -> void:
+	guild_name = ""
+	guild_level = 0
+	guild_leader = ""
+	guild_funds = 0
+	guild_announcement = ""
+	_guild_members = []
+	var guild_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("guild")
+	if not guild_snapshot.is_empty():
+		guild_name = str(guild_snapshot.get("guild_name", guild_name))
+		guild_level = int(guild_snapshot.get("guild_level", guild_level))
+		guild_leader = str(guild_snapshot.get("guild_leader", guild_leader))
+		guild_funds = int(guild_snapshot.get("guild_funds", guild_funds))
+		guild_announcement = str(guild_snapshot.get("guild_announcement", guild_announcement))
+		if guild_snapshot.get("friends") is Array:
+			friends = FrontendSnapshot.read_array(guild_snapshot, "friends")
+		if guild_snapshot.get("npc_dialogs") is Array:
+			npc_dialogs = FrontendSnapshot.read_array(guild_snapshot, "npc_dialogs")
+		trade_partner_name = str(guild_snapshot.get("trade_partner_name", trade_partner_name))
+		if guild_snapshot.get("my_inventory") is Array:
+			my_inventory = FrontendSnapshot.read_array(guild_snapshot, "my_inventory")
+		if guild_snapshot.get("partner_trade_items") is Array:
+			partner_trade_items = FrontendSnapshot.read_array(guild_snapshot, "partner_trade_items")
+		if guild_snapshot.get("chat_messages_by_channel") is Array:
+			var cloned_channels: Array = (guild_snapshot.get("chat_messages_by_channel") as Array).duplicate(true)
+			for channel_index in range(mini(chat_channels.size(), cloned_channels.size())):
+				if cloned_channels[channel_index] is Array:
+					chat_channels[channel_index]["messages"] = cloned_channels[channel_index]
+	var generated_roster := ServiceLocator.get_instance().guild().generate_roster(15)
+	if not generated_roster.is_empty():
+		_guild_members = generated_roster
+	var guild_reply := ServiceLocator.get_instance().guild().dispatch_guild_action("GET_GUILD_STATE", {})
+	var guild_table: Dictionary = guild_reply.get("data", guild_reply) as Dictionary
+	if guild_table.has("guild_name"):
+		guild_name = str(guild_table.get("guild_name", guild_name))
+	if guild_table.get("members") is Array:
+		_guild_members = (guild_table.get("members") as Array).duplicate(true)
 
 # ==============================================================================
 # Tab 标题初始化

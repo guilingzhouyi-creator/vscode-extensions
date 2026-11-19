@@ -71,71 +71,6 @@ func connect_signals() -> void:
 	connect_managed(_view._trade_cancel_button.pressed, _on_trade_cancel_pressed)
 
 # ==============================================================================
-# Mock 数据装配
-# ==============================================================================
-
-## 装配好友、NPC 对话、玩家交易及各聊天频道预设快照数据。
-func init_mock_data() -> void:
-	if _view == null:
-		return
-	_view.friends = [
-		{"name": "ui.fe09.mock.member.grain", "location": "ui.fe09.mock.location.valan", "online": true, "category": FriendCategory.FRIEND, "level": 28},
-		{"name": "ui.fe09.mock.member.silvia", "location": "ui.fe09.mock.location.silver_grove", "online": true, "category": FriendCategory.FRIEND, "level": 25},
-		{"name": "ui.fe09.mock.member.darius", "location": "ui.fe09.mock.location.iron_fortress", "online": false, "category": FriendCategory.FRIEND, "level": 30},
-		{"name": "ui.fe09.mock.member.eleanor", "location": "ui.fe09.mock.location.dragon_peak", "online": true, "category": FriendCategory.FRIEND, "level": 22},
-		{"name": "ui.fe09.mock.member.kyle", "location": "ui.fe09.mock.location.valan", "online": false, "category": FriendCategory.FRIEND, "level": 19},
-		{"name": "ui.fe09.mock.member.lillian", "location": "ui.fe09.mock.location.offline", "online": false, "category": FriendCategory.FRIEND, "level": 27},
-		{"name": "ui.fe09.mock.friend.blackmerchant", "location": "ui.fe09.mock.location.valan", "online": false, "category": FriendCategory.BLACKLIST, "level": 15},
-		{"name": "ui.fe09.mock.friend.scammer", "location": "ui.fe09.mock.location.offline", "online": false, "category": FriendCategory.BLACKLIST, "level": 10},
-		{"name": "ui.fe09.mock.friend.passerby_a", "location": "ui.fe09.mock.location.iron_fortress", "online": true, "category": FriendCategory.STRANGER, "level": 12},
-		{"name": "ui.fe09.mock.friend.passerby_b", "location": "ui.fe09.mock.location.silver_grove", "online": false, "category": FriendCategory.STRANGER, "level": 8},
-	]
-	_view.npc_dialogs = [
-		{"npc_name": "ui.fe09.mock.npc.blacksmith", "npc_title": "ui.fe09.mock.npc_title.blacksmith", "text": "ui.fe09.mock.dialog.blacksmith.text", "options": [ {"text": "ui.fe09.mock.dialog.blacksmith.option_quest", "action": "QUEST"}, {"text": "ui.fe09.mock.dialog.blacksmith.option_shop", "action": "SHOP"}, {"text": "ui.fe09.mock.dialog.blacksmith.option_leave", "action": "LEAVE"}]},
-		{"npc_name": "ui.fe09.mock.npc.guild_steward", "npc_title": "ui.fe09.mock.npc_title.steward", "text": "ui.fe09.mock.dialog.steward.text", "options": [ {"text": "ui.fe09.mock.dialog.steward.option_quest", "action": "QUEST"}, {"text": "ui.fe09.mock.dialog.steward.option_shop", "action": "SHOP"}, {"text": "ui.fe09.mock.dialog.steward.option_leave", "action": "LEAVE"}]},
-		{"npc_name": "ui.fe09.mock.npc.mysterious_traveler", "npc_title": "ui.fe09.mock.npc_title.unknown", "text": "ui.fe09.mock.dialog.traveler.text", "options": [ {"text": "ui.fe09.mock.dialog.traveler.option_quest", "action": "QUEST"}, {"text": "ui.fe09.mock.dialog.traveler.option_shop", "action": "SHOP"}, {"text": "ui.fe09.mock.dialog.traveler.option_leave", "action": "LEAVE"}]},
-	]
-	_view.trade_partner_name = "ui.fe09.mock.trade_partner"
-	_view.my_inventory = [
-		{"name": "ui.fe09.mock.item.mithril_sword", "rarity": "RARE", "qty": 1},
-		{"name": "ui.fe09.mock.item.leather_armor", "rarity": "COMMON", "qty": 1},
-		{"name": "ui.fe09.mock.item.hp_potion", "rarity": "COMMON", "qty": 12},
-		{"name": "ui.fe09.mock.item.mp_potion", "rarity": "COMMON", "qty": 8},
-		{"name": "ui.fe09.mock.item.mithril_ore", "rarity": "UNCOMMON", "qty": 3},
-		{"name": "ui.fe09.mock.item.dragon_scale", "rarity": "EPIC", "qty": 2},
-		{"name": "ui.fe09.mock.item.ancient_scroll", "rarity": "RARE", "qty": 1},
-		{"name": "ui.fe09.mock.item.speed_charm", "rarity": "UNCOMMON", "qty": 5},
-	]
-	_view.partner_trade_items = [
-		{"name": "ui.fe09.mock.item.magic_crystal", "rarity": "RARE", "qty": 10},
-		{"name": "ui.fe09.mock.item.elf_bow", "rarity": "RARE", "qty": 1},
-		{"name": "ui.fe09.mock.item.silver_herb", "rarity": "COMMON", "qty": 20},
-	]
-	_view.chat_channels[0]["messages"] = [
-		{"sender": "ui.fe09.mock.member.meryl", "text": "ui.fe09.chat.mock.guild_msg_1"},
-		{"sender": "ui.fe09.mock.member.grain", "text": "ui.fe09.chat.mock.guild_msg_2"},
-		{"sender": "ui.fe09.mock.member.silvia", "text": "ui.fe09.chat.mock.guild_msg_3"},
-		{"sender": "ui.fe09.mock.member.altria", "text": "ui.fe09.chat.mock.guild_msg_4"},
-	]
-	_view.chat_channels[1]["messages"] = [
-		{"sender": "ui.fe09.mock.member.altria", "text": "ui.fe09.chat.mock.officer_msg_1"},
-		{"sender": "ui.fe09.mock.member.meryl", "text": "ui.fe09.chat.mock.officer_msg_2"},
-	]
-	_view.chat_channels[2]["messages"] = [
-		{"sender": "ui.fe09.mock.friend.passerby_a", "text": "ui.fe09.chat.mock.world_msg_1"},
-		{"sender": "ui.fe09.mock.member.beowulf", "text": "ui.fe09.chat.mock.world_msg_2"},
-		{"sender": "ui.fe09.chat.sender_system", "text": "ui.fe09.chat.mock.world_msg_3"},
-	]
-	_view.chat_channels[3]["messages"] = [
-		{"sender": "ui.fe09.chat.sender_system", "text": "ui.fe09.chat.mock.party_msg_1"},
-		{"sender": "ui.fe09.mock.member.kyle", "text": "ui.fe09.chat.mock.party_msg_2"},
-	]
-	_view.chat_channels[4]["messages"] = [
-		{"sender": "ui.fe09.mock.friend.blackmerchant", "text": "ui.fe09.chat.mock.trade_msg_1"},
-		{"sender": "ui.fe09.mock.member.isabella", "text": "ui.fe09.chat.mock.trade_msg_2"},
-	]
-
-# ==============================================================================
 # Tab 3: 聊天频道 (CHAT_CHANNELS)
 # ==============================================================================
 
@@ -192,7 +127,7 @@ func _send_chat_message() -> void:
 	var text: String = _view._line_chat_input.text.strip_edges()
 	if text.is_empty() or _view.current_channel_index < 0 or _view.current_channel_index >= _view.chat_channels.size():
 		return
-	var sender: String = str(_view.guild_leader) if (ServiceLocator.get_mode() != "mock" and not str(_view.guild_leader).is_empty()) else "ui.fe09.mock.local_player_name"
+	var sender: String = str(_view.guild_leader) if not str(_view.guild_leader).is_empty() else "ui.fe09.mock.local_player_name"
 	ServiceLocator.get_instance().guild().dispatch_guild_action("SEND_CHAT", {"channel_index": _view.current_channel_index, "text": text})
 	var channel: Dictionary = _view.chat_channels[_view.current_channel_index]
 	var message_list: Array = channel["messages"]

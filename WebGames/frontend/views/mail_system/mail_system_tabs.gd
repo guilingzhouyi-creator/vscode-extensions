@@ -24,69 +24,6 @@ var state_panel: KStatePanel = null
 
 var _view: Variant = null
 
-var mock_mails: Array = [
-	{
-		"mail_id": "M_01", "category": "REWARD", "sender_key": "ui.fe08.mock.mail_01_sender", "recipient_key": "ui.fe08.mock.mail_01_recipient",
-		"subject_key": "ui.fe08.mock.mail_01_subject", "body_key": "ui.fe08.mock.mail_01_body",
-		"time_key": "ui.fe08.mock.mail_01_time", "is_read": false, "has_attachment": true, "is_claimed": false,
-		"attachment_keys": ["ui.fe08.mock.mail_01_attach_0", "ui.fe08.mock.mail_01_attach_1"]
-	},
-	{
-		"mail_id": "M_02", "category": "REWARD", "sender_key": "ui.fe08.mock.mail_02_sender", "recipient_key": "ui.fe08.mock.mail_02_recipient",
-		"subject_key": "ui.fe08.mock.mail_02_subject", "body_key": "ui.fe08.mock.mail_02_body",
-		"time_key": "ui.fe08.mock.mail_02_time", "is_read": false, "has_attachment": true, "is_claimed": false,
-		"attachment_keys": ["ui.fe08.mock.mail_02_attach_0"]
-	},
-	{
-		"mail_id": "M_03", "category": "GUILD", "sender_key": "ui.fe08.mock.mail_03_sender", "recipient_key": "ui.fe08.mock.mail_03_recipient",
-		"subject_key": "ui.fe08.mock.mail_03_subject", "body_key": "ui.fe08.mock.mail_03_body",
-		"time_key": "ui.fe08.mock.mail_03_time", "is_read": true, "has_attachment": false, "is_claimed": false,
-		"attachment_keys": []
-	},
-	{
-		"mail_id": "M_04", "category": "GUILD", "sender_key": "ui.fe08.mock.mail_04_sender", "recipient_key": "ui.fe08.mock.mail_04_recipient",
-		"subject_key": "ui.fe08.mock.mail_04_subject", "body_key": "ui.fe08.mock.mail_04_body",
-		"time_key": "ui.fe08.mock.mail_04_time", "is_read": true, "has_attachment": false, "is_claimed": false,
-		"attachment_keys": []
-	},
-	{
-		"mail_id": "M_05", "category": "PLAYER", "sender_key": "ui.fe08.mock.mail_05_sender", "recipient_key": "ui.fe08.mock.mail_05_recipient",
-		"subject_key": "ui.fe08.mock.mail_05_subject", "body_key": "ui.fe08.mock.mail_05_body",
-		"time_key": "ui.fe08.mock.mail_05_time", "is_read": true, "has_attachment": true, "is_claimed": true,
-		"attachment_keys": ["ui.fe08.mock.mail_05_attach_0"]
-	},
-	{
-		"mail_id": "M_06", "category": "PLAYER", "sender_key": "ui.fe08.mock.mail_06_sender", "recipient_key": "ui.fe08.mock.mail_06_recipient",
-		"subject_key": "ui.fe08.mock.mail_06_subject", "body_key": "ui.fe08.mock.mail_06_body",
-		"time_key": "ui.fe08.mock.mail_06_time", "is_read": true, "has_attachment": false, "is_claimed": false,
-		"attachment_keys": []
-	},
-	{
-		"mail_id": "M_07", "category": "SYSTEM", "sender_key": "ui.fe08.mock.mail_07_sender", "recipient_key": "ui.fe08.mock.mail_07_recipient",
-		"subject_key": "ui.fe08.mock.mail_07_subject", "body_key": "ui.fe08.mock.mail_07_body",
-		"time_key": "ui.fe08.mock.mail_07_time", "is_read": true, "has_attachment": true, "is_claimed": true,
-		"attachment_keys": ["ui.fe08.mock.mail_07_attach_0", "ui.fe08.mock.mail_07_attach_1"]
-	},
-	{
-		"mail_id": "M_08", "category": "GUILD", "sender_key": "ui.fe08.mock.mail_08_sender", "recipient_key": "ui.fe08.mock.mail_08_recipient",
-		"subject_key": "ui.fe08.mock.mail_08_subject", "body_key": "ui.fe08.mock.mail_08_body",
-		"time_key": "ui.fe08.mock.mail_08_time", "is_read": true, "has_attachment": false, "is_claimed": false,
-		"attachment_keys": []
-	},
-	{
-		"mail_id": "M_09", "category": "PLAYER", "sender_key": "ui.fe08.mock.mail_09_sender", "recipient_key": "ui.fe08.mock.mail_09_recipient",
-		"subject_key": "ui.fe08.mock.mail_09_subject", "body_key": "ui.fe08.mock.mail_09_body",
-		"time_key": "ui.fe08.mock.mail_09_time", "is_read": true, "has_attachment": true, "is_claimed": true,
-		"attachment_keys": ["ui.fe08.mock.mail_09_attach_0"]
-	},
-	{
-		"mail_id": "M_10", "category": "REWARD", "sender_key": "ui.fe08.mock.mail_10_sender", "recipient_key": "ui.fe08.mock.mail_10_recipient",
-		"subject_key": "ui.fe08.mock.mail_10_subject", "body_key": "ui.fe08.mock.mail_10_body",
-		"time_key": "ui.fe08.mock.mail_10_time", "is_read": false, "has_attachment": true, "is_claimed": false,
-		"attachment_keys": ["ui.fe08.mock.mail_10_attach_0", "ui.fe08.mock.mail_10_attach_1"]
-	}
-]
-
 ## 绑定宿主邮件视图实例。
 func setup(host_view: BaseScreen) -> void:
 	_view = host_view
