@@ -1,12 +1,16 @@
 # ==============================================================================
-# 单元测试：配置层护栏 (Configuration Sanity Guard)
+# 模块归属: 测试体系 (Tests · Architecture & Robustness Guards)
 # 文件路径: res://tests/guards/test_configuration_guard.gd
-# 职责: 校验「除数型 / 边界型」配置处于合法值域。配置驱动不等于放弃边界校验——
-#       这些键会被用作除数、模数或分桶基数，若被热重载或人为改成 0 / 负值，
-#       会在运行期产生整数模零崩溃、inf/NaN 污染或静默的语义错误。
+# 架构定位: Static Guard & Architecture Verification Suite
+# 依赖与触发: 触发方: TestRegistry / audit-arch | 上游: backend/, frontend/, config/ | 下游: audit_arch / tests/reports/
+# 职责说明: 校验「除数型 / 边界型」配置处于合法值域。配置驱动不等于放弃边界校验—— 这些键会被用作除数、模数或分桶基数，若被热重载或人为改成 0 / 负值， 会在运行期产生整数模零崩溃、inf/NaN 污染或静默的语义错误。
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：配置层护栏 (Configuration Sanity Guard)
 # ==============================================================================
+
+## TestConfigurationGuard：校验「除数型 / 边界型」配置处于合法值域。配置驱动不等于放弃边界校验—— 这些键会被用作除数、模数或分桶基数，若被热重
 class_name TestConfigurationGuard extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results := []
 	results.append(test_divisor_configs_positive())

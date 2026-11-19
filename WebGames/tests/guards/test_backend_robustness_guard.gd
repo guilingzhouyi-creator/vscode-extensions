@@ -1,10 +1,16 @@
 # ==============================================================================
-# 单元测试：后端鲁棒性与异常隔离 (Backend Robustness Guard)
+# 模块归属: 测试体系 (Tests · Architecture & Robustness Guards)
 # 文件路径: res://tests/guards/test_backend_robustness_guard.gd
-# 职责: 验证脏数据清洗、极值截断、异常分类与深拷贝防污染（TC-RM-21 ~ TC-RM-28）
+# 架构定位: Static Guard & Architecture Verification Suite
+# 依赖与触发: 触发方: TestRegistry / audit-arch | 上游: backend/, frontend/, config/ | 下游: audit_arch / tests/reports/
+# 职责说明: 验证脏数据清洗、极值截断、异常分类与深拷贝防污染（TC-RM-21 ~ TC-RM-28）
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：后端鲁棒性与异常隔离 (Backend Robustness Guard)
 # ==============================================================================
+
+## TestBackendRobustnessGuard：验证脏数据清洗、极值截断、异常分类与深拷贝防污染（TC-RM-21 ~ TC-RM-28）
 class_name TestBackendRobustnessGuard extends RefCounted
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_sanitize_int_negative())

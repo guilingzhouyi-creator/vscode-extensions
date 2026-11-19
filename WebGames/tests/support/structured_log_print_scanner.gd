@@ -1,11 +1,17 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 测试辅助：print/printerr 零残留静态扫描器
+# 模块归属: 测试体系 (Tests · Test Infrastructure & Runners)
 # 文件路径: res://tests/support/structured_log_print_scanner.gd
-# 职责: 扫描 res://backend 与 res://frontend 目录下 .gd 文件是否存在裸 print(/printerr(
+# 架构定位: Test Base Class & Execution Support Utility
+# 依赖与触发: 触发方: test_runner, tests/**/*.gd | 下游: tests/reports/
+# 职责说明: 扫描 res://backend 与 res://frontend 目录下 .gd 文件是否存在裸 print(/printerr(
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 测试辅助：print/printerr 零残留静态扫描器
 # ==============================================================================
+
+## StructuredLogPrintScanner：扫描 res://backend 与 res://frontend 目录下 .gd 文件是否存在裸 print(/pri
 class_name StructuredLogPrintScanner
 extends RefCounted
 
+## 扫描指定目录并统计非结构化裸 print 违规
 static func scan_roots(roots: Array[String]) -> Array[String]:
 	var print_hits: Array[String] = []
 	for root_dir in roots:

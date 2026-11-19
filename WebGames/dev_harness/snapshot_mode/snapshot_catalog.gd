@@ -2,10 +2,12 @@
 # 模块归属: 测试与工程化工具层 (Dev Harness · 快照测试工程模式)
 # 文件路径: res://dev_harness/snapshot_mode/snapshot_catalog.gd
 # 架构定位: Test Fixture Catalog / Predefined Preset Library
-# 跨域依赖: 上游: SnapshotInjectionSolver, 测试套件 | 下游: TestSnapshotBundleDTO
-# 职责说明: 提供全域工业级预置测试快照模版，覆盖初生、进阶、终局全装与极限战斗态
-# 设计依据: 业务域第一性原理 / 快照测试工程化规范
+# 依赖与触发: 触发方: SnapshotInjectionSolver, 测试套件 | 下游: TestSnapshotBundleDTO
+# 职责说明: 提供标准化预置测试快照模版，覆盖初生、进阶、终局全装与极限战斗态。
+# 退出语义与设计依据: 纯工厂静态构造返回 TestSnapshotBundleDTO | 设计依据: 快照测试规范
 # ==============================================================================
+
+## SnapshotCatalog：预置多阶段测试快照夹具库
 class_name SnapshotCatalog
 extends RefCounted
 

@@ -2,10 +2,12 @@
 # 模块归属: 测试与工程化工具层 (Dev Harness · 快照测试工程模式)
 # 文件路径: res://dev_harness/snapshot_mode/test_snapshot_builder.gd
 # 架构定位: Fluent Builder / State Synthesizer
-# 跨域依赖: 上游: 测试用例 / 开发者脚本 | 下游: TestSnapshotBundleDTO
-# 职责说明: 提供流畅优雅的链式构造器，支持一行代码快速定制任意维度测试快照状态
-# 设计依据: 业务域第一性原理 / 快照测试工程化规范
+# 依赖与触发: 触发方: 测试用例 / 开发者脚本 | 下游: TestSnapshotBundleDTO
+# 职责说明: 提供链式快照构造器，支持按领域维度快速定制测试快照状态。
+# 退出语义与设计依据: build() 输出 TestSnapshotBundleDTO | 设计依据: 快照测试构造器契约
 # ==============================================================================
+
+## TestSnapshotBuilder：流畅式测试快照状态构造器
 class_name TestSnapshotBuilder
 extends RefCounted
 

@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端可视化边界长效全域架构护栏
+# 模块归属: 测试体系 (Tests · Architecture & Robustness Guards)
 # 文件路径: res://tests/guards/test_frontend_boundary_guard.gd
-# 职责: 静态审查 frontend 下所有视图与模块的基类继承、后端直连、裸随机、节点路径、
-#       配置语义白名单外零直读、Color字面量单一真源、legacy清零、对象池契约与音效桥接
+# 架构定位: Static Guard & Architecture Verification Suite
+# 依赖与触发: 触发方: TestRegistry / audit-arch | 上游: backend/, frontend/, config/ | 下游: audit_arch / tests/reports/
+# 职责说明: 静态审查 frontend 下所有视图与模块的基类继承、后端直连、裸随机、节点路径、 配置语义白名单外零直读、Color字面量单一真源、legacy清零、对象池契约与音效桥接
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 前端可视化边界长效全域架构护栏
 # ==============================================================================
+
+## TestFrontendBoundaryGuard：静态审查 frontend 下所有视图与模块的基类继承、后端直连、裸随机、节点路径、 配置语义白名单外零直读、Color
 class_name TestFrontendBoundaryGuard
 extends TestCase
 
@@ -55,6 +59,7 @@ const FORBIDDEN_TOKENS: Array[String] = [
 const RANDOM_TOKENS: Array[String] = ["randi(", "randf(", "randomize("]
 const RELATIVE_NODE_TOKENS: Array[String] = ["get_parent().get_node", "get_node(\"../", "find_child("]
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_views_extend_base())

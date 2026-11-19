@@ -1,13 +1,17 @@
 # ==============================================================================
-# 卡拉尔世界引擎 - GDScript 全量语法与装载批处理校验器 (单进程极速版)
+# 模块归属: 自动化测试层 (Tests · 全量语法校验器)
 # 文件路径: res://tests/batch_syntax_checker.gd
-# 职责: 在单次 Godot 进程中批量校验全部 .gd 文件的语法与装载正确性，消除 340+ 次冷启动
-#       （全量 backend/frontend/tests/benchmarks 四目录，随新增测试套件持续增长）
+# 架构定位: Single-Process GDScript Batch Syntax & Load Verifier
+# 依赖与触发: 触发方: check-gdscript CLI | 上游: 全仓 .gd 文件 | 下游: 控制台校验报告
+# 职责说明: 在单次 Godot 进程中批量校验全量 .gd 脚本的语法与装载正确性，支持 --scope 收敛。
+# 退出语义与设计依据: SceneTree 入口，0=全通过, 1=存在语法/装载失败 | 设计依据: 单进程批处理优化
 # ==============================================================================
+
+## BatchSyntaxChecker：GDScript 全量语法与装载批处理校验器
+class_name BatchSyntaxChecker
 extends SceneTree
 
-## G3 审查收敛：.gd 扫描目录清单 —— 唯一事实源（主路径单进程批处理按此扫描）。
-## scripts/sh/check-gdscript.sh 运行时从本清单提取同口径（禁止再手工维护第二份）。
+## 全域 .gd 扫描目录清单（唯一事实来源；check-gdscript 运行时按同口径扫描）。
 const SCAN_DIRS: Array[String] = [
 	"res://backend",
 	"res://frontend",

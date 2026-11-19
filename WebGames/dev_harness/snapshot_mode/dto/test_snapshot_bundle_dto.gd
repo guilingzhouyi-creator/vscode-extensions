@@ -2,10 +2,12 @@
 # 模块归属: 测试与工程化工具层 (Dev Harness · 快照测试工程模式)
 # 文件路径: res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd
 # 架构定位: Value Object / Data Transfer Object
-# 跨域依赖: 纯数据载体，零强依赖
-# 职责说明: 定义全域测试快照数据传输模型，支持全要素状态打包、往返序列化与对象池重置
-# 设计依据: 业务域第一性原理 / 快照测试工程化规范
+# 依赖与触发: 触发方: SnapshotCatalog, TestSnapshotBuilder | 纯数据载体，零强依赖
+# 职责说明: 定义全域测试快照数据传输模型，支持全要素状态打包、往返序列化与对象池重置。
+# 退出语义与设计依据: 纯数据载体 DTO | 设计依据: 业务域第一性原理与快照测试规范
 # ==============================================================================
+
+## TestSnapshotBundleDTO：全域测试快照状态封装与序列化数据载体
 class_name TestSnapshotBundleDTO
 extends RefCounted
 
@@ -161,19 +163,19 @@ static func from_dict(d: Dictionary) -> RefCounted:
 	bundle.gender = String(d.get("gender", "MALE"))
 	bundle.level = int(d.get("level", 1))
 
-	var raw_attr = d.get("attributes", null)
+	var raw_attr: Variant = d.get("attributes", null)
 	if raw_attr is Dictionary:
 		bundle.attributes = (raw_attr as Dictionary).duplicate(true)
 
-	var raw_phys = d.get("physiology_data", null)
+	var raw_phys: Variant = d.get("physiology_data", null)
 	if raw_phys is Dictionary:
 		bundle.physiology_data = (raw_phys as Dictionary).duplicate(true)
 
-	var raw_wallet = d.get("wallet_data", null)
+	var raw_wallet: Variant = d.get("wallet_data", null)
 	if raw_wallet is Dictionary:
 		bundle.wallet_data = (raw_wallet as Dictionary).duplicate(true)
 
-	var raw_inv = d.get("inventory_items", null)
+	var raw_inv: Variant = d.get("inventory_items", null)
 	if raw_inv is Array:
 		bundle.inventory_items = (raw_inv as Array).duplicate(true)
 
@@ -181,11 +183,11 @@ static func from_dict(d: Dictionary) -> RefCounted:
 	bundle.coordinates_x = float(d.get("coordinates_x", 0.0))
 	bundle.coordinates_y = float(d.get("coordinates_y", 0.0))
 
-	var raw_quest = d.get("quest_dag_state", null)
+	var raw_quest: Variant = d.get("quest_dag_state", null)
 	if raw_quest is Dictionary:
 		bundle.quest_dag_state = (raw_quest as Dictionary).duplicate(true)
 
-	var raw_ext = d.get("domain_extensions", null)
+	var raw_ext: Variant = d.get("domain_extensions", null)
 	if raw_ext is Dictionary:
 		bundle.domain_extensions = (raw_ext as Dictionary).duplicate(true)
 

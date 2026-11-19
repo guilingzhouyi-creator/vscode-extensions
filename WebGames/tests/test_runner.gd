@@ -1,9 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 全量无头自动化测试运行器
+# 模块归属: 自动化测试层 (Tests · 全域单测主调度器)
 # 文件路径: res://tests/test_runner.gd
-# 职责: 汇聚全域业务领域测试套件（清单与数量取自 TestRegistry，此处不写死），
-#       执行第一性原理与数学方程断言并生成验收报告
+# 架构定位: Headless Unified Test Suite Runner
+# 依赖与触发: 触发方: test-run CLI | 上游: TestRegistry | 下游: tests/reports/test_latest.json
+# 职责说明: 汇聚全域注册测试套件并顺序执行，校验证明全通过、零 ObjectDB/RID 泄漏后输出汇总报告。
+# 退出语义与设计依据: SceneTree 入口，0=全通过, 1=存在失败或资源泄漏 | 设计依据: 统一单测注册表契约
 # ==============================================================================
+
+## TestRunner：全量无头自动化测试运行主调度器
+class_name TestRunner
 extends SceneTree
 
 const TestRegistryClass = preload("res://tests/test_registry.gd")

@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 契约注册表测试数据工厂
+# 模块归属: 测试体系 (Tests · Test Fixtures & Factories)
 # 文件路径: res://tests/fixtures/factories/contract_registry_factory.gd
-# 职责: 构造合法契约实例与 5 类损坏契约场景，支撑注入式单测与门禁阻断验证
+# 架构定位: Deterministic Test Fixture & Data Factory
+# 依赖与触发: 触发方: tests/unit/, tests/integration/ | 下游: 各测试套件注入构造
+# 职责说明: 构造合法契约实例与 5 类损坏契约场景，支撑注入式单测与门禁阻断验证
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 契约注册表测试数据工厂
 # ==============================================================================
+
+## ContractRegistryFactory：构造合法契约实例与 5 类损坏契约场景，支撑注入式单测与门禁阻断验证
 class_name ContractRegistryFactory
 extends RefCounted
 

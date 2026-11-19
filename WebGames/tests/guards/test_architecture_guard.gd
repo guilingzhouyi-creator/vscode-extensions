@@ -1,15 +1,13 @@
 # ==============================================================================
-# 单元测试：架构护栏 (Architecture Guard)
+# 模块归属: 测试体系 (Tests · Architecture & Robustness Guards)
 # 文件路径: res://tests/guards/test_architecture_guard.gd
-# 职责: 以 config/infrastructure/domains.json 为唯一事实来源，校验「领域目录 / 配置表 /
-#       测试注册 / 确定性约定 / 文档计数 / 配置键存在性」六方一致。新增领域若漏建配置
-#       表、漏注册测试套件、漏同步文档计数，或代码读取了表里不存在的键，本套件会立即
-#       变红，杜绝静默通过。
-#
-# 设计约束（务必遵守）:
-#   1. 所有期望值均从磁盘推导，禁止写死领域总数 / 断言总数等易变数字。
-#   2. 断言失败时输出完整违规清单，便于一次定位全部缺口。
+# 架构定位: Static Guard & Architecture Verification Suite
+# 依赖与触发: 触发方: TestRegistry / audit-arch | 上游: backend/, frontend/, config/ | 下游: audit_arch / tests/reports/
+# 职责说明: 以 config/infrastructure/domains.json 为唯一事实来源，校验「领域目录 / 配置表 / 测试注册 / 确定性约定 / 文档计数 / 配置键存在性」六方一致。新增领域若漏建配置 表、漏注册测试套件、漏同步文档计数，或代码读取了表里不存在的键，本套件会立即 变红，杜绝静默通过。 设计约束（务必遵守）: 1. 所有期望值均从磁盘推导，禁止写死领域总数 / 断言总数等易变数字。 2. 断言失败时输出完整违规清单，便于一次定位全部缺口。
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 单元测试：架构护栏 (Architecture Guard)
 # ==============================================================================
+
+## TestArchitectureGuardDomain：以 config/infrastructure/domains.json 为唯一事实来源，校验「领域目录 / 配置表 /
 class_name TestArchitectureGuardDomain extends RefCounted
 
 ## 领域清单文件与根键
@@ -138,6 +136,7 @@ const DOMAIN_COUNT_PATTERNS: Array[String] = [
 ]
 
 
+## 执行本测试套件全量用例并返回聚合结果字典
 static func run_all_tests() -> Dictionary:
 	var manifest := _load_manifest()
 	var results := []

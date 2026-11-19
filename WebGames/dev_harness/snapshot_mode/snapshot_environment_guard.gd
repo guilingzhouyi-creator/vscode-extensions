@@ -2,10 +2,12 @@
 # 模块归属: 测试与工程化工具层 (Dev Harness · 快照测试工程模式)
 # 文件路径: res://dev_harness/snapshot_mode/snapshot_environment_guard.gd
 # 架构定位: Safety Gate / Environment Sentinel
-# 跨域依赖: 上游: SnapshotInjectionSolver | 下游: EventBusCore, OS, Engine
-# 职责说明: 提供运行环境安全性硬核守卫，严格判定 Debug 与 Test 模式，生产环境强行熔断
-# 设计依据: 业务域第一性原理 / 快照测试工程化规范
+# 依赖与触发: 触发方: SnapshotInjectionSolver | 下游: EventBusCore, OS, Engine
+# 职责说明: 提供运行环境安全性守卫，严格判定 Debug 与 Test 模式，在生产环境执行熔断拦截。
+# 退出语义与设计依据: 返回 { permitted, error_code, message } | 设计依据: 生产隔离防误注契约
 # ==============================================================================
+
+## SnapshotEnvironmentGuard：快照注入环境安全守卫
 class_name SnapshotEnvironmentGuard
 extends RefCounted
 

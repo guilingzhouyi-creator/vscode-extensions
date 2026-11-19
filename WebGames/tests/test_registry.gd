@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 全域测试注册表 (Test Registry)
+# 模块归属: 测试体系 (Tests · Registry & Entrypoints)
 # 文件路径: res://tests/test_registry.gd
-# 职责: 统一注册后端业务领域、横切护栏与前端系统全量测试套件
+# 架构定位: Test Suite Registry & Execution Coordinator
+# 依赖与触发: 触发方: test_runner, test_fe_runner | 上游: tests/**/*.gd | 下游: 测试执行报告
+# 职责说明: 统一注册后端业务领域、横切护栏与前端系统全量测试套件
+# 退出语义与设计依据: 退出码: 返回 all_passed 与断言列表字典 | 设计依据: 卡拉尔世界引擎 (Kalar World Engine) - 全域测试注册表 (Test Registry)
 # ==============================================================================
+
+## TestRegistry：统一注册后端业务领域、横切护栏与前端系统全量测试套件
 class_name TestRegistry
 extends RefCounted
 
