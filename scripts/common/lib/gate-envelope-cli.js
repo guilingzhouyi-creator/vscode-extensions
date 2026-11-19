@@ -137,7 +137,7 @@ function buildSingleStepFailureEnvelope(options = {}) {
     recordedAt,
     status: contract.STATUS_BLOCK,
     gate,
-    step: stepTitle,
+    step: stepId,
     stepTitle,
     stepId,
     failedCommand,

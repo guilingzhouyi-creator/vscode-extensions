@@ -47,13 +47,14 @@ function resolveWorkerConcurrency() {
  * Parses CLI flags into an immutable configuration object.
  *
  * @param {string[]} argv - Command-line arguments excluding node executable and script path.
- * @returns {{ group: string, logDir: string, json: boolean, listJson: boolean, help: boolean, error: string }}
+ * @returns {{ group: string, logDir: string, json: boolean, tsv: boolean, listJson: boolean, help: boolean, error: string }}
  */
 function parseCliArgs(argv) {
-  const state = { group: 'pillar2', logDir: '', json: false, listJson: false, help: false, error: '' };
+  const state = { group: 'pillar2', logDir: '', json: false, tsv: false, listJson: false, help: false, error: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') { state.json = true; continue; }
+    if (arg === '--tsv') { state.tsv = true; continue; }
     if (arg === '--list-json') { state.listJson = true; continue; }
     if (arg === '--help' || arg === '-h') { state.help = true; continue; }
     if (arg === '--group' || arg === '--log-dir') {
@@ -66,6 +67,7 @@ function parseCliArgs(argv) {
     }
     return { ...state, error: `Unknown argument: ${arg}` };
   }
+  if (state.json && state.tsv) return { ...state, error: '--json and --tsv are mutually exclusive' };
   if (!GUARD_GROUPS[state.group]) return { ...state, error: `Unknown guard group: ${state.group}` };
   return state;
 }
@@ -115,8 +117,20 @@ function executeOneGuard(guard, index, logDir) {
   const logFile = buildLogPath(logDir, index, guard.id);
   const absScript = path.join(REPO_ROOT, guard.script);
   const buildRecord = (exitCode, stdout, stderr) => ({
-    index, id: guard.id, script: guard.script, exitCode, logFile,
-    durationMs: Date.now() - startedAt, stdout, stderr,
+    index,
+    id: guard.id,
+    stepId: guard.stepId || '',
+    name: guard.name,
+    script: guard.script,
+    cmd: guard.cmd,
+    fix: guard.fix,
+    verifyCmd: guard.verifyCmd,
+    aasLayer: guard.aasLayer,
+    exitCode,
+    logFile,
+    durationMs: Date.now() - startedAt,
+    stdout,
+    stderr,
   });
 
   return new Promise((resolve) => {
@@ -180,6 +194,7 @@ function formatGuardResultEntry(item) {
   const cmd = item.cmd || meta.cmd || (item.script ? `node ${item.script}` : '');
   return {
     id: item.id,
+    stepId: item.stepId !== undefined ? item.stepId : (meta.stepId || ''),
     name: item.name || meta.name || item.id,
     cmd,
     fix: item.fix || meta.fix || '',
@@ -229,6 +244,27 @@ function buildJsonPayload(group, concurrency, durationMs, results) {
 }
 
 /**
+ * Emits tab-separated guard results in exact group declaration order.
+ *
+ * @param {Array<object>} entries - Ordered enriched guard entries from payload.results.
+ * @returns {void}
+ */
+function emitTsvReport(entries) {
+  const clean = (value) => String(value == null ? '' : value).replace(/[\t\r\n]+/g, ' ');
+  for (const entry of entries) {
+    const row = [
+      clean(entry.stepId),
+      clean(entry.id),
+      entry.exitCode,
+      entry.durationMs,
+      clean(entry.cmd),
+      clean(entry.logFile),
+    ].join('\t');
+    process.stdout.write(`${row}\n`);
+  }
+}
+
+/**
  * Emits human-readable ordered guard output and failure diagnostics.
  *
  * @param {string} group - Group name.
@@ -259,7 +295,7 @@ function emitHumanReport(group, concurrency, durationMs, results) {
 async function main() {
   const cli = parseCliArgs(process.argv.slice(2));
   if (cli.help) {
-    console.log('Usage: node scripts/common/run-workspace-guards.js [--group pillar2] [--log-dir <dir>] [--json] [--list-json]');
+    console.log('Usage: node scripts/common/run-workspace-guards.js [--group pillar2|prepush-rules|prepush-governance] [--log-dir <dir>] [--json] [--tsv] [--list-json]');
     process.exit(0);
   }
   if (cli.error) {
@@ -282,6 +318,7 @@ async function main() {
   const payload = buildJsonPayload(cli.group, concurrency, durationMs, results);
 
   if (cli.json) process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  else if (cli.tsv) emitTsvReport(payload.results);
   else emitHumanReport(cli.group, concurrency, durationMs, results);
   process.exit(payload.passed ? 0 : 1);
 }

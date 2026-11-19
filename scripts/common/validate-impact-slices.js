@@ -15,8 +15,17 @@
 'use strict';
 
 const path = require('path');
-const { resolveImpactTargets, buildImpactTestCommand, IMPACT_RULES } =
-  require('./impact-slice-map.js');
+const { spawnSync } = require('child_process');
+const {
+  resolveImpactTargets,
+  resolveAutoImpactTargets,
+  buildImpactTestCommand,
+  classifyWorkspaceImpact,
+  IMPACT_RULES
+} = require('./impact-slice-map.js');
+
+const REPO_ROOT = path.resolve(__dirname, '../..');
+const ROUTER_SCRIPT = path.join(__dirname, 'impact-slice-map.js');
 
 let failures = 0;
 
@@ -121,6 +130,98 @@ check(
   '反斜杠路径同样命中规则',
   windowsPath.targets.length > 0 && !windowsPath.targets.includes('integration_storage'),
   `got [${windowsPath.targets.join(', ')}]`
+);
+
+// 9. Single-project auto-refactor unit test path must resolve without ReferenceError (requires path).
+const autoUnit = resolveAutoImpactTargets(['auto-refactor/tests/unit/sample.test.ts']);
+check(
+  'auto-refactor 单测路径直接命中并无 path 缺失异常',
+  autoUnit.testSuites.length === 1 && autoUnit.testSuites[0] === 'sample.test.ts' && autoUnit.unknown.length === 0,
+  `got [${autoUnit.testSuites.join(', ')}]`
+);
+
+// 10. classifyWorkspaceImpact single-project narrowing.
+const singleAr = classifyWorkspaceImpact(['auto-refactor/src/core/ast/parser.ts']);
+check(
+  '工作区影响面路由对单子项目变更只选中目标子项目',
+  singleAr.runAr && !singleAr.runWt && !singleAr.runWg && !singleAr.runFg && !singleAr.runAll && singleAr.projectCount === 1,
+  JSON.stringify(singleAr)
+);
+
+// 11. classifyWorkspaceImpact multi-project widening.
+const multiProj = classifyWorkspaceImpact(['auto-refactor/src/a.ts', 'fractal-git/src/b.rs']);
+check(
+  '多子项目跨界变更放宽到全量执行',
+  multiProj.runAll && multiProj.runAr && multiProj.runWt && multiProj.runWg && multiProj.runFg && multiProj.projectCount === 2,
+  JSON.stringify(multiProj)
+);
+
+// 12. classifyWorkspaceImpact shared-file widening.
+const sharedTouch = classifyWorkspaceImpact(['scripts/common/impact-slice-map.js']);
+check(
+  '共享治理文件变更放宽到全量执行',
+  sharedTouch.touchedShared && sharedTouch.runAll && sharedTouch.runAr && sharedTouch.runWt && sharedTouch.runWg && sharedTouch.runFg,
+  JSON.stringify(sharedTouch)
+);
+
+// 13. classifyWorkspaceImpact empty-range / no-range widening.
+const noRange = classifyWorkspaceImpact([], { hasRange: false });
+check(
+  '无基线区间时保守放宽到全量执行',
+  !noRange.hasRange && noRange.runAll && noRange.runAr && noRange.runWt && noRange.runWg && noRange.runFg,
+  JSON.stringify(noRange)
+);
+
+// 14. classifyWorkspaceImpact Windows backslash normalization.
+const winImpact = classifyWorkspaceImpact(['workspace-timing\\src\\extension.ts', '  ']);
+check(
+  '工作区影响面路由正确归一化反斜杠并忽略空白项',
+  winImpact.changedCount === 1 && winImpact.touchedWt && !winImpact.touchedShared && !winImpact.runAll && winImpact.runWt && !winImpact.runAr,
+  JSON.stringify(winImpact)
+);
+
+// 15. CLI `--files ... --kv` emits deterministic KEY=VALUE flags.
+const kvCli = spawnSync(
+  process.execPath,
+  [ROUTER_SCRIPT, '--files', 'WebGames/scripts/py/audit_config.py', '--kv'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }
+);
+const kvLines = String(kvCli.stdout || '').trim().split(/\r?\n/);
+check(
+  'CLI --files --kv 输出精确键值标志',
+  kvCli.status === 0 &&
+    kvLines.includes('HAS_RANGE=1') &&
+    kvLines.includes('CHANGED_COUNT=1') &&
+    kvLines.includes('TOUCHED_WG=1') &&
+    kvLines.includes('RUN_WG=1') &&
+    kvLines.includes('RUN_ALL=0') &&
+    kvLines.includes('RUN_AR=0'),
+  `status=${kvCli.status} stdout=${kvCli.stdout}`
+);
+
+// 16. CLI `--resolve-range invalid-rev-0000..HEAD` must fail closed with exit code 1.
+const badRangeCli = spawnSync(
+  process.execPath,
+  [ROUTER_SCRIPT, '--resolve-range', 'invalid-rev-0000..HEAD'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }
+);
+check(
+  'CLI --resolve-range 对无效区间严格 fail-closed 退出码 1',
+  badRangeCli.status === 1 && String(badRangeCli.stderr || '').trim().length > 0,
+  `status=${badRangeCli.status} stderr=${badRangeCli.stderr}`
+);
+
+// 17. CLI `--resolve-range "" --kv` treats empty range as hasRange=0 and widens to RUN_ALL=1 with exit 0.
+const emptyRangeCli = spawnSync(
+  process.execPath,
+  [ROUTER_SCRIPT, '--resolve-range', '--kv'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }
+);
+const emptyKv = String(emptyRangeCli.stdout || '').trim().split(/\r?\n/);
+check(
+  'CLI --resolve-range 空区间退化为全量并退出码 0',
+  emptyRangeCli.status === 0 && emptyKv.includes('HAS_RANGE=0') && emptyKv.includes('RUN_ALL=1'),
+  `status=${emptyRangeCli.status} stdout=${emptyRangeCli.stdout}`
 );
 
 if (failures > 0) {

@@ -26,6 +26,7 @@ function defineGuard(spec) {
   const cmd = cmdParts.join(' ');
   return Object.freeze({
     id: spec.id,
+    stepId: spec.stepId || '',
     name: spec.name,
     script: spec.script,
     args: Object.freeze([...args]),
@@ -180,11 +181,78 @@ const PILLAR2_GUARDS = Object.freeze([
   }),
 ]);
 
+const PILLAR2_BY_ID = new Map(PILLAR2_GUARDS.map((guard) => [guard.id, guard]));
+
+/**
+ * Attaches a gate-step-registry stepId to an existing Pillar-2 guard definition.
+ *
+ * @param {string} baseId - Guard identifier registered in PILLAR2_GUARDS.
+ * @param {string} stepId - Step identifier in gate-step-registry.json.
+ * @returns {object} Frozen guard descriptor with stepId populated.
+ */
+function bindStepGuard(baseId, stepId) {
+  const base = PILLAR2_BY_ID.get(baseId);
+  if (!base) throw new Error(`Unknown base guard id: ${baseId}`);
+  return defineGuard({
+    id: base.id,
+    stepId,
+    name: base.name,
+    script: base.script,
+    args: base.args,
+    fix: base.fix,
+    verifyCmd: base.verifyCmd,
+    aasLayer: base.aasLayer,
+    suppressStderrOnPass: base.suppressStderrOnPass,
+  });
+}
+
+const PREPUSH_RULES_GUARDS = Object.freeze([
+  bindStepGuard('generate-rule-catalog', 'RULE-CATALOG-04'),
+  bindStepGuard('validate-rule-id-closure', 'RULE-CLOSURE-05'),
+  bindStepGuard('validate-docs-consistency', 'DOCS-CONSISTENCY-06'),
+  bindStepGuard('validate-rule-reachability', 'RULE-REACHABILITY-07'),
+]);
+
+const PREPUSH_GOVERNANCE_GUARDS = Object.freeze([
+  bindStepGuard('validate-gate-feedback', 'FEEDBACK-VOCABULARY-23'),
+  bindStepGuard('validate-gate-ordering', 'GATE-ORDERING-24'),
+  bindStepGuard('test-gate-guards', 'GATE-PROOF-25'),
+  defineGuard({
+    id: 'validate-gate-verdicts',
+    stepId: 'GATE-COVERAGE-26',
+    name: '步骤判定覆盖与横幅唯一性',
+    script: 'scripts/common/validate-gate-verdicts.js',
+    fix: '补全注册步骤横幅与可达 PASS/BLOCK 判定',
+  }),
+  bindStepGuard('validate-hardcoded-counts', 'GATE-COUNT-27'),
+  bindStepGuard('validate-block-chains', 'GATE-CHAIN-28'),
+  bindStepGuard('sync-doc-metrics', 'DOC-METRICS-29'),
+  bindStepGuard('validate-shell-parity', 'SHELL-PARITY-30'),
+  bindStepGuard('validate-subagent-catalog', 'SUBAGENT-CATALOG-31'),
+  bindStepGuard('validate-doc-anchors', 'DOC-ANCHORS-32'),
+  bindStepGuard('validate-metric-coverage', 'METRIC-COVERAGE-33'),
+  bindStepGuard('validate-family-contract', 'FAMILY-CONTRACT-34'),
+  bindStepGuard('validate-doc-reachability', 'DOC-REACH-35'),
+  bindStepGuard('validate-commit-history-baseline', 'COMMIT-HISTORY-BASELINE-36'),
+  bindStepGuard('validate-rule-source-consistency', 'RULE-SOURCE-37'),
+  bindStepGuard('validate-destructive-ops', 'DESTRUCTIVE-OPS-38'),
+]);
+
 const GUARD_GROUPS = Object.freeze({
   pillar2: PILLAR2_GUARDS,
+  'prepush-rules': PREPUSH_RULES_GUARDS,
+  'prepush-governance': PREPUSH_GOVERNANCE_GUARDS,
 });
 
-const GUARD_META_BY_ID = new Map(PILLAR2_GUARDS.map((guard) => [guard.id, guard]));
+const GUARD_META_BY_ID = new Map();
+for (const groupGuards of Object.values(GUARD_GROUPS)) {
+  for (const guard of groupGuards) {
+    const existing = GUARD_META_BY_ID.get(guard.id);
+    if (!existing || (!existing.stepId && guard.stepId)) {
+      GUARD_META_BY_ID.set(guard.id, guard);
+    }
+  }
+}
 
 /**
  * Formats an ordered guard metadata list for `--list-json` inspection and fallback collectors.
@@ -196,6 +264,7 @@ function buildListPayload(guards) {
   return guards.map((guard, index) => ({
     index,
     id: guard.id,
+    stepId: guard.stepId || '',
     name: guard.name,
     script: guard.script,
     args: guard.args,
@@ -210,6 +279,8 @@ function buildListPayload(guards) {
 module.exports = Object.freeze({
   defineGuard,
   PILLAR2_GUARDS,
+  PREPUSH_RULES_GUARDS,
+  PREPUSH_GOVERNANCE_GUARDS,
   GUARD_GROUPS,
   GUARD_META_BY_ID,
   buildListPayload,

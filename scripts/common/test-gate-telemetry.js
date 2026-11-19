@@ -221,7 +221,7 @@ function testSingleStepEnvelope(baseDir) {
       && built.gate === 'pre-commit'
       && built.stepId === 'STAGED-HYGIENE-01'
       && built.stepTitle === '暂存区物理卫生'
-      && built.step === '暂存区物理卫生'
+      && built.step === 'STAGED-HYGIENE-01'
       && built.exitCode === 2
       && built.runId === 'unit-run-01');
   assert('buildSingleStepFailureEnvelope strips ANSI codes',
