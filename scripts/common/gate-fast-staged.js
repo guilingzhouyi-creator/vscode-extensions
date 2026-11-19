@@ -35,7 +35,7 @@ const {
   checkHeadReceipt,
 } = require('./git-env');
 const checks = require('./lib/fast-staged-checks');
-const { calculateEloc, createViolation } = checks;
+const { calculateEloc, createViolation, validateFilenameSlang, isMorphemeValid, validateFilenameSegments, validateFilenameLength } = checks;
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -210,138 +210,6 @@ function getStagedDiff(repoRoot, range = '') {
     stdio: STDIO_PIPE,
     maxBuffer: MAX_DIFF_BUFFER_BYTES,
   });
-}
-
-function isExemptSlangPath(filePath, baseName) {
-  const norm = filePath.replace(/\\/g, '/');
-  return RE_EXEMPT_SLANG.test(norm) || /^fe_\d{2}/.test(baseName);
-}
-
-const RE_FAST_WIRING = /^(?:import\s+|import\(|from\s+|export\s+(?:\*|type\s+\*|\{[^}]*\}\s*(?:from\s+[^;]+)?;?|default\s+[A-Za-z0-9_$]+;?$)|(?:const|let|var)\s+.*=\s*require\(|module\.exports\s*=|exports\.|source\s+|\.\s+|using\s+|Import-Module\s+|(?:extends\s+|class_name\s+|(?:const|var)\s+\w+\s*=\s*preload\())/;
-
-/**
- * Validates that file name does not contain temporary engineering slang or batch tokens.
- *
- * @param {string} file - Relative path to staged file.
- * @param {Array} nomenclatureViolations - Collector array for NOMENCLATURE findings.
- */
-function validateFilenameSlang(file, nomenclatureViolations) {
-  const baseName = path.basename(file);
-  if (!isExemptSlangPath(file, baseName) && SLANG_FILENAME_PATTERN.test(baseName)) {
-    const tpl = VIOLATION_TPLS.SLANG_NAME;
-    nomenclatureViolations.push(
-      createViolation({
-        ruleId: RULE_HYG_NAM_001,
-        file,
-        message: `文件名包含临时性违规黑话标记: ${file}`,
-        actual: baseName,
-        expected: tpl.expected,
-        actionableFix: tpl.actionableFix,
-      }),
-    );
-  }
-}
-
-/**
- * Determines whether a name segment contains valid vowel morphemes or approved technical acronyms.
- *
- * @param {string} seg - Substring word segment.
- * @returns {boolean} True if segment conforms to morpheme criteria.
- */
-function isMorphemeValid(seg) {
-  if (seg.length < 2) return true;
-  if (/^\d+$/.test(seg)) return true;
-  if (seg.toLowerCase() === 'xyz') return false;
-  if (/[aeiouy]/i.test(seg)) return true;
-  return STANDARD_TECH_ABBREVIATIONS.has(seg.toLowerCase());
-}
-
-/**
- * Validates hyphenated/underscored segment count and phonotactic hygiene of filename stems.
- *
- * @param {string} file - Relative path of target file.
- * @param {string} stem - Extension-stripped filename stem.
- * @param {Array} nomenclatureViolations - Collector array for NOMENCLATURE findings.
- */
-function validateFilenameSegments(file, stem, nomenclatureViolations) {
-  const norm = file.replace(/\\/g, '/');
-  const isTest = /(?:tests\/|\.test\.|\.spec\.|test_)/i.test(norm);
-  const maxSegments = isTest ? MAX_FILENAME_SEGMENTS_TEST : MAX_FILENAME_SEGMENTS_SRC;
-  const cleanStem = stem.replace(/\.(?:test|spec)$/i, '').replace(/^test[_-]/i, '');
-  const segments = cleanStem.split(/[-_]+/).filter(Boolean);
-  if (segments.length > maxSegments) {
-    const tpl = VIOLATION_TPLS.NAME_SEGMENTS;
-    nomenclatureViolations.push(
-      createViolation({
-        ruleId: RULE_HYG_NAM_001,
-        file,
-        message: `文件名单词段数过多 (> ${maxSegments} 段，过度堆叠): ${file}`,
-        actual: `${segments.length} segments`,
-        expected: `<= ${maxSegments} segments`,
-        actionableFix: tpl.actionableFix,
-      }),
-    );
-  }
-  for (const seg of segments) {
-    if (!isMorphemeValid(seg)) {
-      const tpl = VIOLATION_TPLS.NAME_VOWEL;
-      nomenclatureViolations.push(
-        createViolation({
-          ruleId: RULE_HYG_NAM_001,
-          file,
-          message: `文件名单词段 '${seg}' 缺乏元音语素且非标准技术缩写: ${file}`,
-          actual: seg,
-          expected: tpl.expected,
-          actionableFix: tpl.actionableFix,
-        }),
-      );
-    }
-  }
-}
-
-/**
- * Enforces length boundaries (< 3 chars, > 55 chars) and segment complexity on filename stems.
- *
- * @param {string} file - Relative path to staged file.
- * @param {Array} nomenclatureViolations - Collector array for NOMENCLATURE findings.
- */
-function validateFilenameLength(file, nomenclatureViolations) {
-  const norm = file.replace(/\\/g, '/');
-  if (/(?:fixtures\/|testdata\/|\.bench|__mocks__\/|docs\/)/i.test(norm)) return;
-  const baseName = path.basename(file);
-  const ext = path.extname(baseName);
-  if (!/\.(?:ts|js|py|gd|rs|sh|ps1)$/i.test(ext)) return;
-  const stem = baseName.slice(0, baseName.length - ext.length);
-  const lower = stem.toLowerCase();
-  if (IGNORED_BASENAMES.has(lower)) return;
-  if (stem.length < MIN_FILENAME_STEM_LENGTH && !ALLOWED_SHORT_STEMS.has(lower)) {
-    const tpl = VIOLATION_TPLS.NAME_SHORT;
-    nomenclatureViolations.push(
-      createViolation({
-        ruleId: RULE_HYG_NAM_001,
-        file,
-        message: `文件名过短 (< ${MIN_FILENAME_STEM_LENGTH} 字符，缺乏语义描述): ${file}`,
-        actual: `${stem.length} chars`,
-        expected: tpl.expected,
-        actionableFix: tpl.actionableFix,
-      }),
-    );
-    return;
-  }
-  if (stem.length > MAX_FILENAME_STEM_LENGTH) {
-    const tpl = VIOLATION_TPLS.NAME_LONG;
-    nomenclatureViolations.push(
-      createViolation({
-        ruleId: RULE_HYG_NAM_001,
-        file,
-        message: `文件名过长 (> ${MAX_FILENAME_STEM_LENGTH} 字符，建议按子目录解耦): ${file}`,
-        actual: `${stem.length} chars`,
-        expected: tpl.expected,
-        actionableFix: tpl.actionableFix,
-      }),
-    );
-  }
-  validateFilenameSegments(file, stem, nomenclatureViolations);
 }
 
 /**
