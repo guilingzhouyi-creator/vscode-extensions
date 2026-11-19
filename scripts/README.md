@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**112 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**115 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -74,6 +74,7 @@
 | `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
 | `common/` | Node.js | `record-workspace-audit.js` | telemetry / audit（统一审查结论汇总落盘与跨项目得分聚合） | `audit-all` |
 | `common/` | Node.js | `render-audit-all-summary.js` | audit / summary（Linux Bash 统一审查 6 大支柱真实遥测聚合、零假保底裁决与十维质量看板渲染） | `audit-all.sh` |
+| `common/` | Node.js | `run-workspace-guards.js` | audit / orchestrator（Pillar-2 治理守卫有界并发调度器：统一运行 23 项规则与文档守卫并输出顺序退出码/日志索引） | `audit-all`、CI |
 | `common/` | Node.js | `evaluate-polyglot-balance.js` | audit / balance（异构多语言均衡指数与离散度惩罚度量） | `audit-all` |
 | `common/` | Node.js | `evaluate-workspace-quant.js` | telemetry / quant（资本负债与量化风险模型：利息覆盖率、夏普比率、索提诺比率、基尼系数与自愈半衰期评估） | `audit-all`、本地 CLI |
 | `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） |
@@ -94,7 +95,9 @@
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `common/` | JSON | `impact-slice-map.js` | data / slices（改动路径到预测试目标的影响面映射单源：包、测试与切片身份集中登记，供预测试机与本地切片共用） | `remote-sandbox-gate`、`validate-impact-slices` |
 | `common/` | JSON | `commit-rule-coverage.json` | data / ssot（提交信息门禁规则覆盖矩阵的数据面，登记每条提交层规则被哪些用例覆盖） | `validate-commit-rule-coverage` |
-| `common/` | JSON | `diff-bounds-contract.json` | data / ssot（5D ELOC、TSPR、删除换手率、重构放宽与 Jeffreys 经验准入的跨语言参数契约） | `gate-differential-bounds`、auto-refactor、taxis |
+| `common/` | JSON | `diff-bounds-contract.json` | data / ssot（weighted ELOC、TSPR、删除换手率、重构放宽与 Jeffreys 经验准入的跨语言参数契约） | `gate-differential-bounds`、auto-refactor、taxis |
+| `common/` | JSON | `quality-budget-contract.json` | data / ssot（静态体积 ELOC/LOC、圈复杂度 CC、嵌套深度、噪声比、接线率 POR 与密度 tau 走廊参数契约） | `evaluate-eloc-budget`、`validate-code-density`、`validate-staged-slice` |
+| `common/` | JSON | `ten-dimensions-contract.json` | data / ssot（十维工程质量向量 canonical key、序号、中英文名称与简要说明的单源契约） | `render-audit-all-summary`、`record-workspace-trajectory`、`parity-assertions`、`validate-scoring-rule-closure`、CI |
 | `common/` | JSON | `diff-exemptions.json` | data / ledger（差分豁免授予账本：`schemaVersion` 加 `grants` 映射，逐条记录被豁免标识的测量值、floor 与 target，随提交走以便审计复算） | `diff-exemption-ledger`、`gate-differential-bounds` |
 | `common/` | JSON | `rule-lexicon.json` | data / ssot（跨引擎与门禁脚本共享的规则标识符与语义步骤词汇形状单源字典） | 静态审查与提交门禁工具链 |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
