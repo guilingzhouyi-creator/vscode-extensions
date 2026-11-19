@@ -21,3 +21,7 @@ func preview_enhance_rate(target_level: int) -> Dictionary:
 	var max_rate := GameConfig.get_float(RULES_SECTION, RULES_KEY + "/max_success_rate", 1.0)
 	var success_rate := clampf(1.0 - float(maxi(0, target_level)) * decay, min_rate, max_rate)
 	return {"success": true, "rate": success_rate}
+
+## 模拟分发锻造、强化与分解协议动作
+func dispatch_crafting_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

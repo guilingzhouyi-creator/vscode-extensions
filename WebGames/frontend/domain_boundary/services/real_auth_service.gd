@@ -46,11 +46,8 @@ func login_async(username: String, password_plain: String, result_callback: Call
         return
 
     var account_id := str(service_response.data.get("account_id", ""))
-    var repository := AccountRepository.get_instance()
-    if not repository.is_loaded():
-        repository.load_all()
-    var account_profile: AccountProfile = repository.find_by_id(account_id)
-    var slots: Array = AccountSlotBindingSolver.to_frontend_character_slots(account_profile) if account_profile != null else []
+    var raw_slots: Variant = service_response.data.get("character_slots", [])
+    var slots: Array = (raw_slots as Array).duplicate(true) if raw_slots is Array else []
 
     if result_callback.is_valid():
         result_callback.call({
@@ -80,20 +77,13 @@ func register_async(username: String, password_plain: String, result_callback: C
         "username": str(service_response.data.get("username", trimmed_username)),
         "created_timestamp_utc": int(service_response.data.get("created_timestamp_utc", 0))
     }
-    var session_token := str(service_response.data.get("session_token", service_response.data.get("token", "")))
+    var session_token := str(service_response.data.get("session_token", ""))
     if auto_login or not session_token.is_empty():
-        var account_id := str(reply_payload.get("account_id", ""))
-        var repository := AccountRepository.get_instance()
-        if not repository.is_loaded():
-            repository.load_all()
-        var account_profile: AccountProfile = repository.find_by_id(account_id)
-        var slots: Array = AccountSlotBindingSolver.to_frontend_character_slots(account_profile) if account_profile != null else []
-        var world_reference := str(service_response.data.get("world_state_ref", ""))
-        if world_reference.is_empty() and account_profile != null and "world_state_ref" in account_profile:
-            world_reference = str(account_profile.world_state_ref)
+        var raw_slots: Variant = service_response.data.get("character_slots", [])
+        var slots: Array = (raw_slots as Array).duplicate(true) if raw_slots is Array else []
         reply_payload["token"] = session_token
         reply_payload["character_slots"] = slots
-        reply_payload["world_state_ref"] = world_reference
+        reply_payload["world_state_ref"] = str(service_response.data.get("world_state_ref", ""))
 
     if result_callback.is_valid():
         result_callback.call(reply_payload)
@@ -130,18 +120,17 @@ func get_servers_async(result_callback: Callable) -> void:
             "servers": servers.duplicate(true)
         })
 
-## 获取指定账号的角色槽位列表（优先经统一协议检索）
+## 获取指定账号的角色槽位列表（严格经统一协议检索）
 func get_characters_async(account_id: String, result_callback: Callable) -> void:
     var protocol_outcome := RealProtocolBridge.dispatch_flat("account", "LIST_CHARACTERS", {"account_id": account_id})
-    var slots: Array = protocol_outcome.get("characters", []) if protocol_outcome.get("characters") is Array else []
     if not bool(protocol_outcome.get("success", false)):
-        var repository := AccountRepository.get_instance()
-        if not repository.is_loaded():
-            repository.load_all()
-        var account_profile: AccountProfile = repository.find_by_id(account_id)
-        if account_profile != null:
-            slots = AccountSlotBindingSolver.to_frontend_character_slots(account_profile)
-
+        _emit_error_callback(
+            result_callback,
+            str(protocol_outcome.get("error_code", "ERR_LIST_CHARACTERS_FAILED")),
+            str(protocol_outcome.get("message", ""))
+        )
+        return
+    var slots: Array = protocol_outcome.get("characters", []) if protocol_outcome.get("characters") is Array else []
     if result_callback.is_valid():
         result_callback.call({
             "success": true,

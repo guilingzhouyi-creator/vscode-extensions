@@ -31,3 +31,7 @@ func transition_status(quest: Dictionary, quest_action: String) -> Dictionary:
 	var updated_quest: Dictionary = quest.duplicate(true)
 	updated_quest["status"] = str(transition_rule.get("to", current_status))
 	return {"success": true, "quest": updated_quest, "action": quest_action}
+
+## 模拟接取悬赏目标
+func accept_bounty(bounty_id: String, _reward_gold: int = 0) -> Dictionary:
+	return {"success": true, "quest_id": bounty_id, "status": "ACTIVE"}

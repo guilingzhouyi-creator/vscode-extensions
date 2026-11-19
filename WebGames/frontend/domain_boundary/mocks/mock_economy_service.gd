@@ -91,3 +91,7 @@ func generate_price_series(commodity_key: String) -> Array:
 		var sampled_price := base_price + int(sin(day_index * 1.2) * base_price * 0.1) + day_index * 2
 		prices.append(max(1, sampled_price))
 	return prices
+
+## 模拟分发商店买卖、竞拍与兑换协议动作
+func dispatch_economy_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

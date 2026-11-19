@@ -51,6 +51,7 @@ func generate_price_series(_commodity_key: String) -> Array:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.generate_price_series: pure virtual method must be implemented by subclass")
 	return []
 
-## 分发商店买卖、竞拍与兑换动作至后端经济域（默认兼容回执）
-func dispatch_economy_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
-	return {"success": true, "action": action_type, "payload": payload_data}
+## 分发商店买卖、竞拍与兑换动作至后端经济域
+func dispatch_economy_action(_action_type: String, _payload_data: Dictionary = {}) -> Dictionary:
+	EventBusCore.get_instance().emit_log("error", "IEconomyService.dispatch_economy_action: pure virtual method must be implemented by subclass")
+	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

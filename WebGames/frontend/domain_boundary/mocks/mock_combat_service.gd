@@ -18,8 +18,9 @@ func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) 
 
 ## 模拟异步拉取当前战斗（首领血量、部位耐久与玩家状态）快照
 func get_combat_snapshot_async(_battle_id: String, result_callback: Callable) -> void:
-	var combat_payload := MockDataCatalog.get_domain_data("combat")
-	MockBaseService.delayed_call(result_callback, { "success": true, "combat": combat_payload.duplicate(true) }, simulate_delay_ms)
+	var combat_payload := MockDataCatalog.get_domain_data("combat").duplicate(true)
+	combat_payload["success"] = true
+	MockBaseService.delayed_call(result_callback, combat_payload, simulate_delay_ms)
 
 var _action_seed: int = 123456789
 
@@ -33,7 +34,7 @@ func cast_skill_async(skill_id: String, target_id: String, result_callback: Call
 	MockBaseService.delayed_call(result_callback, {
 		"success": true,
 		"skill_id": skill_id,
-		"damage": damage,
+		"actual_damage": damage,
 		"is_crit": is_critical,
 		"target_id": target_id
 	}, simulate_delay_ms)

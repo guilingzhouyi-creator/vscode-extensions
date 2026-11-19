@@ -23,23 +23,16 @@ func get_rules() -> Dictionary:
 	var rate_5star := GameConfig.get_float("domains.gacha", "rates/base_5star", 0.006)
 	var rate_4star := GameConfig.get_float("domains.gacha", "rates/base_4star", 0.051)
 	var rate_3star := maxf(0.0, 1.0 - rate_5star - rate_4star)
-	var soft_pity := GameConfig.get_int("domains.gacha", "pity/soft_threshold", 70)
 	var hard_pity := GameConfig.get_int("domains.gacha", "pity/hard_threshold", 90)
 	var four_star_pity := GameConfig.get_int("domains.gacha", "pity/four_star_threshold", 10)
 	var cost_single := maxi(1, GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_gold", 160))
 	return {
-		"base_5star_rate": rate_5star,
-		"base_4star_rate": rate_4star,
 		"base_rate_5star": rate_5star,
 		"base_rate_4star": rate_4star,
 		"base_rate_3star": rate_3star,
 		"up_rate": GameConfig.get_float("domains.gacha", "rates/up_rate", 0.5),
-		"soft_pity": soft_pity,
-		"hard_pity": hard_pity,
-		"four_star_pity": four_star_pity,
 		"pity_5star_hard": hard_pity,
 		"pity_4star_hard": four_star_pity,
-		"cost_per_pull": cost_single,
 		"cost_single": cost_single,
 		"cost_ten": cost_single * 10,
 	}
@@ -47,7 +40,7 @@ func get_rules() -> Dictionary:
 ## 按软硬保底曲线与确定性随机序列生成掉落数组
 func generate_drops(pull_count: int, pity_5star: int, pity_4star: int) -> Array:
 	var gacha_rules: Dictionary = get_rules()
-	var four_star_limit: int = maxi(1, int(gacha_rules.get("four_star_pity", 10)))
+	var four_star_limit: int = maxi(1, int(gacha_rules.get("pity_4star_hard", 10)))
 	var rng := DeterministicRNG.global()
 	var local_5star: int = maxi(0, pity_5star)
 	var local_4star: int = maxi(0, pity_4star)
@@ -106,8 +99,8 @@ func resolve_pull(gacha_state: Dictionary, pull_count: int, injected_drops: Arra
 
 ## 校验原石余额并扣减对应抽数消耗（同步后端钱包会话）
 func purchase(currency_balance: int, pull_count: int) -> Dictionary:
-	var cost_per_pull: int = int(get_rules().get("cost_per_pull", 160))
-	var required_currency: int = maxi(0, pull_count) * cost_per_pull
+	var cost_single: int = int(get_rules().get("cost_single", 160))
+	var required_currency: int = maxi(0, pull_count) * cost_single
 	if currency_balance < required_currency:
 		return {"success": false, "error_code": "INSUFFICIENT_CURRENCY", "balance": currency_balance}
 	RealProtocolBridge.dispatch_flat("gacha", "PULL_GACHA", {"pull_count": maxi(0, pull_count)})

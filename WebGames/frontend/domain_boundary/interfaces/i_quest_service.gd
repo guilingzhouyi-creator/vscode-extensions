@@ -16,6 +16,7 @@ func transition_status(_quest: Dictionary, _action: String) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IQuestService.transition_status: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
-## 接取悬赏目标（默认兼容回执）
-func accept_bounty(bounty_id: String, _reward_gold: int = 0) -> Dictionary:
-	return {"success": true, "bounty_id": bounty_id, "status": "ACTIVE"}
+## 接取悬赏目标
+func accept_bounty(_bounty_id: String, _reward_gold: int = 0) -> Dictionary:
+	EventBusCore.get_instance().emit_log("error", "IQuestService.accept_bounty: pure virtual method must be implemented by subclass")
+	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

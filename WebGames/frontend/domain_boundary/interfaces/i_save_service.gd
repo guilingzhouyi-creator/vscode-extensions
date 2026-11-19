@@ -41,6 +41,7 @@ func clear_slot(slot_record: Dictionary) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.clear_slot: pure virtual method must be implemented by subclass")
 	return slot_record
 
-## 分发存档写入、导出、云同步与兑换码核销协议动作（默认兼容回执）
-func dispatch_save_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
-	return {"success": true, "action": action_type, "payload": payload_data}
+## 分发存档写入、导出、云同步与兑换码核销协议动作
+func dispatch_save_action(_action_type: String, _payload_data: Dictionary = {}) -> Dictionary:
+	EventBusCore.get_instance().emit_log("error", "ISaveService.dispatch_save_action: pure virtual method must be implemented by subclass")
+	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

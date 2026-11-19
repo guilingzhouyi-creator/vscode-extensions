@@ -32,7 +32,7 @@ func get_map_landmarks_async(result_callback: Callable) -> void:
 	var seen_ids: Dictionary = {}
 	for entry in landmarks:
 		if entry is Dictionary:
-			var identifier := str((entry as Dictionary).get("id", (entry as Dictionary).get("node_id", ""))).strip_edges()
+			var identifier := str((entry as Dictionary).get("id", "")).strip_edges()
 			if not identifier.is_empty():
 				seen_ids[identifier] = true
 	var raw_nodes: Variant = topology.get("nodes", [])
@@ -40,12 +40,12 @@ func get_map_landmarks_async(result_callback: Callable) -> void:
 		for raw_node in raw_nodes:
 			if raw_node is Dictionary:
 				var node_map := raw_node as Dictionary
-				var node_id := str(node_map.get("node_id", node_map.get("id", ""))).strip_edges()
+				var node_id := str(node_map.get("node_id", "")).strip_edges()
 				if not node_id.is_empty() and not seen_ids.has(node_id):
 					seen_ids[node_id] = true
 					landmarks.append({
 						"id": node_id,
-						"name": str(node_map.get("name", node_map.get("node_name", node_id))),
+						"name": str(node_map.get("name", node_id)),
 						"x": float(node_map.get("x", 0.0)),
 						"y": float(node_map.get("y", 0.0)),
 						"terrain_type": str(node_map.get("terrain_type", "PLAINS")),

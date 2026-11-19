@@ -19,22 +19,15 @@ func get_hud_snapshot_async(_character_id: String, _result_callback: Callable) -
 func get_map_landmarks_async(_result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.get_map_landmarks_async: pure virtual method must be implemented by subclass")
 
-## 寻路规划：起终点索引 → 候选路线数组（视图只渲染）
-func plan_routes(from_index: int, to_index: int) -> Array:
-	if from_index < 0 or to_index < 0 or from_index == to_index:
-		return []
-	return [
-		{"label": "A", "hours": 6, "danger_key": "ui.fe10.pf.danger_low", "cost": 50},
-		{"label": "B", "hours": 4, "danger_key": "ui.fe10.pf.danger_mid", "cost": 80},
-		{"label": "C", "hours": 3, "danger_key": "ui.fe10.pf.danger_high", "cost": 120},
-	]
+## 寻路规划：起终点索引 → 候选路线数组（纯虚契约）
+func plan_routes(_from_index: int, _to_index: int) -> Array:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.plan_routes: pure virtual method must be implemented by subclass")
+	return []
 
-## 领地升级：建设完成与驻军提升规则（返回新领地副本）
-func upgrade_territory(territory: Dictionary) -> Dictionary:
-	var updated_territory: Dictionary = territory.duplicate(true)
-	updated_territory["construction"] = 1.0
-	updated_territory["garrison"] = int(updated_territory.get("garrison", 0)) + 10
-	return {"success": true, "territory": updated_territory}
+## 领地升级：建设完成与驻军提升规则（纯虚契约）
+func upgrade_territory(_territory: Dictionary) -> Dictionary:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.upgrade_territory: pure virtual method must be implemented by subclass")
+	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
 ## 异步进入网关契约 (对齐 ENTER_GATEWAY)
 func enter_gateway_async(_account_id: String, _token: String, _result_callback: Callable) -> void:
@@ -156,6 +149,7 @@ func verify_realm_manifest_async(_account_id: String, _token: String, _realm_mod
 	if result_callback.is_valid():
 		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
-## 分发怪物生态与世界导航协议动作（默认兼容回执）
-func dispatch_world_directive(domain_name: String, action_type: String, payload_data: Dictionary = {}) -> Dictionary:
-	return {"success": true, "domain": domain_name, "action": action_type, "payload": payload_data}
+## 分发怪物生态与世界导航协议动作
+func dispatch_world_directive(_domain_name: String, _action_type: String, _payload_data: Dictionary = {}) -> Dictionary:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.dispatch_world_directive: pure virtual method must be implemented by subclass")
+	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

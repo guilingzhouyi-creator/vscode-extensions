@@ -53,3 +53,7 @@ func claim_one(mails: Array, mail_id: String) -> Dictionary:
 			mail_entry["is_claimed"] = true
 			return {"success": true, "mails": updated_mails, "mail_id": mail_id}
 	return {"success": false, "error_code": "MAIL_NOT_FOUND", "mails": updated_mails}
+
+## 模拟分发发信或存草稿协议动作
+func dispatch_mail_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

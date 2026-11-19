@@ -13,7 +13,7 @@ extends "res://frontend/domain_boundary/interfaces/i_combat_service.gd"
 
 ## 获取当前战斗快照（首领多阶段血量、护盾与活跃玩家实时状态）
 func get_combat_snapshot_async(battle_id: String, result_callback: Callable) -> void:
-	var outcome := RealProtocolBridge.dispatch_flat("combat", "GET_COMBAT_SNAPSHOT", {"battle_id": battle_id})
+	var outcome := RealProtocolBridge.dispatch_flat("combat", "GET_COMBAT_SNAPSHOT", {"target_id": battle_id})
 	if result_callback.is_valid():
 		result_callback.call(outcome)
 

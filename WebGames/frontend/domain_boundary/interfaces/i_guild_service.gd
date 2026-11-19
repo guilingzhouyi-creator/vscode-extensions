@@ -26,6 +26,7 @@ func trade_transition(_trade_state: Dictionary, _trade_action: String) -> Dictio
 	EventBusCore.get_instance().emit_log("error", "IGuildService.trade_transition: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
-## 分发公会管理、好友、聊天与交易协议动作（默认兼容回执）
-func dispatch_guild_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
-	return {"success": true, "action": action_type, "payload": payload_data}
+## 分发公会管理、好友、聊天与交易协议动作
+func dispatch_guild_action(_action_type: String, _payload_data: Dictionary = {}) -> Dictionary:
+	EventBusCore.get_instance().emit_log("error", "IGuildService.dispatch_guild_action: pure virtual method must be implemented by subclass")
+	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

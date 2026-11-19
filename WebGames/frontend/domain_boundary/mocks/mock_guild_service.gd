@@ -73,3 +73,7 @@ func trade_transition(trade_state: Dictionary, trade_action: String) -> Dictiona
 		_:
 			return {"success": false, "error_code": "INVALID_ACTION", "locked": is_locked, "confirmed": is_confirmed}
 	return {"success": true, "locked": is_locked, "confirmed": is_confirmed}
+
+## 模拟分发公会管理、好友、聊天与交易协议动作
+func dispatch_guild_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

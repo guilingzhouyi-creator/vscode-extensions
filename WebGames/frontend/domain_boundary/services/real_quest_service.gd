@@ -30,7 +30,7 @@ func transition_status(quest: Dictionary, action: String) -> Dictionary:
 	var next_status := str(allowed_actions[requested_action])
 	quest_copy["status"] = next_status
 	RealProtocolBridge.dispatch_flat("quest", "TRANSITION_QUEST", {
-		"quest_id": str(quest_copy.get("quest_id", quest_copy.get("id", ""))),
+		"quest_id": str(quest_copy.get("quest_id", "")),
 		"next_status": next_status,
 	})
 	return {"success": true, "quest": quest_copy, "error_code": ""}
@@ -38,7 +38,7 @@ func transition_status(quest: Dictionary, action: String) -> Dictionary:
 ## 接取动态悬赏目标并持久化至后端任务记录
 func accept_bounty(bounty_id: String, reward_gold: int = 0) -> Dictionary:
 	return RealProtocolBridge.dispatch_flat("quest", "ACCEPT_BOUNTY", {
-		"bounty_id": bounty_id,
+		"quest_id": bounty_id,
 		"next_status": "ACTIVE",
 		"reward_gold": reward_gold,
 	})

@@ -27,30 +27,30 @@ func _has_active_mutation(active_mutations: Array, target_key: String) -> bool:
 func activate_mutation(active_mutations: Array, mutation_entry: Dictionary, max_slots: int) -> Dictionary:
 	var slot_limit: int = maxi(1, max_slots)
 	if active_mutations.size() >= slot_limit:
-		return {"success": false, "mutations": active_mutations.duplicate(true), "reason": "MUTATION_SLOTS_FULL"}
+		return {"success": false, "mutations": active_mutations.duplicate(true), "error_code": "MUTATION_SLOTS_FULL"}
 	var target_key: String = _extract_mutation_key(mutation_entry)
 	if _has_active_mutation(active_mutations, target_key):
-		return {"success": false, "mutations": active_mutations.duplicate(true), "reason": "MUTATION_ALREADY_ACTIVE"}
+		return {"success": false, "mutations": active_mutations.duplicate(true), "error_code": "MUTATION_ALREADY_ACTIVE"}
 	var updated_mutations: Array = active_mutations.duplicate(true)
 	updated_mutations.append(mutation_entry.duplicate(true))
-	return {"success": true, "mutations": updated_mutations, "reason": ""}
+	return {"success": true, "mutations": updated_mutations, "error_code": ""}
 
 ## 替换当前激活列表末位的突变词条
 func replace_last_mutation(active_mutations: Array, mutation_entry: Dictionary) -> Dictionary:
 	if active_mutations.is_empty():
-		return {"success": false, "mutations": [], "reason": "NO_ACTIVE_MUTATIONS"}
+		return {"success": false, "mutations": [], "error_code": "NO_ACTIVE_MUTATIONS"}
 	var updated_mutations: Array = active_mutations.duplicate(true)
 	updated_mutations[updated_mutations.size() - 1] = mutation_entry.duplicate(true)
-	return {"success": true, "mutations": updated_mutations, "reason": ""}
+	return {"success": true, "mutations": updated_mutations, "error_code": ""}
 
 ## 校验地面掉落索引并执行无副作用列表移除
 func pickup_loot(loot_entries: Array, loot_index: int) -> Dictionary:
 	if loot_index < 0 or loot_index >= loot_entries.size():
-		return {"success": false, "loot": loot_entries.duplicate(true), "item": {}, "reason": "INVALID_LOOT_INDEX"}
+		return {"success": false, "loot": loot_entries.duplicate(true), "item": {}, "error_code": "INVALID_LOOT_INDEX"}
 	var remaining_loot: Array = loot_entries.duplicate(true)
 	var picked_entry: Variant = remaining_loot[loot_index]
 	remaining_loot.remove_at(loot_index)
-	return {"success": true, "loot": remaining_loot, "item": picked_entry, "reason": ""}
+	return {"success": true, "loot": remaining_loot, "item": picked_entry, "error_code": ""}
 
 ## 读取命名类型对应的注册手续费
 func get_name_type_fee(type_index: int) -> int:

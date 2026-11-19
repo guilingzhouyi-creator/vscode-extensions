@@ -72,10 +72,10 @@ static func get_instance() -> ServiceContainer:
 				_instance = MockServiceContainer.get_instance()
 			_:
 				EventBusCore.get_instance().emit_log(
-					"warn",
-					TemplateFormatter.format("ServiceLocator: unknown service_mode '{mode}', falling back to mock", {"mode": mode})
+					"error",
+					TemplateFormatter.format("ServiceLocator: unknown service_mode '{mode}', fail-closed (no mock fallback)", {"mode": mode})
 				)
-				_instance = MockServiceContainer.get_instance()
+				return null
 	return _instance
 
 ## 获取当前服务模式（从 custom_mode 覆盖或 frontend.ui.service_mode 配置读取，默认 real）

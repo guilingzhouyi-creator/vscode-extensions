@@ -28,31 +28,34 @@ func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) 
 ## 模拟异步账号密码登录校验并返回模拟令牌
 func login_async(username: String, password_plain: String, result_callback: Callable) -> void:
 	if username.is_empty():
-		MockBaseService.delayed_call(result_callback, { "success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "用户名不能为空" }, simulate_delay_ms)
+		MockBaseService.delayed_call(result_callback, {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "用户名不能为空"}, simulate_delay_ms)
 		return
 	if password_plain == "wrong":
-		MockBaseService.delayed_call(result_callback, { "success": false, "error_code": "ERR_INVALID_CREDENTIALS", "message": "密码错误" }, simulate_delay_ms)
+		MockBaseService.delayed_call(result_callback, {"success": false, "error_code": "ERR_INVALID_CREDENTIALS", "message": "密码错误"}, simulate_delay_ms)
 		return
 
+	var derived_account_id := "ACC_" + username.strip_edges().to_upper()
 	MockBaseService.delayed_call(result_callback, {
 		"success": true,
-		"account_id": "ACC_MOCK_1001",
+		"account_id": derived_account_id,
 		"username": username,
-		"token": "MOCK_TOKEN_eyJhbGciOiJIUzI1NiJ9"
+		"token": "TOKEN_" + derived_account_id,
+		"character_slots": _mock_characters.duplicate(true),
 	}, simulate_delay_ms)
 
 ## 模拟异步新账号注册请求（支持可选自动登录并签发模拟令牌）
 func register_async(username: String, password_plain: String, result_callback: Callable, auto_login: bool = false) -> void:
 	if username.is_empty() or password_plain.is_empty():
-		MockBaseService.delayed_call(result_callback, { "success": false, "error_code": "ERR_PARAM_INVALID", "message": "账号或密码不能为空" }, simulate_delay_ms)
+		MockBaseService.delayed_call(result_callback, {"success": false, "error_code": "ERR_PARAM_INVALID", "message": "账号或密码不能为空"}, simulate_delay_ms)
 		return
+	var derived_account_id := "ACC_" + username.strip_edges().to_upper()
 	var response_payload: Dictionary = {
 		"success": true,
-		"account_id": "ACC_MOCK_NEW",
+		"account_id": derived_account_id,
 		"username": username
 	}
 	if auto_login:
-		response_payload["token"] = "MOCK_TOKEN_eyJhbGciOiJIUzI1NiJ9"
+		response_payload["token"] = "TOKEN_" + derived_account_id
 		response_payload["character_slots"] = _mock_characters.duplicate(true)
 	MockBaseService.delayed_call(result_callback, response_payload, simulate_delay_ms)
 
@@ -60,17 +63,17 @@ func register_async(username: String, password_plain: String, result_callback: C
 func get_servers_async(result_callback: Callable) -> void:
 	var base_payload := MockDataCatalog.get_domain_data("account")
 	var servers: Array = base_payload.get("default_servers", [])
-	MockBaseService.delayed_call(result_callback, { "success": true, "servers": servers.duplicate(true) }, simulate_delay_ms)
+	MockBaseService.delayed_call(result_callback, {"success": true, "servers": servers.duplicate(true)}, simulate_delay_ms)
 
 ## 模拟异步查询账号下角色槽位列表
 func get_characters_async(_account_id: String, result_callback: Callable) -> void:
-	MockBaseService.delayed_call(result_callback, { "success": true, "characters": _mock_characters.duplicate(true) }, simulate_delay_ms)
+	MockBaseService.delayed_call(result_callback, {"success": true, "characters": _mock_characters.duplicate(true)}, simulate_delay_ms)
 
 ## 模拟异步创建角色并写入首个空闲槽位
 func create_character_async(_account_id: String, request_payload: Dictionary, result_callback: Callable) -> void:
 	var character_name: String = str(request_payload.get("name", "")).strip_edges()
 	if character_name.is_empty():
-		MockBaseService.delayed_call(result_callback, { "success": false, "error_code": "ERR_NAME_EMPTY", "message": "角色名不能为空" }, simulate_delay_ms)
+		MockBaseService.delayed_call(result_callback, {"success": false, "error_code": "ERR_NAME_EMPTY", "message": "角色名不能为空"}, simulate_delay_ms)
 		return
 
 	var new_slot := {
@@ -94,7 +97,7 @@ func create_character_async(_account_id: String, request_payload: Dictionary, re
 	if not is_placed:
 		_mock_characters.append(new_slot)
 
-	MockBaseService.delayed_call(result_callback, { "success": true, "character": new_slot }, simulate_delay_ms)
+	MockBaseService.delayed_call(result_callback, {"success": true, "character": new_slot}, simulate_delay_ms)
 
 ## 六维资质骰点：确定性 8~18 生成（规则归边界层，视图只消费结果）
 func roll_attribute_spread() -> Dictionary:
@@ -107,12 +110,12 @@ func roll_attributes_async(result_callback: Callable) -> void:
 ## 模拟异步吊销会话令牌
 func revoke_token(token: String, result_callback: Callable = Callable()) -> void:
 	if result_callback.is_valid():
-		MockBaseService.delayed_call(result_callback, { "success": true, "token": token }, simulate_delay_ms)
+		MockBaseService.delayed_call(result_callback, {"success": true, "token": token}, simulate_delay_ms)
 
 ## 模拟异步退出当前登录账号
 func logout_async(account_id: String, _token: String, result_callback: Callable = Callable()) -> void:
 	if result_callback.is_valid():
-		MockBaseService.delayed_call(result_callback, { "success": true, "account_id": account_id }, simulate_delay_ms)
+		MockBaseService.delayed_call(result_callback, {"success": true, "account_id": account_id}, simulate_delay_ms)
 
 ## 模拟异步游客免密快捷登录
 func login_guest_async(_device_fingerprint: String = "", result_callback: Callable = Callable()) -> void:

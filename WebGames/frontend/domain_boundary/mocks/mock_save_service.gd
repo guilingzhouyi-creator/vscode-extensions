@@ -51,3 +51,7 @@ func clear_slot(slot_record: Dictionary) -> Dictionary:
 	updated_slot["playtime_sec"] = 0
 	updated_slot["save_date"] = ""
 	return updated_slot
+
+## 模拟分发存档写入、导出、云同步与兑换码核销协议动作
+func dispatch_save_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return {"success": true, "action": action_type, "payload": payload_data}

@@ -164,7 +164,7 @@ func list_remote_realms_async(_account_id: String, _token: String, result_callba
 		result_callback,
 		{
 			"success": true,
-			"realms": []
+			"data": {"realms": []}
 		},
 		simulate_delay_ms
 	)
@@ -239,7 +239,7 @@ func list_installed_mods_async(
 	]
 	MockBaseService.delayed_call(
 		result_callback,
-		{"success": true, "data": {"installed_packs": mock_packs, "selected_pack_ids": ["mock_sandbox_base"]}},
+		{"success": true, "data": {"packages": mock_packs, "selected_pack_ids": ["mock_sandbox_base"]}},
 		simulate_delay_ms
 	)
 
@@ -363,3 +363,38 @@ func verify_realm_manifest_async(
 		{"success": true, "data": {"verified": true, "manifest_count": realm_mod_manifest.size()}},
 		simulate_delay_ms
 	)
+
+## 模拟寻路规划：起终点索引 -> 候选路线数组
+func plan_routes(from_index: int, to_index: int) -> Array:
+	if from_index < 0 or to_index < 0 or from_index == to_index:
+		return []
+	return [
+		{"label": "A", "hours": 6, "danger_key": "ui.fe10.pf.danger_low", "cost": 50},
+		{"label": "B", "hours": 4, "danger_key": "ui.fe10.pf.danger_mid", "cost": 80},
+		{"label": "C", "hours": 3, "danger_key": "ui.fe10.pf.danger_high", "cost": 120},
+	]
+
+## 模拟领地升级：建设完成与驻军提升规则
+func upgrade_territory(territory: Dictionary) -> Dictionary:
+	var updated_territory: Dictionary = territory.duplicate(true)
+	updated_territory["construction"] = 1.0
+	updated_territory["garrison"] = int(updated_territory.get("garrison", 0)) + 10
+	return {"success": true, "territory": updated_territory}
+
+## 模拟分发怪物生态与世界导航协议动作
+func dispatch_world_directive(domain_name: String, action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	if action_type == "ESTABLISH_SOVEREIGNTY":
+		return {
+			"success": true,
+			"domain": domain_name,
+			"action": action_type,
+			"sovereignty": {
+				"nation_name": "ui.fe10.mock.sov.nation_name",
+				"monarch": "ui.fe10.mock.sov.monarch",
+				"population": 1200,
+				"territory_count": int(payload_data.get("territory_count", 0)),
+				"level": "ui.fe10.mock.sov.level",
+			},
+			"payload": payload_data,
+		}
+	return {"success": true, "domain": domain_name, "action": action_type, "payload": payload_data}

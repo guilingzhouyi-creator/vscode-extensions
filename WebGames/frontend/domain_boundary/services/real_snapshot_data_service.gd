@@ -31,11 +31,8 @@ func _build_character_snapshot() -> Dictionary:
 	var live_context: Dictionary = WorldSessionRuntimeService.build_live_hud_context()
 	if live_context.has("character") and live_context.get("character") is Dictionary:
 		return (live_context.get("character") as Dictionary).duplicate(true)
-	var default_attributes: Dictionary = {
-		"STR": 10, "AGI": 10, "CON": 10, "INT": 10, "WIS": 10, "CHA": 10
-	}
 	var live_attributes: Variant = live_context.get("attribute_values", {})
-	var resolved_attributes := (live_attributes as Dictionary).duplicate(true) if (live_attributes is Dictionary and not (live_attributes as Dictionary).is_empty()) else default_attributes
+	var resolved_attributes := (live_attributes as Dictionary).duplicate(true) if live_attributes is Dictionary else {}
 	return {
 		"character_id": str(live_context.get("character_id", "")),
 		"name": str(live_context.get("character_name", "")),
@@ -92,12 +89,12 @@ func _build_world_map_snapshot() -> Dictionary:
 		for raw_node in topology_nodes:
 			if raw_node is Dictionary:
 				var node_map := raw_node as Dictionary
-				var node_id := str(node_map.get("node_id", node_map.get("id", ""))).strip_edges()
+				var node_id := str(node_map.get("node_id", "")).strip_edges()
 				if not node_id.is_empty() and not seen_ids.has(node_id):
 					seen_ids[node_id] = true
 					configured_landmarks.append({
 						"id": node_id,
-						"name": str(node_map.get("name", node_map.get("node_name", node_id))),
+						"name": str(node_map.get("name", node_id)),
 						"x": float(node_map.get("x", 0.0)),
 						"y": float(node_map.get("y", 0.0)),
 						"terrain_type": str(node_map.get("terrain_type", "PLAINS")),
@@ -112,6 +109,25 @@ func _build_world_map_snapshot() -> Dictionary:
 		"territories": (raw_territories as Array).duplicate(true) if raw_territories is Array else [],
 	}
 
+## 构建抽卡祈愿域实时状态快照
+func _build_gacha_snapshot() -> Dictionary:
+	var banner_defaults: Dictionary = GameConfig.get_dict("domains.gacha", "banner_defaults", {})
+	var default_id := str(banner_defaults.get("banner_id", "BANNER_STANDARD_DEFAULT"))
+	var live_context: Dictionary = WorldSessionRuntimeService.build_live_hud_context() if WorldSessionRuntimeService.has_active_world() else {}
+	return {
+		"default_banner_id": default_id,
+		"pity_5star": 0,
+		"pity_4star": 0,
+		"currency_primogems": int(live_context.get("wallet_mana_monocrystals", 0)),
+		"banners": [ {
+			"banner_id": default_id,
+			"title": str(banner_defaults.get("banner_title", default_id)),
+			"subtitle": str(banner_defaults.get("fallback_title", "")),
+			"remaining_time": "-",
+			"up_items": [],
+		}],
+	}
+
 ## 按域标识读取实时状态快照（未激活会话时安全返回配置驱动空壳或空字典）
 func load_snapshot(domain_id: String) -> Dictionary:
 	match domain_id.strip_edges():
@@ -123,5 +139,7 @@ func load_snapshot(domain_id: String) -> Dictionary:
 			return _build_economy_snapshot()
 		"world_map":
 			return _build_world_map_snapshot()
+		"gacha":
+			return _build_gacha_snapshot()
 		_:
 			return {}

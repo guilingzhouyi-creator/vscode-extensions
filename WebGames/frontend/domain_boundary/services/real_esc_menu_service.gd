@@ -37,7 +37,6 @@ func request_save_async(target_slot: String, is_quicksave: bool, result_callback
 	var slot_to_save := target_slot if not target_slot.is_empty() else WorldSessionRuntimeService.get_active_slot_id()
 	_dispatch_esc_action("ESC_SAVE_GAME", {
 		"slot_id": slot_to_save,
-		"target_save_slot": slot_to_save,
 		"is_quicksave": is_quicksave
 	}, result_callback)
 
@@ -56,7 +55,6 @@ func exit_to_gateway_async(result_callback: Callable, auto_save: bool = true, al
 func quit_game_async(result_callback: Callable, save_before_quit: bool = true, require_save_success: bool = false, force_quit: bool = false) -> void:
 	_dispatch_esc_action("ESC_QUIT_GAME", {
 		"slot_id": WorldSessionRuntimeService.get_active_slot_id(),
-		"target_save_slot": WorldSessionRuntimeService.get_active_slot_id(),
 		"save_before_quit": save_before_quit,
 		"require_save_success": require_save_success,
 		"force_quit": force_quit
