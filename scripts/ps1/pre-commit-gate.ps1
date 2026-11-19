@@ -440,53 +440,37 @@ if ($stagedFiles | Where-Object { $_ -match "^workspace-timing/(CHANGELOG\.md|RE
 }
 
 if ($hasArCompile) {
-    if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
+    Write-StepBanner -StepId "ENGINE-COMPILE-07"
+    $okArCompile = $true
     if ($hasArCrates.Count -gt 0) {
-        # Crate sources only exist inside the Rust workspace under auto-refactor/crates.
         $arManifest = Join-Path $repoRoot "auto-refactor/crates/Cargo.toml"
-        if ($Agent) {
-            if (-not $cargoCmd) {
-                $json = Write-PreCommitFailure `
-                    -StepId "ENGINE-COMPILE-07" `
-                    -RuleId "L0-COMPILE" `
+        if (-not $cargoCmd) {
+            if ($isMachineMode) {
+                $json = Write-PreCommitFailure -StepId "ENGINE-COMPILE-07" -RuleId "L0-COMPILE" `
                     -Summary "cargo is unavailable, so auto-refactor crate sources cannot be compiled." `
                     -ActionableFix "Install the Rust toolchain, then re-run the commit gate." `
                     -VerifyCmd "cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets" `
-                    -TargetFiles $hasArCrates `
-                    -Details "cargo executable was not resolved on this host."
+                    -TargetFiles $hasArCrates -Details "cargo executable was not resolved on this host."
                 Write-Output $json
                 exit 1
             }
-            $out = & $cargoCmd check --workspace --manifest-path $arManifest --all-targets 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                $json = Write-PreCommitFailure `
-                    -StepId "ENGINE-COMPILE-07" `
-                    -RuleId "L0-COMPILE" `
-                    -Summary "Rust crate compilation failed in auto-refactor." `
-                    -ActionableFix "Run cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets and resolve errors." `
-                    -VerifyCmd "cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets" `
-                    -TargetFiles $hasArCrates `
-                    -Details ($out -join "`n")
-                Write-Output $json
-                exit 1
-            }
-            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor Rust 增量编译通过"
+            $failed = $true
+            $okArCompile = $false
         } else {
-            $process = Start-GateProcess -FilePath $cargoCmd -ArgumentList "check", "--workspace", "--manifest-path", $arManifest, "--all-targets" -WorkingDirectory $repoRoot
-            if ($process.ExitCode -ne 0) {
-                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor Rust 编译失败"
-                $failed = $true
-            } else {
-                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor Rust 增量编译通过"
-            }
+            $okArCompile = Invoke-PreCommitCheck -StepId "ENGINE-COMPILE-07" -RuleId "L0-COMPILE" `
+                -FilePath $cargoCmd -ArgumentList @("check", "--workspace", "--manifest-path", $arManifest, "--all-targets") -WorkingDirectory $repoRoot `
+                -Summary "Rust crate compilation failed in auto-refactor." `
+                -ActionableFix "Run cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets and resolve errors." `
+                -VerifyCmd "cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets" `
+                -TargetFiles $hasArCrates -DefaultTimeout 120
         }
+        Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status $(if ($okArCompile) { "PASS" } else { "BLOCK" }) -Detail $(if ($okArCompile) { "auto-refactor Rust 增量编译通过" } else { "auto-refactor Rust 编译失败" })
     } else {
         $arDistEntry = Join-Path $repoRoot "auto-refactor/dist/index.js"
         $arNeedsBuild = -not (Test-Path $arDistEntry)
         if (-not $arNeedsBuild) {
             $arDistTime = (Get-Item $arDistEntry).LastWriteTimeUtc
-            $arStagedSrc = @($stagedFiles | Where-Object { $_ -match "^auto-refactor/src/.+\.ts$" })
-            foreach ($srcFile in $arStagedSrc) {
+            foreach ($srcFile in @($stagedFiles | Where-Object { $_ -match "^auto-refactor/src/.+\.ts$" })) {
                 $srcPath = Join-Path $repoRoot $srcFile
                 if ((Test-Path $srcPath) -and ((Get-Item $srcPath).LastWriteTimeUtc -gt $arDistTime)) {
                     $arNeedsBuild = $true
@@ -495,34 +479,14 @@ if ($hasArCompile) {
             }
         }
         if ($arNeedsBuild) {
-            if ($Agent) {
-                $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
-                $out = $childBuild.Output
-                if ($childBuild.ExitCode -ne 0) {
-                    $json = Write-PreCommitFailure `
-                        -StepId "ENGINE-COMPILE-07" `
-                        -RuleId "L0-COMPILE" `
-                        -Summary "TypeScript compilation failed in auto-refactor." `
-                        -ActionableFix "Run 'npm run build' in auto-refactor and resolve compiler errors." `
-                        -VerifyCmd "npm --prefix auto-refactor run build" `
-                        -TargetFiles @("auto-refactor/src") `
-                        -Details ($out -join "`n")
-                    Write-Output $json
-                    exit 1
-                }
-            } else {
-                $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
-                if ($process.ExitCode -ne 0) {
-                    Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor 编译失败"
-                    $failed = $true
-                } else {
-                    Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 增量编译通过"
-                }
-            }
+            $okArCompile = Invoke-PreCommitCheck -StepId "ENGINE-COMPILE-07" -RuleId "L0-COMPILE" `
+                -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") `
+                -Summary "TypeScript compilation failed in auto-refactor." `
+                -ActionableFix "Run 'npm run build' in auto-refactor and resolve compiler errors." `
+                -VerifyCmd "npm --prefix auto-refactor run build" -TargetFiles @("auto-refactor/src") -DefaultTimeout 120
+            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status $(if ($okArCompile) { "PASS" } else { "BLOCK" }) -Detail $(if ($okArCompile) { "auto-refactor 增量编译通过" } else { "auto-refactor 编译失败" })
         } else {
-            if (-not $Agent) {
-                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 编译产物已是最新 (免去二次冗余构建)"
-            }
+            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 编译产物已是最新 (免去二次冗余构建)"
         }
     }
 
@@ -530,36 +494,25 @@ if ($hasArCompile) {
         $arStagedCode = @($stagedFiles | Where-Object { $_ -match "^auto-refactor/(src|tests/unit)/.+\.ts$" })
         if ($arStagedCode -and $arStagedCode.Count -gt 0) {
             $arRelArgs = @($arStagedCode | ForEach-Object { $_ -replace "^auto-refactor/", "" })
-            if (-not $Agent) { Write-StepBanner -StepId "ENGINE-TESTS-08" }
-            if ($Agent) {
-                $childVitest = Invoke-VitestRelated -RelativePaths $arRelArgs `
-                    -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NodeCommand $nodeCmd -TimeoutSeconds 180
-                $outVitest = $childVitest.Output
-                if ($childVitest.ExitCode -ne 0) {
-                    $json = Write-PreCommitFailure `
-                        -StepId "ENGINE-TESTS-08" `
-                        -RuleId "GUARD-SYS-001" `
-                        -Summary "Impacted unit tests failed in auto-refactor." `
-                        -ActionableFix "Re-run scripts/ps1/pre-commit-gate.ps1 and inspect the vitest failure detail below." `
-                        -VerifyCmd "npx --prefix auto-refactor vitest related <changed-source> --run --passWithNoTests=false" `
-                        -TargetFiles $arStagedCode `
-                        -Details ($outVitest -join "`n")
-                    Write-Output $json
-                    exit 1
-                }
-            } else {
-                $pVitest = Invoke-VitestRelated -RelativePaths $arRelArgs `
-                    -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NodeCommand $nodeCmd -TimeoutSeconds 180
-                if ($pVitest.ExitCode -ne 0) {
-                    Write-StepVerdict -StepId "ENGINE-TESTS-08" -Status "BLOCK" -Detail "auto-refactor 增量影响单测未通过"
-                    $failed = $true
-                } else {
-                    Write-StepVerdict -StepId "ENGINE-TESTS-08" -Status "PASS" -Detail "增量影响单测通过"
-                }
+            Write-StepBanner -StepId "ENGINE-TESTS-08"
+            $arTestTimeout = Get-GateStepTimeout -StepId "ENGINE-TESTS-08" -DefaultSeconds 180
+            $pVitest = Invoke-VitestRelated -RelativePaths $arRelArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor") `
+                -NodeCommand $nodeCmd -TimeoutSeconds $arTestTimeout
+            $okArTest = ($pVitest.ExitCode -eq 0)
+            if (-not $okArTest -and $isMachineMode) {
+                $json = Write-PreCommitFailure -StepId "ENGINE-TESTS-08" -RuleId "GUARD-SYS-001" `
+                    -Summary "Impacted unit tests failed in auto-refactor." `
+                    -ActionableFix "Re-run scripts/ps1/pre-commit-gate.ps1 and inspect the vitest failure detail below." `
+                    -VerifyCmd "npx --prefix auto-refactor vitest related <changed-source> --run --passWithNoTests=false" `
+                    -TargetFiles $arStagedCode -Details ($pVitest.Output -join "`n")
+                Write-Output $json
+                exit 1
             }
+            if (-not $okArTest) { $failed = $true }
+            Write-StepVerdict -StepId "ENGINE-TESTS-08" -Status $(if ($okArTest) { "PASS" } else { "BLOCK" }) -Detail $(if ($okArTest) { "增量影响单测通过" } else { "auto-refactor 增量影响单测未通过" })
         }
     }
-} elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^auto-refactor/" })) {
+} elseif (-not $isMachineMode -and ($stagedFiles | Where-Object { $_ -match "^auto-refactor/" })) {
     Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "SKIP" -Detail "仅文档或配置变更"
 }
 
