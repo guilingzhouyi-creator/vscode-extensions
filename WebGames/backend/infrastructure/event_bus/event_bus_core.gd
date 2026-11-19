@@ -2,7 +2,7 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/event_bus_core.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus_config.json | 信号: 全域领域事件中心分发
 # 职责说明: 全域解耦事件中枢核心单例：提供强类型事件订阅、通道路由、同步即时派发与异步队列缓冲支持；包含强弱引用生命周期管理，彻底防范观察者内存泄漏与悬挂指针双重广播。
 # 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
@@ -11,11 +11,17 @@
 class_name EventBusCore
 extends RefCounted
 
+const DYNAMIC_CHANNEL_ID_BASE: int = 0x10000
+
 static var _instance: EventBusCore = null
 
 var _channel_routes: Dictionary = {} # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
-var _channel_name_to_id: Dictionary = {} # "channel_string" -> channel_id(int)
+var _channel_name_to_id: Dictionary = {} # 静态配置注册表 "channel_string" -> channel_id(int)
+var _dynamic_name_to_id: Dictionary = {} # 运行期动态信道 "channel_string" -> channel_id(int >= 0x10000)
 var _id_to_channel_name: Dictionary = {} # channel_id(int) -> "channel_string"
+var _id_to_category_mask: Dictionary = {} # channel_id(int) -> EventCategoryMask 位掩码
+var _id_to_is_narrative: Dictionary = {} # channel_id(int) -> bool（是否允许尝试叙事文案解析）
+var _next_dynamic_channel_id: int = DYNAMIC_CHANNEL_ID_BASE
 var _channel_cache_version: int = -1
 var _spatial_grid: HeadlessSpatialHashGrid3D = null
 var _ring_buffer: PingPongRingBuffer = null
@@ -41,6 +47,8 @@ var _is_warning_high_frequency: bool = false
 static var _record_sequence_number: int = 0
 static var _narrative_table_cache: Dictionary = {}
 static var _narrative_cache_version: int = -1
+static var _domain_event_key_cache: Dictionary = {}
+const MAX_DOMAIN_EVENT_KEY_CACHE: int = 1024
 
 func _init() -> void:
 	_spatial_grid = HeadlessSpatialHashGrid3D.new(16.0)
@@ -57,6 +65,39 @@ static func get_instance() -> EventBusCore:
 		_instance = EventBusCore.new()
 	return _instance
 
+## 将配置类别字符串映射为正交掩码常量
+static func _category_name_to_mask(category_name: String) -> int:
+	match category_name.strip_edges().to_upper():
+		"CORE_STATE":
+			return EventCategoryMask.CORE_STATE
+		"SPATIAL_VFX":
+			return EventCategoryMask.SPATIAL_VFX
+		"SPATIAL_AUDIO":
+			return EventCategoryMask.SPATIAL_AUDIO
+		"SYSTEM_TELEMETRY":
+			return EventCategoryMask.SYSTEM_TELEMETRY
+		_:
+			return EventCategoryMask.NARRATIVE_TEXT
+
+func _register_static_channel_entry(
+	channel_id: int,
+	registry_code: String,
+	channel_name: String,
+	category_mask_value: int,
+	is_narrative: bool
+) -> void:
+	if channel_id <= 0:
+		return
+	if not registry_code.is_empty():
+		_channel_name_to_id[registry_code] = channel_id
+		_channel_name_to_id[registry_code.to_lower()] = channel_id
+	if not channel_name.is_empty():
+		_channel_name_to_id[channel_name] = channel_id
+		_channel_name_to_id[channel_name.to_lower()] = channel_id
+	_id_to_channel_name[channel_id] = channel_name if not channel_name.is_empty() else registry_code
+	_id_to_category_mask[channel_id] = category_mask_value
+	_id_to_is_narrative[channel_id] = is_narrative
+
 ## 确保频道配置与整型信道映射表加载对齐
 func _ensure_channel_registry_loaded() -> void:
 	var current_version: int = GameConfig.config_reload_version()
@@ -64,11 +105,13 @@ func _ensure_channel_registry_loaded() -> void:
 		return
 	_channel_name_to_id.clear()
 	_id_to_channel_name.clear()
-	_channel_name_to_id["world_state.snapshot_published"] = EventChannelDefinition.HUD_STATUS_SNAPSHOT
-	_channel_name_to_id["world_state.stat_mutated"] = EventChannelDefinition.HUD_STAT_MUTATED
-	_channel_name_to_id["world_state.wallet_mutated"] = EventChannelDefinition.HUD_WALLET_MUTATED
-	_channel_name_to_id["account.registered"] = EventChannelDefinition.AUTH_REGISTERED
-	_channel_name_to_id["account.login_succeeded"] = EventChannelDefinition.AUTH_LOGIN_SUCCEEDED
+	_id_to_category_mask.clear()
+	_id_to_is_narrative.clear()
+	_register_static_channel_entry(EventChannelDefinition.HUD_STATUS_SNAPSHOT, "", "world_state.snapshot_published", EventCategoryMask.CORE_STATE, true)
+	_register_static_channel_entry(EventChannelDefinition.HUD_STAT_MUTATED, "", "world_state.stat_mutated", EventCategoryMask.CORE_STATE, true)
+	_register_static_channel_entry(EventChannelDefinition.HUD_WALLET_MUTATED, "", "world_state.wallet_mutated", EventCategoryMask.CORE_STATE, true)
+	_register_static_channel_entry(EventChannelDefinition.AUTH_REGISTERED, "", "account.registered", EventCategoryMask.CORE_STATE, true)
+	_register_static_channel_entry(EventChannelDefinition.AUTH_LOGIN_SUCCEEDED, "", "account.login_succeeded", EventCategoryMask.CORE_STATE, true)
 
 	var channel_registry: Array = GameConfig.get_array("infrastructure.event_bus_config", "channel_registry", [])
 	for raw_entry in channel_registry:
@@ -78,30 +121,45 @@ func _ensure_channel_registry_loaded() -> void:
 		var channel_id: int = int(entry.get("id", 0))
 		var registry_code: String = str(entry.get("name", ""))
 		var channel_name: String = str(entry.get("channel_name", ""))
-		if channel_id <= 0:
-			continue
-		if not registry_code.is_empty():
-			_channel_name_to_id[registry_code] = channel_id
-			_channel_name_to_id[registry_code.to_lower()] = channel_id
-		if not channel_name.is_empty():
-			_channel_name_to_id[channel_name] = channel_id
-			_channel_name_to_id[channel_name.to_lower()] = channel_id
-		_id_to_channel_name[channel_id] = channel_name if not channel_name.is_empty() else registry_code
+		var category_mask_value: int = _category_name_to_mask(str(entry.get("category", "NARRATIVE_TEXT")))
+		var is_narrative: bool = bool(entry.get("narrative", true))
+		_register_static_channel_entry(channel_id, registry_code, channel_name, category_mask_value, is_narrative)
+	for dynamic_channel_name in _dynamic_name_to_id.keys():
+		var dynamic_channel_id: int = int(_dynamic_name_to_id[dynamic_channel_name])
+		if not _id_to_channel_name.has(dynamic_channel_id):
+			_id_to_channel_name[dynamic_channel_id] = str(dynamic_channel_name)
 	_channel_cache_version = current_version
 
-## 将信道名称或整型常量解析为标准整型信道常量
+## 将信道名称或整型常量解析为标准整型信道常量（未静态登记的命名频道自动分配专属动态整型信道，不坍缩入通用信道）
 func resolve_channel_id(channel_descriptor: Variant) -> int:
 	if channel_descriptor is int:
 		return int(channel_descriptor)
 	if channel_descriptor is String:
-		var channel_name: String = channel_descriptor as String
+		var raw_name: String = channel_descriptor
+		if raw_name.is_empty():
+			return EventChannelDefinition.DOMAIN_EVENT_GENERIC
 		_ensure_channel_registry_loaded()
+		if _channel_name_to_id.has(raw_name):
+			return int(_channel_name_to_id[raw_name])
+		if _dynamic_name_to_id.has(raw_name):
+			return int(_dynamic_name_to_id[raw_name])
+		var channel_name: String = raw_name.strip_edges()
+		if channel_name.is_empty():
+			return EventChannelDefinition.DOMAIN_EVENT_GENERIC
 		if _channel_name_to_id.has(channel_name):
 			return int(_channel_name_to_id[channel_name])
 		var channel_name_lower: String = channel_name.to_lower()
 		if _channel_name_to_id.has(channel_name_lower):
 			return int(_channel_name_to_id[channel_name_lower])
-		return EventChannelDefinition.DOMAIN_EVENT_GENERIC
+		if _dynamic_name_to_id.has(channel_name_lower):
+			return int(_dynamic_name_to_id[channel_name_lower])
+		_next_dynamic_channel_id += 1
+		while _id_to_channel_name.has(_next_dynamic_channel_id):
+			_next_dynamic_channel_id += 1
+		var allocated_id: int = _next_dynamic_channel_id
+		_dynamic_name_to_id[channel_name_lower] = allocated_id
+		_id_to_channel_name[allocated_id] = channel_name
+		return allocated_id
 	return EventChannelDefinition.DOMAIN_EVENT_GENERIC
 
 ## 根据整型信道常量反查配置表规范信道名
@@ -127,7 +185,11 @@ func initialize_from_config() -> void:
 func clear_for_tests() -> void:
 	_channel_routes.clear()
 	_channel_name_to_id.clear()
+	_dynamic_name_to_id.clear()
 	_id_to_channel_name.clear()
+	_id_to_category_mask.clear()
+	_id_to_is_narrative.clear()
+	_next_dynamic_channel_id = DYNAMIC_CHANNEL_ID_BASE
 	_channel_cache_version = -1
 	if _spatial_grid != null:
 		_spatial_grid.clear()
@@ -284,8 +346,8 @@ func dispatch_now(packet: EventPacket) -> void:
 	_collect_channel_subscribers(packet.channel_id, packet, seen, targets)
 	if packet.channel_id != 0:
 		_collect_channel_subscribers(0, packet, seen, targets)
-	if packet.channel_id != EventChannelDefinition.DOMAIN_EVENT_GENERIC:
-		if (packet.category_mask & EventCategoryMask.NARRATIVE_TEXT) != 0 or not packet.narrative_key.is_empty():
+	if packet.channel_id != EventChannelDefinition.DOMAIN_EVENT_GENERIC and _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC):
+		if packet.is_domain_event or (packet.category_mask & EventCategoryMask.NARRATIVE_TEXT) != 0 or not packet.narrative_key.is_empty():
 			_collect_channel_subscribers(EventChannelDefinition.DOMAIN_EVENT_GENERIC, packet, seen, targets)
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7）
@@ -392,9 +454,9 @@ static var _category_cache_version: int = -1
 func has_channel_listeners(channel_id: int) -> bool:
 	return _channel_routes.has(channel_id) or _channel_routes.has(0)
 
-## 判断叙事文本信道（含通配与泛化领域广播）是否存在活跃监听器
+## 判断叙事文本信道（含通配信道 0）是否存在活跃监听器
 func has_narrative_listeners() -> bool:
-	return _channel_routes.has(EventChannelDefinition.NARRATIVE_EVENT_TEXT) or _channel_routes.has(0) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
+	return _channel_routes.has(EventChannelDefinition.NARRATIVE_EVENT_TEXT) or _channel_routes.has(0)
 
 ## 测试专用重置：清零记录序号并清空叙事表缓存（避免跨用例状态残留）
 static func reset_sequence_for_test() -> void:
@@ -472,6 +534,7 @@ static func resolve_narrative_table(domain_id: String) -> String:
 	var current_version := GameConfig.config_reload_version()
 	if _narrative_cache_version != current_version:
 		_narrative_table_cache.clear()
+		_domain_event_key_cache.clear()
 		var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
 		for entry in all_entries:
 			if not entry is Dictionary:
@@ -489,13 +552,25 @@ static func resolve_narrative_table(domain_id: String) -> String:
 
 ## 解析泛化领域事件的文案（键形 "<domain_id>.<event_name>"，多段事件名完整保留）
 static func render_domain_event_text(channel: String, payload: Dictionary = {}) -> String:
-	var parts := channel.split(".")
-	if parts.size() >= 2:
-		var domain := parts[0]
-		var full_event_name := String(".").join(parts.slice(1, parts.size()))
-		if domain.is_empty() or full_event_name.is_empty():
-			return String(payload.get("text", ""))
-		var template := GameConfig.get_string(resolve_narrative_table(domain), full_event_name, "")
+	var table_and_event: Array = []
+	var current_version := GameConfig.config_reload_version()
+	if _narrative_cache_version == current_version and _domain_event_key_cache.has(channel):
+		table_and_event = _domain_event_key_cache[channel]
+	else:
+		var dot_index := channel.find(".")
+		if dot_index > 0 and dot_index + 1 < channel.length():
+			var domain := channel.substr(0, dot_index)
+			var full_event_name := channel.substr(dot_index + 1)
+			table_and_event = [resolve_narrative_table(domain), full_event_name]
+		else:
+			table_and_event = ["", ""]
+		if _domain_event_key_cache.size() >= MAX_DOMAIN_EVENT_KEY_CACHE:
+			_domain_event_key_cache.clear()
+		_domain_event_key_cache[channel] = table_and_event
+	var table_name: String = String(table_and_event[0])
+	var event_name: String = String(table_and_event[1])
+	if not table_name.is_empty() and not event_name.is_empty():
+		var template := GameConfig.get_string(table_name, event_name, "")
 		if not template.is_empty():
 			var narrative_arguments: Variant = payload.get("args", [])
 			return _format_template_safely(template, narrative_arguments)
@@ -518,22 +593,25 @@ func emit_narrative_by_key(template_key: String, category_key: String, format_ar
 		return
 	emit_narrative(render_narrative(template_key, format_arguments), category_key, metadata)
 
-## 广播泛化领域事件：配置驱动信道对齐；结构化 payload 经对应信道派发；
-## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
+## 广播泛化领域事件：配置驱动信道对齐；按注册表分类掩码直投对应信道，并跳过非叙事事件的文案查表
 func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
+	if _channel_routes.is_empty():
+		return
 	var resolved_channel_id: int = resolve_channel_id(channel)
 	var has_domain_listeners: bool = has_channel_listeners(resolved_channel_id) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
-	var has_text_listeners: bool = has_narrative_listeners()
+	var is_narrative_channel: bool = bool(_id_to_is_narrative.get(resolved_channel_id, true))
+	var has_text_listeners: bool = is_narrative_channel and has_narrative_listeners()
 	if not has_domain_listeners and not has_text_listeners:
 		return
 	if has_domain_listeners:
-		var packet := borrow_packet(resolved_channel_id, EventCategoryMask.NARRATIVE_TEXT, payload)
+		var category_mask_value: int = int(_id_to_category_mask.get(resolved_channel_id, EventCategoryMask.NARRATIVE_TEXT))
+		var packet := borrow_packet(resolved_channel_id, category_mask_value, payload)
+		packet.is_domain_event = true
 		var packet_payload: Dictionary
 		if payload.has("channel") and payload.has("payload"):
 			packet_payload = payload
 		else:
 			packet_payload = {"channel": channel, "payload": payload}
-			packet_payload.merge(payload)
 		packet.payload_data = packet_payload
 		packet.narrative_key = channel
 		dispatch_now(packet)

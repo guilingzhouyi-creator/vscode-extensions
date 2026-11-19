@@ -2,7 +2,7 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/event_pool.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus_config.json | 信号: 全域领域事件中心分发
 # 职责说明: 事件包高频复用对象池，严格遵循 ADV-POOL-001 规范。 提供 borrow/recycle/get_free_count/get_borrowed_count 核心 API， 通过 is_borrowed 状态位防止双重归还，保障借还守恒与零热路径堆分配。
 # 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================

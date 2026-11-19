@@ -2,7 +2,7 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/headless_presentation_mock_adapter.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus_config.json | 信号: 全域领域事件中心分发
 # 职责说明: 无头环境表现层打桩适配器：在单测与 CLI 模式下捕获并断言表现层派发的视觉事件，替代实际渲染树完成端到端自动化测试验证。
 # 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================

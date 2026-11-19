@@ -2,7 +2,7 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/event_packet.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus_config.json | 信号: 全域领域事件中心分发
 # 职责说明: 紧凑型强类型事件数据载体。原生承载 2D/3D 空间标头、多态业务载荷与池化生命周期 （遵循 ADV-POOL-001 规范，零循环内堆分配），彻底告别裸 Dictionary 历史包袱。
 # 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
@@ -17,6 +17,7 @@ var channel_id: int = 0 # EventChannelDefinition 整型信道常量
 var category_mask: int = 0 # EventCategoryMask 位掩码
 var timestamp_tick: int = 0
 var source_entity_id: String = ""
+var is_domain_event: bool = false # 标记经 emit_domain_event 发出的领域信封，供通用监听者按需旁路捕获
 
 # ---- 二、2D/3D 空间几何标头 ----
 var is_spatial: bool = false
@@ -41,6 +42,7 @@ func reset_state() -> void:
 	category_mask = 0
 	timestamp_tick = 0
 	source_entity_id = ""
+	is_domain_event = false
 	is_spatial = false
 	world_position = Vector3.ZERO
 	effect_radius = 0.0
