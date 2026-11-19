@@ -4,15 +4,37 @@
 # 文件路径: scripts/sh/pre-commit-gate.sh
 # 架构定位: 本地 Git 提交前置物理卫生与质量安全门禁 (Linux Bash)
 # 依赖与触发: 触发方: .githooks/pre-commit / 本地 CLI 手动触发 | 上游: git commit | 下游: 提交暂存区 | 运行时: Bash 4+
-# 职责说明: 执行提交前物理卫生与质量安全检查（挂载 gate-fast-staged.js 极速流式验证 Gates 1-6、规则漂移熔断、精准增量编译、AST 局部切片，支持 Agent-Native 结构化输出）
+# 职责说明: 执行提交前物理卫生与质量安全检查（挂载 gate-fast-staged.js 极速流式验证、规则漂移熔断、精准增量编译、AST 局部切片，支持 Agent/JSON 结构化输出）
 # 退出语义与设计依据: 退出码: 0=通过门禁, 1=存在卫生或质量违规阻断 | 设计依据: AGENTS.md 跨项目全局通用契约
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   bash scripts/sh/pre-commit-gate.sh
 #   bash scripts/sh/pre-commit-gate.sh --agent
-#   bash scripts/sh/pre-commit-gate.sh --view-log
+#   bash scripts/sh/pre-commit-gate.sh --json
+#   bash scripts/sh/pre-commit-gate.sh --help
 # ==============================================================================
 set -euo pipefail
+
+AGENT_MODE=0
+FAST_MODE=0
+VIEW_LOG=0
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h|-Help)
+            echo "用法: bash scripts/sh/pre-commit-gate.sh [--agent] [--json] [--fast] [--view-log] [--help]"
+            echo "选项:"
+            echo "  --agent, -a, -Agent      以 Agent-Native JSON 信封格式输出校验结果"
+            echo "  --json, -j, -Json        以 JSON 格式输出校验结果 (与 --agent 等价)"
+            echo "  --fast, -f, -Fast        快速模式标记"
+            echo "  --view-log, -v, -ViewLog 查看最近一次失败日志"
+            echo "  --help, -h, -Help        显示此帮助信息"
+            exit 0
+            ;;
+        --view-log|-v|-ViewLog) VIEW_LOG=1 ;;
+        --agent|-a|-Agent|--json|-j|-Json) AGENT_MODE=1 ;;
+        --fast|-f|-Fast) FAST_MODE=1 ;;
+    esac
+done
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT_DIR" || exit 1
@@ -31,41 +53,28 @@ if [[ -z "$NODE_BIN" ]]; then
     exit 1
 fi
 
+if [[ "$VIEW_LOG" -eq 1 ]]; then
+    exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
+fi
+
 if [[ -z "$NPM_BIN" ]]; then
     echo "✖ BLOCK  未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" >&2
     echo "   修复: 随 Node.js 一并安装 npm，并确保 'npm' 在 PATH 中。" >&2
     exit 1
 fi
 
-AGENT_MODE=0
-FAST_MODE=0
-for arg in "$@"; do
-    case "$arg" in
-        --view-log|-v)
-            exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
-            ;;
-        --agent|-a|--json)
-            AGENT_MODE=1
-            ;;
-        --fast|-f|-Fast)
-            FAST_MODE=1
-            ;;
-    esac
-done
-
 STEP_LOG=$(mktemp)
 STREAM_OUT=""
 trap 'rm -f "$STEP_LOG" ${STREAM_OUT:+"$STREAM_OUT"}' EXIT
 
 RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
-
 GATE_SUPPRESS="$AGENT_MODE"
 gate_init pre-commit
 
-# 兼容既有调用点：门禁正文统一使用 log_gate 作为抑制式输出别名。
 log_gate() {
     gate_log "$@"
 }
+
 record_pre_commit_failure() {
     local step_name="$1"
     local rule_id="$2"
@@ -79,9 +88,10 @@ record_pre_commit_failure() {
     fi
 
     # 步骤身份只来自单源登记表：未登记标识直接阻断，绝不回落到合成标识。
-    local step_meta step_id
+    local step_meta step_id step_title
     step_meta=$(get_step_meta "$step_name") || exit 1
     step_id=$(cut -f2 <<< "$step_meta")
+    step_title=$(cut -f4 <<< "$step_meta")
 
     local diag_dir="$ROOT_DIR/.audit-logs"
     mkdir -p "$diag_dir" 2>/dev/null || true
@@ -90,7 +100,7 @@ record_pre_commit_failure() {
         echo "================================================================="
         echo "❌ Pre-Commit 门禁拦截现场快照"
         echo "时间: $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')"
-        echo "步骤: $step_name ($rule_id)"
+        echo "步骤: $step_id ($rule_id)"
         echo "说明: $summary"
         if [[ -n "$details" ]]; then
             echo "-----------------------------------------------------------------"
@@ -99,40 +109,52 @@ record_pre_commit_failure() {
         echo "================================================================="
     } > "$fail_log" 2>/dev/null || true
 
-    local snapshot_json="$diag_dir/last-failure.json"
-    "$NODE_BIN" -e '
-const fs = require("fs");
-const [dest, runId, step, stepId, ruleId, summary, actionableFix, verifyCmd, targetFile] = process.argv.slice(1);
-const violation = {
-  ruleId,
-  severity: "BLOCK",
-  message: summary,
-  actionableFix,
-  verificationCommand: verifyCmd,
-};
-if (targetFile) violation.file = targetFile;
-const envelope = {
-  protocolVersion: "1.0.0",
-  runId,
-  recordedAt: new Date().toISOString(),
-  status: "BLOCK",
-  gate: "pre-commit",
-  step,
-  stepId,
-  failedCommand: verifyCmd,
-  exitCode: 1,
-  summary,
-  logFile: ".audit-logs/last-pre-commit.log",
-  violations: [violation],
-  agentDirectives: {
-    targetFiles: targetFile ? [targetFile] : [],
-    remediationPriority: [ruleId],
-    verificationCommand: verifyCmd,
-    fastRecheckCommand: "bash scripts/sh/pre-commit-gate.sh --agent",
-  },
-};
-fs.writeFileSync(dest, JSON.stringify(envelope, null, 2) + "\n", "utf8");
-' "$snapshot_json" "$RUN_ID" "$step_name" "$step_id" "$rule_id" "$summary" "$actionable_fix" "$verify_cmd" "$target_file" 2>/dev/null || true
+    local -a env_args=(
+        --gate pre-commit --step-id "$step_id" --step-title "$step_title" --rule-id "$rule_id"
+        --exit-code 1 --run-id "$RUN_ID" --command "$verify_cmd" --summary "$summary"
+        --actionable-fix "$actionable_fix" --verify-cmd "$verify_cmd"
+        --fast-recheck "bash scripts/sh/pre-commit-gate.sh --agent"
+        --log-file ".audit-logs/last-pre-commit.log"
+    )
+    [[ -n "$target_file" ]] && env_args+=(--target-file "$target_file")
+    gate_write_failure_envelope "${env_args[@]}" >/dev/null 2>&1 || true
+}
+
+fail_pre_commit_step() {
+    local step_id="$1" rule_id="$2" summary="$3" actionable_fix="$4" verify_cmd="$5" target_file="${6:-}"
+    if [[ "$AGENT_MODE" -eq 1 ]]; then
+        record_pre_commit_failure "$step_id" "$rule_id" "$summary" "$actionable_fix" "$verify_cmd" "$target_file"
+        cat "$ROOT_DIR/.audit-logs/last-failure.json"
+        exit 1
+    fi
+    tail -n 15 "$STEP_LOG" 2>/dev/null | sed 's/^/   /' || true
+    FAILED=1
+    return 1
+}
+
+run_pre_commit_check() {
+    local step_id="$1" rule_id="$2" work_dir="$3" summary="$4" actionable_fix="$5" verify_cmd="$6" target_file="$7"
+    shift 7
+    if (cd "$work_dir" && "$@") >"$STEP_LOG" 2>&1; then
+        return 0
+    fi
+    fail_pre_commit_step "$step_id" "$rule_id" "$summary" "$actionable_fix" "$verify_cmd" "$target_file"
+}
+
+report_streaming_step() {
+    local step_id="$1" rule_id="$2" status="$3" summary="$4" detail="$5" target_file="$6"
+    if [[ "$status" == "PASS" ]]; then
+        return 0
+    fi
+    if [[ "$AGENT_MODE" -eq 1 ]]; then
+        record_pre_commit_failure "$step_id" "$rule_id" "${summary:-${step_id} 审查未通过或未产出数据 (Fail-Closed)}" \
+            "${detail:-Run node scripts/common/gate-differential-bounds.js --stream}" \
+            "bash scripts/sh/pre-commit-gate.sh --fast" "$target_file" "$detail"
+        cat "$ROOT_DIR/.audit-logs/last-failure.json"
+        exit 1
+    fi
+    FAILED=1
+    return 1
 }
 
 # 根目录物理防污染与散落脚本前置雷达
@@ -154,23 +176,16 @@ if [[ -n "$ROOT_CLUTTER" ]]; then
         ACTIONABLE_FIX="Delete root temporary file '$BAD_NAME' or run 'node scripts/common/validate-physical-hygiene.js --fix'."
     fi
     if [[ "$AGENT_MODE" -eq 1 ]]; then
-        record_pre_commit_failure "STAGED-HYGIENE-01" \
-            "$RULE_ID" \
-            "$SUMMARY" \
-            "$ACTIONABLE_FIX" \
-            "node scripts/common/validate-physical-hygiene.js" \
-            "$BAD_NAME"
+        record_pre_commit_failure "STAGED-HYGIENE-01" "$RULE_ID" "$SUMMARY" "$ACTIONABLE_FIX" "node scripts/common/validate-physical-hygiene.js" "$BAD_NAME"
         cat "$ROOT_DIR/.audit-logs/last-failure.json"
         exit 1
-    else
-        write_step_verdict "STAGED-HYGIENE-01" BLOCK "根目录存在散落脚本或未受控临时脏文件: $BAD_NAME"
-        echo "   $ACTIONABLE_FIX"
-        exit 1
     fi
+    write_step_verdict "STAGED-HYGIENE-01" BLOCK "根目录存在散落脚本或未受控临时脏文件: $BAD_NAME"
+    echo "   $ACTIONABLE_FIX"
+    exit 1
 fi
 
-# 获取当前暂存区中的文件列表（新增、修改、重命名）
-# 暂存区不可读时不得回落为空列表：那会让"git 失败"与"暂存区为空"变成同一个 PASS。
+# 获取当前暂存区中的文件列表；不可读时 fail-closed，不得回落为空列表。
 STAGED_STATUS=0
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null) || STAGED_STATUS=$?
 if [[ "${STAGED_STATUS}" -ne 0 ]]; then
@@ -196,27 +211,21 @@ if [[ "$AGENT_MODE" -eq 0 ]]; then
 fi
 
 FAILED=0
-
-if [[ "$AGENT_MODE" -eq 1 ]]; then
-    rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
-fi
+[[ "$AGENT_MODE" -eq 1 ]] && rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
 
 # --- 暂存区流式物理卫生与安全审查 ---
+write_step_banner "STAGED-HYGIENE-01"
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if ! "$NODE_BIN" scripts/common/gate-fast-staged.js --agent >/dev/null 2>&1; then
-        if [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-        fi
+        [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]] && cat "$ROOT_DIR/.audit-logs/last-failure.json"
         exit 1
     fi
+    write_step_verdict "STAGED-HYGIENE-01" PASS "暂存区物理卫生与安全审查通过"
+elif ! "$NODE_BIN" scripts/common/gate-fast-staged.js; then
+    write_step_verdict "STAGED-HYGIENE-01" BLOCK "暂存区物理卫生与安全审查未通过"
+    FAILED=1
 else
-    write_step_banner "STAGED-HYGIENE-01"
-    if ! "$NODE_BIN" scripts/common/gate-fast-staged.js; then
-        write_step_verdict "STAGED-HYGIENE-01" BLOCK "暂存区物理卫生与安全审查未通过"
-        FAILED=1
-    else
-        write_step_verdict "STAGED-HYGIENE-01" PASS "暂存区物理卫生与安全审查通过"
-    fi
+    write_step_verdict "STAGED-HYGIENE-01" PASS "暂存区物理卫生与安全审查通过"
 fi
 
 # --- 单源规则漂移熔断 ---
